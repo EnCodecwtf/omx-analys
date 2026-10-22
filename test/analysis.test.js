@@ -192,3 +192,16 @@ test('Signalloggen följer utfallet med samma regler som backtestet', async () =
   assert.equal(o.state, 'öppen');
   assert.equal(outcome({ ...e, date: day(9) }, bars).state, 'väntar på köp');
 });
+
+test('Krigsspik eller akut oro ger halv position', async () => {
+  const { applyGuards } = await import('../lib/analyze.js');
+  const { gprLevel } = await import('../lib/stress.js');
+  const ev = applyGuards({ status: 'buy', warnings: [] }, { macro: { score: 1, size: 1 }, stress: { stressed: true, size: 0.5 } });
+  assert.equal(ev.status, 'strong');
+  assert.equal(ev.guards.size, 0.5);
+  const series = {};
+  for (let i = 0; i < 400; i++) series[new Date(Date.UTC(2025, 0, 1) + i * 864e5).toISOString().slice(0, 10)] = { gpr: 100, ma7: 100 };
+  series['2026-02-05'] = { gpr: 200, ma7: 130 };
+  const g = gprLevel(series, '2026-02-05');
+  assert.ok(Math.abs(g.rel - 1.3) < 1e-9);
+});

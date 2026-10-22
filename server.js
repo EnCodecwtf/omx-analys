@@ -7,6 +7,8 @@ import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyz
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
+import { stressNow } from './lib/stress.js';
+import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend } from './lib/avanza.js';
 
@@ -53,10 +55,15 @@ async function macro() {
   });
 }
 
+async function stress() {
+  return cached('stress', stressNow);
+}
+
 async function guards(s) {
   const macroAt = await macro();
+  const st = await stress();
   const report = s.isIndex ? null : await nextReport(s.symbol);
-  return { report, reportDays: report ? tradingDaysBetween(today(), report.date) : null, macro: macroAt(today()) };
+  return { report, reportDays: report ? tradingDaysBetween(today(), report.date) : null, macro: macroAt(today()), stress: st };
 }
 
 // Samma regler i backtestet som i appen: rapportspärr och makrofilter.
@@ -105,7 +112,7 @@ async function scan() {
         tps: r.plan.tps.map(x => x.price), loggedAt: new Date().toISOString(),
       })));
     }
-    return { updated: Date.now(), macro: (await macro())(today()), rows };
+    return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), rows };
   });
 }
 
@@ -188,6 +195,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await scan());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
+    if (url.pathname === '/api/news') {
+      const meta = bySymbol.get(url.searchParams.get('symbol'));
+      if (meta && !meta.isIndex) return send(res, 200, { items: await news(meta.newsQuery || companyQuery(meta.name)) });
+      const [market, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }), news(GEO_QUERY, { limit: 30 })]);
+      const perSource = {};
+      const geoItems = geo.filter(n => n.tags.includes('Geopolitik') && (perSource[n.source] = (perSource[n.source] || 0) + 1) <= 2);
+      return send(res, 200, { market, geo: geoItems.slice(0, 8) });
+    }
     if (url.pathname === '/api/log') return send(res, 200, await logView());
     if (url.pathname === '/api/macro') return send(res, 200, (await macro())(today()));
     if (url.pathname === '/api/products') {

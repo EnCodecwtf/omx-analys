@@ -63,6 +63,13 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 .sizing #risk { width: 70px; }
 .sizing .muted { font-size: 12px; flex-basis: 100%; }
 .log { margin-top: 10px; font-size: 12px; }
+.log h4 { margin: 8px 0 4px; font-size: 12px; color: var(--text); }
+ul.news { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.news li { line-height: 1.35; }
+ul.news a { color: var(--text); text-decoration: none; display: block; }
+ul.news a:hover { color: var(--blue); }
+ul.news .muted { font-size: 11px; }
+.tag.geo { background: var(--red-soft); color: var(--red); }
 .log summary { cursor: pointer; color: var(--text); font-weight: 600; }
 .log table { margin-top: 6px; font-size: 12px; }
 .log tr[data-symbol] { cursor: pointer; }

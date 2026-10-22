@@ -68,6 +68,40 @@ Bara makropoäng 1 eller mer ger köpsignal:
 
 Strategin fungerar bäst när marknaden är rädd. Översålda storbolag studsar då kraftigast.
 
+### Krig och oro (positionsstorlek)
+Två mått sätter positionen till hälften när de slår till:
+
+- **Krigsspik:** geopolitiskt riskindex (GPR, Caldara och Iacoviello, matteoiacoviello.com/gpr.htm) som 7-dagarssnitt minst 15 % över
+  medianen för senaste året. GPR räknar artiklar om krig, terror och hot i stora tidningar varje dag.
+- **Akut oro:** VIX9D/VIX minst 1,04. Marknaden väntar sig då mer turbulens de närmaste dagarna än den närmaste månaden.
+
+Båda gav sämre studsar i båda perioderna (starka signaler, OMXS30):
+
+| Mått | Gynnsamt läge | Ogynnsamt läge |
+|---|---|---|
+| GPR mot normalt | Lugnt: +0,54 R (2017–21 +0,43, 2022–26 +0,68) | Spik: +0,21 R (+0,06 / +0,26) |
+| VIX9D/VIX | Oron avtar: +0,49 R (+0,44 / +0,51) | Oron stiger akut: +0,22 R (+0,30 / +0,11) |
+
+Ingen konsekvent effekt hade obligationsoro (MOVE), kreditspread (HYG/LQD), oljepriset, VIX-kurvans lutning, GPR:s delindex för
+faktiska händelser och hot, samt dollarn när den stiger.
+
+Kontot 2017–2026 med halv position vid krigsspik eller akut oro:
+
+| Grundrisk | Per år 2017–2021 | Per år 2022–2026 | Per år, hela perioden | Största nedgång |
+|---|---|---|---|---|
+| 4 %, ingen justering | +18 % | +57 % | +36 % | −40 % |
+| 4 % | +17 % | +48 % | +31 % | −24 % |
+| 6 % | +23 % | +73 % | +46 % | −35 % |
+| 7 % | +25 % | +86 % | +52 % | −40 % |
+
+**Förväntningar och utfall:** Historiska konsensusprognoser för makrosiffror är betaldata. Marknadens förväntningar fångas i stället
+via VIX, VIX9D och räntebesked i makropoängen.
+
+### Nyheter
+Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
+Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
+testa dem mot. För bolag med tvetydiga namn finns en egen sökfråga i `symbols.json` (`newsQuery`).
+
 ### Bear (säljsignaler)
 Två typer av bear-strategier testades på OMXS30-aktier och index 2022–2026. Båda gick med förlust varje år och ingår därför
 inte i signalerna:
@@ -243,6 +277,8 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/events.js`: rapportdatum (Yahoo Finance) och räntebesked
 - `lib/macro.js`: marknadsläge (OMXS30-trend, bredd, VIX, FOMC)
 - `lib/log.js`: signallogg för framåttest
+- `lib/stress.js`: krigsrisk (GPR, läser Stata-fil) och akut oro (VIX9D/VIX)
+- `lib/news.js`: nyhetsrubriker från Google Nyheter
 - `data/`: historiska rapportdatum och FOMC-kalender
-- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`) och statiska filer
+- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

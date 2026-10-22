@@ -55,7 +55,7 @@ async function loadScan(refresh) {
     scanData = await res.json();
     $('#updated').textContent = 'Analys ' + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     renderScan();
-    renderMacro(scanData.macro);
+    renderMacro(scanData.macro, scanData.stress);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
     if (pick) openSymbol(pick.symbol, { keepView: !fromHash && !refresh, refresh });
@@ -126,6 +126,7 @@ function renderDetail(d) {
     <dl class="kv" style="margin-top:10px">
       ${A.guards?.report ? `<dt>Nästa rapport</dt><dd>${esc(A.guards.report.date)} <span class="muted">(om ${A.guards.report.days} handelsdagar, ${esc(A.guards.report.source)})</span></dd>` : ''}
       ${A.guards?.macro ? `<dt>Makro</dt><dd>${esc(A.guards.macro.label)} <span class="muted">(poäng ${A.guards.macro.score})</span></dd>` : ''}
+      ${A.guards?.stress ? `<dt>Krig och oro</dt><dd>${A.guards.stress.stressed ? 'Förhöjd – halv position' : 'Normal'}</dd>` : ''}
     </dl>`;
 
   // Handelsplan
@@ -142,6 +143,7 @@ function renderDetail(d) {
     Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
 
   loadProducts(d.symbol, A.status);
+  loadCompanyNews(d.symbol, d.name);
 
   // Elliott
   const ew = A.elliott.primary, maj = A.elliottMajor.primary;
@@ -236,11 +238,43 @@ async function loadProducts(symbol, status) {
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
-function renderMacro(m) {
+function renderMacro(m, st) {
   if (!m) return;
+  const stressLine = st ? `<div style="margin-top:6px">Krig och oro: <b class="${st.stressed ? 'neg' : 'pos'}">${st.stressed ? 'Förhöjd – halv position' : 'Normal – hel position'}</b></div>
+    <ul>${st.parts.map(p => `<li class="${p.bad ? 'bad' : ''}">${esc(p.text)}</li>`).join('')}</ul>` : '';
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
-    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>`;
+    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>${stressLine}`;
+}
+
+const newsList = items => items.length
+  ? `<ul class="news">${items.map(n => `<li><a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.title)}</a>
+      <span class="muted">${esc(n.source)} · ${new Date(n.date).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+      ${n.tags.map(t => `<span class="tag ${t === 'Geopolitik' ? 'geo' : ''}">${esc(t)}</span>`).join('')}</li>`).join('')}</ul>`
+  : '<p class="muted">Inga rubriker hittades.</p>';
+
+async function loadMarketNews() {
+  try {
+    const d = await (await fetch('/api/news')).json();
+    $('#news-body').innerHTML = `<h4>Börsen</h4>${newsList(d.market)}<h4>Krig och geopolitik</h4>${newsList(d.geo)}
+      <p class="muted">Rubrikerna visas som information och påverkar inte signalerna. Krigsrisken vägs in via GPR-indexet ovan.</p>`;
+  } catch {
+    $('#news-body').textContent = 'Kunde inte hämta nyheter.';
+  }
+}
+
+async function loadCompanyNews(symbol, name) {
+  const el = $('#c-news');
+  if (symbol.startsWith('^')) { el.innerHTML = '<h3>Nyheter</h3><p class="muted">Se börsnyheterna under listan.</p>'; return; }
+  el.innerHTML = `<h3>Nyheter om ${esc(name)}</h3><p class="muted">Hämtar…</p>`;
+  try {
+    const d = await (await fetch('/api/news?symbol=' + encodeURIComponent(symbol))).json();
+    if (current !== symbol) return;
+    el.innerHTML = `<h3>Nyheter om ${esc(name)}</h3>${newsList(d.items.slice(0, 8))}
+      <p class="muted" style="font-size:12px">Från Google Nyheter. Påverkar inte signalen, men läs rubrikerna innan du köper – en vinstvarning eller ett bud ändrar läget.</p>`;
+  } catch {
+    el.innerHTML = '<h3>Nyheter</h3><p class="muted">Kunde inte hämta nyheter.</p>';
+  }
 }
 
 async function loadLog() {
@@ -282,3 +316,4 @@ async function loadSummary() {
 loadScan(false);
 loadSummary();
 loadLog();
+loadMarketNews();

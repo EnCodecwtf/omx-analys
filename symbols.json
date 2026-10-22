@@ -16,13 +16,13 @@
     {"symbol": "HM-B.ST", "name": "H&M B", "avanzaId": "5364"},
     {"symbol": "HEXA-B.ST", "name": "Hexagon B", "avanzaId": "5286"},
     {"symbol": "INDU-C.ST", "name": "Industrivärden C", "avanzaId": "5245"},
-    {"symbol": "INVE-B.ST", "name": "Investor B", "avanzaId": "5247"},
+    {"symbol": "INVE-B.ST", "name": "Investor B", "avanzaId": "5247", "newsQuery": "\"Investor AB\" OR \"Investors substansvärde\""},
     {"symbol": "LIFCO-B.ST", "name": "Lifco B", "avanzaId": "520898"},
     {"symbol": "NIBE-B.ST", "name": "Nibe B", "avanzaId": "5325"},
     {"symbol": "NDA-SE.ST", "name": "Nordea", "avanzaId": "5249"},
     {"symbol": "SAAB-B.ST", "name": "Saab B", "avanzaId": "5401"},
     {"symbol": "SAND.ST", "name": "Sandvik", "avanzaId": "5471"},
-    {"symbol": "SCA-B.ST", "name": "SCA B", "avanzaId": "5263"},
+    {"symbol": "SCA-B.ST", "name": "SCA B", "avanzaId": "5263", "newsQuery": "\"SCA\" skog aktie"},
     {"symbol": "SEB-A.ST", "name": "SEB A", "avanzaId": "5255"},
     {"symbol": "SHB-A.ST", "name": "Handelsbanken A", "avanzaId": "5264"},
     {"symbol": "SKA-B.ST", "name": "Skanska B", "avanzaId": "5257"},
@@ -30,6 +30,6 @@
     {"symbol": "SWED-A.ST", "name": "Swedbank A", "avanzaId": "5241"},
     {"symbol": "TEL2-B.ST", "name": "Tele2 B", "avanzaId": "5386"},
     {"symbol": "TELIA.ST", "name": "Telia", "avanzaId": "5479"},
-    {"symbol": "VOLV-B.ST", "name": "Volvo B", "avanzaId": "5269"}
+    {"symbol": "VOLV-B.ST", "name": "Volvo B", "avanzaId": "5269", "newsQuery": "(\"AB Volvo\" OR Volvokoncernen OR Volvoaktien) -\"Volvo Cars\""}
   ]
 }
