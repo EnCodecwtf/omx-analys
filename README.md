@@ -342,6 +342,33 @@ också avkastningen 2017–2026, på grund av V-formade vändningar. Med 3x häv
 
 Avkastningen blir högre, men nedgångarna blir djupare (2018 och 2022). Nasdaq är vald i efterhand som den bästa marknaden.
 
+## Korta affärer (1–5 dagar)
+Strategin ovan håller affärer i median 16 dagar. Följande testades för affärer på 1–5 dagar, 2017–2026, med kostnader
+(0,1 % per köp och sälj samt 3 % finansiering per år) och med det faktiska indexinnehållet.
+
+**Swingsignalerna med kort hålltid** gav +0,05 R per affär vid max 2–3 dagar och +0,09 R vid max 5 dagar. Det räcker inte till
+kostnaderna, som är cirka 0,07 R.
+
+**Klassiska kortsiktiga strategier** (RSI(2), IBS, Double 7):
+
+| Marknad | 1x hävstång | 3x hävstång |
+|---|---|---|
+| OMXS30-index och DAX | −7 till −1 %/år | −14 till +1 %/år |
+| S&P 500 och Nasdaq 100 | −6 till +2 %/år | upp till +14 %/år (IBS på Nasdaq) |
+| OMXS30-aktier | −8 till 0 %/år, även med makrofilter | −29 till −11 %/år |
+
+**Maskininlärning** (ridge-regression och gradient boosting) med 38 egenskaper för varje aktie och dag: tekniska mått,
+OMXS30, bredd, VIX, VIX9D/VIX, S&P 500 och Nasdaq från dagen innan, dollarn, USD/SEK, krigsrisk (GPR), räntebesked,
+rapportdatum och kalender. Modellen tränades bara på åren före varje testår (2019–2026), och prognoserna gällde 1–3 dagar.
+
+| Test | Resultat |
+|---|---|
+| Aktier | Den översta tiondelen av prognoserna gav 0,2–0,3 % på 2–3 dagar, ungefär lika mycket som kostnaderna. Alla handelsvarianter blev minus eller runt noll |
+| OMXS30-index, lång och kort | Rätt riktning i 48–50 % av fallen, alltså ingen förmåga att förutse |
+
+**Slutsats:** Med fri data finns ingen fördel för 1–3-dagarsaffärer i svenska storbolag eller OMXS30 som klarar
+kostnaderna. Fördelen som finns tar 1–3 veckor att spela ut.
+
 ## Slutligt test av hela systemet
 Testet omfattar 10 000 kr, 2017-01-02 till 2026-10-22. Det använder alla regler: rapportspärr, makrofilter, de tre
 riskfaktorerna och 8 % grundrisk. Säkerheten för minifutures får aldrig överstiga tradingkontot.
