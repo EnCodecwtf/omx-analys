@@ -369,6 +369,18 @@ rapportdatum och kalender. Modellen tränades bara på åren före varje testår
 **Slutsats:** Med fri data finns ingen fördel för 1–3-dagarsaffärer i svenska storbolag eller OMXS30 som klarar
 kostnaderna. Fördelen som finns tar 1–3 veckor att spela ut.
 
+### Fyra parallella forskningsspår (1–5 dagar)
+Alla spår förregistrerade sina varianter, valde regler på 2017–2021 och testade oförändrat på 2022–2026, med kostnader.
+
+| Spår | Testade varianter | Resultat |
+|---|---|---|
+| Data inom dagen (timdata 2023–2026): öppningsintervall, gap, intradagsmomentum, natt/dag, USA-öppningen | ca 260 | Inget lönsamt i testperioden. Förutsägbara rörelser 0–0,05 % per affär mot 0,1–0,2 % i kostnad |
+| Index: natt/dag, ledning från USA, pre-FOMC, månadsskifte, helgdagar, optionslösen, VIX-panik | 46 | Inget handlingsbart. Pre-FOMC (köp dagen före Feds besked) är positivt i båda perioderna men bara ca +1 %/år. USA:s rörelse syns direkt i OMX-öppningen och sedan finns inget kvar |
+| Händelser i aktier: rapportgap, drift efter rapport, gap utan rapport, utdelning, fall på −5 %, indexändringar | 116 | Inget robust. Det som klarade urvalet var negativt i det nordiska testet. Drift efter rapport fungerade 2017–2021 men vände till förlust från 2022 |
+| Parhandel: A/B-aktier (16 par) och liknande bolag (18 par) | 960 | Ingen fördel efter kostnader. Den skenbara vinsten när köp räknas på signalens stängningskurs är ett mätfel orsakat av spreaden i illikvida A-aktier |
+
+Datavarning: Yahoos öppningskurser för ^OMX är felaktiga fram till februari 2020 (öppning ≈ gårdagens stängning).
+
 ## Slutligt test av hela systemet
 Testet omfattar 10 000 kr, 2017-01-02 till 2026-10-22. Det använder alla regler: rapportspärr, makrofilter, de tre
 riskfaktorerna och 8 % grundrisk. Säkerheten för minifutures får aldrig överstiga tradingkontot.
