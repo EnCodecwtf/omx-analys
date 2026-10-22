@@ -7,6 +7,7 @@ import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyz
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
+import { notifySignal } from './lib/notify.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
@@ -99,7 +100,7 @@ async function scan() {
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan, blocked: ev.blocked || null, report: ev.guards.report,
+          plan: ev.plan, blocked: ev.blocked || null, report: ev.guards.report, size: ev.guards.size,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
       } catch (err) {
@@ -108,10 +109,11 @@ async function scan() {
     });
     const signals = rows.filter(r => r.status === 'strong' && isFinal(r.t));
     if (signals.length) {
-      await signalLog.record(signals.map(r => ({
+      const added = await signalLog.record(signals.map(r => ({
         date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
-        tps: r.plan.tps.map(x => x.price), loggedAt: new Date().toISOString(),
+        tps: r.plan.tps.map(x => x.price), size: r.size, loggedAt: new Date().toISOString(),
       })));
+      for (const e of added) await notifySignal(e);
     }
     return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), cycle: btcCycle(today()), rows };
   });

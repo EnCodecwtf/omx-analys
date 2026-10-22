@@ -1,0 +1,26 @@
+# Väcker appen varje vardagskväll efter börsens stängning. Skanningen sparar
+# nya starka köpsignaler i signalloggen och skickar avisering via ntfy.
+# Lägg in appens adress som repo-hemlighet APP_URL (Settings → Secrets → Actions).
+name: Daglig skanning
+
+on:
+  schedule:
+    # 16:20 och 17:20 UTC = 18:20 svensk sommartid respektive 18:20 vintertid
+    - cron: '20 16 * * 1-5'
+    - cron: '20 17 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kör skanningen
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then echo "APP_URL saknas"; exit 1; fi
+          for i in 1 2 3; do
+            if curl -fsS --max-time 120 "$APP_URL/api/scan?refresh=1" -o /dev/null; then echo "Klar"; exit 0; fi
+            echo "Försök $i misslyckades, väntar…"; sleep 30
+          done
+          exit 1

@@ -342,6 +342,42 @@ också avkastningen 2017–2026, på grund av V-formade vändningar. Med 3x häv
 
 Avkastningen blir högre, men nedgångarna blir djupare (2018 och 2022). Nasdaq är vald i efterhand som den bästa marknaden.
 
+## Slutligt test av hela systemet
+Testet omfattar 10 000 kr, 2017-01-02 till 2026-10-22. Det använder alla regler: rapportspärr, makrofilter, de tre
+riskfaktorerna och 8 % grundrisk. Säkerheten för minifutures får aldrig överstiga tradingkontot.
+
+**Utan överlevnadsfel:** Testet använder bara bolag som faktiskt var med i OMXS30 på signaldagen. Indexändringarna är
+rekonstruerade från sv.wikipedia.org/wiki/OMXS30. Det betyder att bolag som senare åkte ur (Autoliv, Securitas, SSAB, Lundin,
+Electrolux, Getinge, Kinnevik, SBB, Sinch, Atlas Copco B) är med under sin tid i indexet. Bolag som kom in senare (Saab, Nibe,
+Evolution och de som kom in 2025) är med först från inträdet. Swedish Match (med till november 2022) och Fingerprint Cards (med
+till juli 2018) saknas, eftersom kursdata inte finns.
+
+| Starka signaler | 2017–2021 | 2022–2026 |
+|---|---|---|
+| Dagens 30 bolag (överlevnadsfel) | +0,31 R, TP1 67 %, TP2 55 % | +0,37 R, TP1 67 %, TP2 56 % |
+| Faktiskt indexinnehåll | +0,29 R, TP1 64 %, TP2 52 % | +0,26 R, TP1 62 %, TP2 51 % |
+
+Bolag som senare åkte ur gav −0,02 R när de var med.
+
+**Portföljer, faktiskt indexinnehåll:**
+
+| Upplägg | Slutvärde | Per år | Största nedgång | Sämsta år |
+|---|---|---|---|---|
+| **50/40/10** (50 % guld, 40 % bitcoin-cykel/guld, 10 % trading, 8 % av tradingkontot) | **413 000 kr** | **+46 %** | **−27 %** | +3 % (2026) |
+| 30/20/50, 8 % av hela portföljen, 10x | 433 000 kr | +47 % | −52 % | −38 % (2022) |
+| 40/30/30, 8 % av hela, 10x | 359 000 kr | +44 % | −43 % | −30 % (2022) |
+| Bara studsstrategin, 8 %, 10x | 176 000 kr | +34 % | −51 % | −31 % (2022) |
+| 50/40/10 utan trading | 338 000 kr | +43 % | −26 % | 0 % (2026) |
+| OMXS30 köp och behåll | 21 000 kr | +8 % | −32 % | −16 % (2022) |
+
+Med dagens 30 bolag gav 30/20/50 med 10x +53 % per år och −32 % som största nedgång, utan minusår. Med det faktiska
+indexinnehållet blev 2022 i stället −38 %. Förlusterna kom tidigt i björnmarknaden, när många positioner var öppna samtidigt i
+Kinnevik, Sinch, Electrolux och Atlas Copco B. Summan av alla affärer 2022 var ändå +9 R. Upplägg där tradingen tar en
+stor del av risken är alltså känsliga för vilka aktier som ingår. 50/40/10 påverkas nästan inte.
+
+**Rekommendation:** 50/40/10. Det har den jämnaste kurvan och har klarat alla tester. Nästan hela avkastningen kommer från guld
+och bitcoin-cykeln, som är testade på få cykler och en period med ovanligt starka år.
+
 **Det här är inte investeringsrådgivning.**
 
 ## Hävstång på Avanza
@@ -377,7 +413,23 @@ Listan finns i `symbols.json` och följer revideringen av OMXS30 i juli 2025. Na
 listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 
 ### Publicera
-`render.yaml` gör att appen kan köras på Render: skapa en ny Blueprint från repot.
+1. **Render:** skapa en ny Blueprint från repot. `render.yaml` sätter upp en gratis webbtjänst.
+2. **Upstash Redis (gratis):** skapa en databas och lägg in `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` i Render.
+   Utan den försvinner signalloggen när Render startar om.
+3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne, till exempel
+   `omx-elias-7f3k9`. Lägg samma ämne i `NTFY_TOPIC` och appens adress i `APP_URL` i Render.
+4. **Daglig skanning:** Render söver gratistjänster efter 15 minuter. Lägg appens adress som repo-hemlighet `APP_URL`
+   (Settings → Secrets and variables → Actions). Då väcker `.github/workflows/daily-scan.yml` appen kl. 18.20 varje
+   vardag. Nya starka köpsignaler sparas i signalloggen och skickas som notis.
+
+| Miljövariabel | Vad den gör |
+|---|---|
+| `PORT` | Port, standard 3000 |
+| `APP_URL` | Appens adress, används för länken i notiser |
+| `NTFY_TOPIC` | ntfy-ämne för aviseringar. Utan den skickas inga notiser |
+| `NTFY_URL` | Egen ntfy-server, standard https://ntfy.sh |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Sparar signalloggen i Upstash Redis |
+| `LOG_FILE` | Fil för signalloggen utan Redis, standard `data/signal-log.json` |
 
 ## Struktur
 - `lib/indicators.js`: EMA, RSI, ATR, MACD
@@ -391,6 +443,7 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/stress.js`: krigsrisk (GPR, läser Stata-fil) och akut oro (VIX9D/VIX)
 - `lib/news.js`: nyhetsrubriker från Google Nyheter
 - `lib/cycle.js`: bitcoins halveringscykel
+- `lib/notify.js`: aviseringar via ntfy
 - `data/`: historiska rapportdatum och FOMC-kalender
 - `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

@@ -214,3 +214,19 @@ test('Bitcoins halveringscykel', async () => {
   assert.equal(out.inWindow, false);
   assert.equal(out.until, '2027-04-15');
 });
+
+test('Avisering skickas bara när ett ämne är satt', async () => {
+  const { notifySignal } = await import('../lib/notify.js');
+  const e = { symbol: 'VOLV-B.ST', name: 'Volvo B', close: 300, stop: 290, tps: [306, 312, 320], size: 0.5 };
+  assert.equal(await notifySignal(e, { topic: '' }), false);
+  const calls = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { calls.push({ url, init }); return { ok: true }; };
+  try {
+    assert.equal(await notifySignal(e, { topic: 'mitt-amne', appUrl: 'https://exempel.se' }), true);
+  } finally { globalThis.fetch = orig; }
+  assert.equal(calls[0].url, 'https://ntfy.sh/mitt-amne');
+  assert.equal(calls[0].init.headers.Title, 'Stark köpsignal: Volvo B');
+  assert.equal(calls[0].init.headers.Click, 'https://exempel.se/#VOLV-B.ST');
+  assert.match(calls[0].init.body, /Halv position/);
+});
