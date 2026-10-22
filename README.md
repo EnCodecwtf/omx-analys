@@ -97,6 +97,33 @@ Kontot 2017–2026 med halv position vid krigsspik eller akut oro:
 **Förväntningar och utfall:** Historiska konsensusprognoser för makrosiffror är betaldata. Marknadens förväntningar fångas i stället
 via VIX, VIX9D och räntebesked i makropoängen.
 
+### Ledig kassa: guld, räntor, krypto
+Studsstrategin har bara en del av kontot i marknaden. Testet 2017–2026 lade den lediga delen, högst 50 %, i andra tillgångar.
+Studsstrategin körs med 6 % grundrisk och halv position vid oro. Allt är räknat i SEK.
+
+| Ledig kassa | Per år | Största nedgång |
+|---|---|---|
+| Kontanter med ränta | +47 % | −32 % |
+| **50 % guld** | **+56 %** | **−31 %** |
+| 50 % statsobligationer 20 år | +45 % | −34 % |
+| 50 % statsobligationer 7–10 år | +46 % | −32 % |
+| 25 % guld + 25 % statsobligationer 7–10 år | +51 % | −31 % |
+| 10 % bitcoin | +56 % | −36 % |
+| 40 % guld + 10 % bitcoin | +63 % | −35 % |
+
+**Slutsatser:**
+- **Guld** höjde avkastningen och sänkte nedgången något, eftersom det ofta stiger när aktier faller. Guld steg dock ovanligt mycket 2024–2025, så framtiden blir troligen svagare.
+- **Statsobligationer** hjälpte inte, eftersom räntechocken 2022 slog mot både aktier och obligationer.
+- **Bitcoin** höjde avkastningen men också nedgångarna.
+
+**Naturgas, kakao, kaffe** (studsstrategin, 10 år):
+
+| Råvara | Snitt per affär | Kommentar |
+|---|---|---|
+| Naturgas | +0,05 R | Ingen fördel. Volatilitet 70 % per år. Börshandlade produkter tappar dessutom värde vid byte av terminskontrakt |
+| Kakao | +0,15 R köp, +0,95 R blankning | Blankningarna är bara 30 affärer, nästan alla i boomen och kraschen 2024–2025. Inte pålitligt |
+| Kaffe | +0,01 R | Ingen fördel |
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
