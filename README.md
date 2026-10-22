@@ -20,9 +20,9 @@ MACD, stängning över gårdagens topp, engulfing eller hammare, divergens). Öv
 
 | Status | Krav |
 |---|---|
-| **STARK KÖPSIGNAL** | Samma krav som KÖPSIGNAL, och dessutom har RSI varit under 32 de senaste dagarna |
-| **KÖPSIGNAL** | Poäng ≥ 42, priset under EMA 200, priset testar en stödzon, RSI vänder upp från under 40, MACD-histogrammet vänder upp och det finns en giltig Elliottvågräkning |
-| **BEVAKA** | Bra läge men alla krav är inte uppfyllda än |
+| **STARK KÖPSIGNAL** | Alla krav för köpsignal och makropoäng 1 eller mer: full position |
+| **KÖPSIGNAL** | Poäng ≥ 42, priset under EMA 200, priset testar en stödzon, RSI vänder upp från under 40, MACD-histogrammet vänder upp, det finns en giltig Elliottvågräkning och makropoängen är 0: halv position |
+| **BEVAKA** | Bra läge men alla krav är inte uppfyllda, eller köpsignalen är spärrad av rapport eller makro |
 | **AVVAKTA** | Överköpt eller sen fas |
 
 **Handelsplan:** Stoppet läggs under stödzonen och de senaste fem dagarnas botten, minst 1 ATR bort. Målen tas från
@@ -35,22 +35,83 @@ läggs strax under motståndet.
 
 Sälj en tredjedel vid varje mål och flytta stoppet till köpkursen när TP2 är nådd.
 
+### Rapportspärr
+Ingen ny affär tas om bolaget rapporterar inom **10 handelsdagar**. Kommande rapportdatum hämtas från Yahoo Finance.
+Historiska datum finns i `data/earnings.json`. Om ett datum saknas uppskattas det från samma kvartal året innan.
+
+I backtestet med gap-hantering (se nedan) gav spärren dessa resultat:
+
+| | Utan spärr | Med spärr |
+|---|---|---|
+| Snitt per affär | +0,35 R | +0,45 R |
+| Sämsta affären | −3,2 R | −1,6 R |
+| TP2 nådd | 59 % | 64 % |
+
+Att också sälja dagen före rapporten gav inget extra.
+
+### Marknadsläge (makro)
+
+| Faktor | Poäng |
+|---|---|
+| OMXS30 under EMA 200 | +1 |
+| Färre än 40 % av OMXS30-aktierna över EMA 50 | +1 |
+| VIX 20 eller högre | +1 |
+| VIX under 15 | −1 |
+| Räntebesked från Fed (FOMC) inom 7 dagar (`data/fomc.json`) | −1 |
+
+Makropoängen avgör positionsstorleken:
+
+| Makropoäng | Position | TP1 | TP2 | Snitt per affär |
+|---|---|---|---|---|
+| Under 0 | Inga nya köp | 62 % | 46 % | +0,08 R |
+| 0 | Halv | 67 % | 60 % | +0,28 R |
+| 1 eller mer | Full | 81 % | 75 % | +0,73 R |
+
+Strategin fungerar bäst när marknaden är rädd. Översålda storbolag studsar då kraftigast.
+
+### Bear (säljsignaler)
+Två typer av bear-strategier testades på OMXS30-aktier och index 2022–2026. Båda gick med förlust varje år och ingår därför
+inte i signalerna:
+
+| Bear-strategi | Snitt per affär |
+|---|---|
+| Speglad köpregel: blanka överköpt aktie över EMA 200 | −0,05 R |
+| Trendföljande: blanka studs i nedtrend | −0,33 R |
+
+Den trendföljande gick sämst när marknaden var svag (−0,64 R). Det är samma kraftiga studsar som gör köpsignalerna bra.
+Backtestet kan köra säljsignaler med `backtest(bars, { side: 'short' })`.
+
 ### Backtest
-Krav: TP1 ska nås i minst 60 % av affärerna och TP2 i minst 54 %. Simuleringen köper på nästa dags öppning. Om stopp och
-mål nås samma dag räknas stoppet. En aktie kan bara ha en affär åt gången. Courtage ingår inte.
+Krav: TP1 ska nås i minst 60 % av affärerna och TP2 i minst 54 %. Så simuleras affärerna:
 
-| OMXS30 2022–2026 | Affärer | TP1 | TP2 | TP3 | Snitt per affär |
+- Köp på nästa dags öppning. En aktie kan bara ha en affär åt gången.
+- Om stopp och mål nås samma dag räknas stoppet.
+- Öppnar kursen under stoppet säljs positionen på öppningskursen. Det gör stora förluster efter rapporter synliga.
+- Courtage ingår inte.
+
+| OMXS30 2022–2026, med rapportspärr och makrofilter | Affärer | TP1 | TP2 | TP3 | Snitt per affär |
 |---|---|---|---|---|---|
-| Alla signaler | 270 | 71,5 % | 60,0 % | 40,4 % | +0,40 R |
-| Stark köpsignal | 139 | 70,5 % | 59,0 % | 38,1 % | +0,43 R |
-| Köpsignal | 131 | 72,5 % | 61,1 % | 42,7 % | +0,38 R |
+| Alla signaler | 184 | 74,5 % | 67,4 % | 46,2 % | +0,53 R |
+| Stark köpsignal | 108 | 81,5 % | 75,0 % | 57,4 % | +0,74 R |
+| Köpsignal | 76 | 64,5 % | 56,6 % | 30,3 % | +0,22 R |
 
-Reglerna valdes på data för 2022–2024 och kontrollerades på 2025–2026, och träffsäkerheten blev ungefär lika hög i båda
-perioderna. Det viktigaste filtret är att priset ligger under EMA 200. Rekyler i aktier som redan ligger i stark upptrend
-nådde TP2 i bara cirka 47 % av fallen.
+### Kontosimulering
+Simuleringen gäller 10 000 kr, 2023 till oktober 2026, och använder OMXS30-aktierna:
 
-Resultatet varierar mellan åren: 2023 nådde 59 % av signalerna TP2 och 2026 hittills 52 %. Appen visar
-backtestet per aktie och för alla signaler tillsammans, och markerar historiska signaler i grafen.
+- **Positionsstorlek efter risk:** varje affär storleksanpassas så att en förlust vid stopp är den valda andelen av kontot.
+- **Hävstång:** via minifutures, med högst 10 samtidiga positioner.
+- **Kostnad:** 0,3 % av exponeringen per affär för spread och finansiering.
+
+| Risk per affär | Avkastning per år | Största nedgång |
+|---|---|---|
+| 2 % | +35 % | −19 % |
+| 3 % | +53 % | −27 % |
+| 4 % | +71 % | −34 % |
+| 6 % | +107 % | −48 % |
+
+**Varning:** Reglerna, rapportspärren och makropoängen är framtagna på samma period som de testas på. På aktier
+från USA och DAX som reglerna inte sett var fördelen per affär ungefär en tredjedel så stor. Räkna med klart lägre avkastning
+framåt. Alla Stockholmsaktier faller dessutom ofta samtidigt, så flera stopp kan nås samma dag.
 
 **Det här är inte investeringsrådgivning.**
 
@@ -95,5 +156,8 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/elliott.js`: Elliottvågor
 - `lib/analyze.js`: poäng, handelsplan och backtest
 - `lib/avanza.js`: urval av minifutures och certifikat på Avanza
-- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`) och statiska filer
+- `lib/events.js`: rapportdatum (Yahoo Finance) och räntebesked
+- `lib/macro.js`: marknadsläge (OMXS30-trend, bredd, VIX, FOMC)
+- `data/`: historiska rapportdatum och FOMC-kalender
+- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

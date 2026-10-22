@@ -3,7 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchBars } from './lib/data.js';
-import { evaluate, backtest } from './lib/analyze.js';
+import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyze.js';
+import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
+import { buildMacro } from './lib/macro.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend } from './lib/avanza.js';
 
@@ -38,26 +40,56 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+const today = () => new Date().toISOString().slice(0, 10);
+const dayOf = t => new Date(t * 1000).toISOString().slice(0, 10);
+
+// Marknadsläget byggs av OMXS30, VIX och alla aktiers kurser.
+async function macro() {
+  return cached('macro', async () => {
+    const [omxBars, vixBars] = await Promise.all([fetchBars(symbols.index.symbol), fetchBars('^VIX')]);
+    const stockBars = await mapLimit(symbols.stocks, 6, s => fetchBars(s.symbol).catch(() => []));
+    return buildMacro({ omxBars, vixBars, stockBars });
+  });
+}
+
+async function guards(s) {
+  const macroAt = await macro();
+  const report = s.isIndex ? null : await nextReport(s.symbol);
+  return { report, reportDays: report ? tradingDaysBetween(today(), report.date) : null, macro: macroAt(today()) };
+}
+
+// Samma regler i backtestet som i appen: rapportspärr och makrofilter.
+async function backtestFor(s, bars) {
+  const macroAt = await macro();
+  const bt = backtest(bars, {
+    reports: s.isIndex ? [] : reportDates(s.symbol),
+    reportBlock: s.isIndex ? 0 : REPORT_BLOCK_DAYS,
+    allow: t => macroAt(dayOf(t)).score >= 0,
+  });
+  for (const t of bt.trades) t.status = macroAt(dayOf(t.t)).score >= 1 ? 'strong' : 'buy';
+  return bt;
+}
+
 async function scan() {
   return cached('scan', async () => {
     const rows = await mapLimit(universe, 6, async s => {
       try {
         const bars = await fetchBars(s.symbol);
-        const ev = evaluate(bars.slice(-CHART_BARS));
+        const ev = applyGuards(evaluate(bars.slice(-CHART_BARS)), await guards(s));
         const prevClose = bars[bars.length - 2]?.c;
         return {
           symbol: s.symbol, name: s.name, isIndex: !!s.isIndex,
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan,
+          plan: ev.plan, blocked: ev.blocked || null, report: ev.guards.report,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
       } catch (err) {
         return { symbol: s.symbol, name: s.name, isIndex: !!s.isIndex, error: err.message };
       }
     });
-    return { updated: Date.now(), rows };
+    return { updated: Date.now(), macro: (await macro())(today()), rows };
   });
 }
 
@@ -68,7 +100,7 @@ async function summary() {
     const trades = [];
     for (const s of universe) {
       try {
-        const bt = backtest(await fetchBars(s.symbol));
+        const bt = await backtestFor(s, await fetchBars(s.symbol));
         trades.push(...bt.trades.filter(t => !t.open));
       } catch { /* instrumentet hoppas över */ }
       await new Promise(r => setImmediate(r));
@@ -87,11 +119,11 @@ async function analysis(symbol) {
     const meta = bySymbol.get(symbol);
     const all = await fetchBars(symbol);
     const bars = all.slice(-CHART_BARS);
-    const ev = evaluate(bars);
+    const ev = applyGuards(evaluate(bars), await guards(meta));
     const ind = computeIndicators(all);
     const off = all.length - bars.length;
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
-    const bt = backtest(all);
+    const bt = await backtestFor(meta, all);
     return {
       symbol, name: meta.name, isIndex: !!meta.isIndex,
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
@@ -121,13 +153,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await scan());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
+    if (url.pathname === '/api/macro') return send(res, 200, (await macro())(today()));
     if (url.pathname === '/api/products') {
       const meta = bySymbol.get(url.searchParams.get('symbol'));
       if (!meta?.avanzaId) return send(res, 404, { error: 'Okänd symbol' });
       const bars = await fetchBars(meta.symbol);
-      const ev = evaluate(bars.slice(-CHART_BARS));
+      const ev = applyGuards(evaluate(bars.slice(-CHART_BARS)), await guards(meta));
       const products = await fetchProducts(meta.avanzaId);
-      return send(res, 200, { status: ev.status, stop: ev.plan.stop, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
+      return send(res, 200, { status: ev.status, stop: ev.plan.stop, size: ev.guards.size, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
     }
     if (url.pathname === '/api/analysis') {
       const symbol = url.searchParams.get('symbol');

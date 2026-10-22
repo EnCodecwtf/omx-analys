@@ -149,3 +149,35 @@ test('Backtest av säljsignaler: stopp över och mål under köpkursen', async (
     assert.ok(t.tps[0] < t.entry);
   }
 });
+
+test('Rapportspärr och makrofilter gör köpsignaler till BEVAKA', async () => {
+  const { applyGuards } = await import('../lib/analyze.js');
+  const base = () => ({ status: 'buy', warnings: [] });
+  const r1 = applyGuards(base(), { report: { date: '2026-11-02' }, reportDays: 5, macro: { score: 1, size: 1 } });
+  assert.equal(r1.status, 'watch');
+  assert.equal(r1.blocked, 'buy');
+  const r2 = applyGuards(base(), { report: { date: '2027-01-30' }, reportDays: 60, macro: { score: -1, size: 0 } });
+  assert.equal(r2.status, 'watch');
+  const r3 = applyGuards(base(), { report: { date: '2027-01-30' }, reportDays: 60, macro: { score: 0, size: 0.5 } });
+  assert.equal(r3.status, 'buy');
+  assert.equal(applyGuards(base(), { macro: { score: 2, size: 1 } }).status, 'strong');
+  assert.equal(r3.guards.size, 0.5);
+});
+
+test('Rapportdatum uppskattas från förra året och handelsdagar räknas', async () => {
+  const { projectReports, tradingDaysBetween } = await import('../lib/events.js');
+  const p = projectReports(['2024-04-18', '2024-07-18'], new Date('2025-12-31'));
+  assert.ok(p.includes('2025-04-17') && p.includes('2025-07-17'));
+  assert.equal(tradingDaysBetween('2026-10-23', '2026-10-30'), 5); // fre -> fre
+});
+
+test('Makropoäng', async () => {
+  const { buildMacro } = await import('../lib/macro.js');
+  const mk = (n, f) => Array.from({ length: n }, (_, i) => ({ t: 1_700_000_000 + i * 86400, c: f(i) }));
+  const omxBars = mk(300, i => 300 - i * 0.5);            // fallande index -> under EMA 200
+  const vixBars = mk(300, () => 25);                       // hög VIX
+  const stockBars = [mk(300, i => 100 - i * 0.1)];         // svag bredd
+  const m = buildMacro({ omxBars, vixBars, stockBars })(new Date((1_700_000_000 + 299 * 86400) * 1000).toISOString().slice(0, 10));
+  assert.ok(m.score >= 2);
+  assert.ok(m.size >= 1 || m.fomcDays <= 7);
+});

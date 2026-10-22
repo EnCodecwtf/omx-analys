@@ -16,6 +16,14 @@ const pct = (a, b) => ((a / b - 1) * 100).toFixed(1).replace('.', ',') + ' %';
 const badge = (s, big) => `<span class="badge ${s}${big ? ' big' : ''}">${STATUS[s].text}</span>`;
 
 let scanData = null;
+let lastDetail = null;
+const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignoreras */ } } };
+$('#acct').value = store.get('acct', '10000');
+$('#risk').value = store.get('risk', '3');
+for (const id of ['acct', 'risk']) $('#' + id).addEventListener('input', () => {
+  store.set(id, $('#' + id).value);
+  if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
+});
 let filter = 'all';
 let current = null;
 const chart = new PriceChart($('#chart'), $('#rsi-chart'), $('#tooltip'));
@@ -47,6 +55,7 @@ async function loadScan(refresh) {
     scanData = await res.json();
     $('#updated').textContent = 'Analys ' + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     renderScan();
+    renderMacro(scanData.macro);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
     if (pick) openSymbol(pick.symbol, { keepView: !fromHash && !refresh, refresh });
@@ -91,6 +100,7 @@ async function openSymbol(symbol, { keepView, refresh } = {}) {
 }
 
 function renderDetail(d) {
+  lastDetail = d;
   const A = d.analysis, pl = A.plan;
   const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
   $('#d-name').textContent = d.name;
@@ -101,8 +111,8 @@ function renderDetail(d) {
   // Signal
   const col = A.score >= 50 ? 'var(--green)' : A.score >= 30 ? 'var(--amber)' : 'var(--muted)';
   const explain = {
-    strong: 'Kraftigt översåld rekyl under EMA 200 som vänder upp vid en stödzon. RSI och MACD vänder samtidigt.',
-    buy: 'Rekyl under EMA 200 som vänder upp vid en stödzon. RSI och MACD vänder samtidigt.',
+    strong: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt. Marknadsläget är gynnsamt: full position.',
+    buy: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt. Marknadsläget är neutralt: halv position.',
     watch: 'Intressant läge, men alla krav för köpsignal är inte uppfyllda än. Vänta på vändning vid stöd.',
     neutral: 'Inget tydligt köpläge just nu.',
     avoid: 'Sent eller överköpt läge. Vänta på en rekyl.',
@@ -111,7 +121,12 @@ function renderDetail(d) {
     <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
     <p>${explain}</p>
     <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
-    ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}`;
+    ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}
+    ${A.blocked ? `<p class="warn">Utan spärren hade detta varit ${STATUS[A.blocked].text.toLowerCase()}.</p>` : ''}
+    <dl class="kv" style="margin-top:10px">
+      ${A.guards?.report ? `<dt>Nästa rapport</dt><dd>${esc(A.guards.report.date)} <span class="muted">(om ${A.guards.report.days} handelsdagar, ${esc(A.guards.report.source)})</span></dd>` : ''}
+      ${A.guards?.macro ? `<dt>Makro</dt><dd>${esc(A.guards.macro.label)} <span class="muted">(poäng ${A.guards.macro.score})</span></dd>` : ''}
+    </dl>`;
 
   // Handelsplan
   const active = A.status === 'strong' || A.status === 'buy';
@@ -173,7 +188,7 @@ function renderDetail(d) {
         <td class="r num ${t.open ? '' : t.r > 0 ? 'pos' : 'neg'}">${t.open ? 'pågår' : (t.r > 0 ? '+' : '') + String(t.r).replace('.', ',') + ' R'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Inga signaler under perioden.</td></tr>'}
     </table>
     <p class="muted" style="font-size:12px;margin-top:8px">Få signaler per aktie ger stor slumpvariation. Se det samlade backtestet överst i listan.
-    Simulering: köp på öppningen dagen efter signalen, stoppet flyttas till köpkursen efter TP2. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
+    Simulering: köp på öppningen dagen efter signalen, stoppet flyttas till köpkursen efter TP2. Rapportspärr och makrofilter ingår. Öppnar kursen under stoppet räknas försäljningen på öppningskursen. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
 }
 
 async function loadProducts(symbol, status) {
@@ -190,6 +205,10 @@ async function loadProducts(symbol, status) {
   }
   if (current !== symbol) return;
   const active = status === 'strong' || status === 'buy';
+  const acct = Math.max(0, +$('#acct').value || 0), riskPct = Math.max(0, +$('#risk').value || 0);
+  const size = r.size ?? 1;
+  const riskKr = acct * riskPct / 100 * size;
+  const invest = p => p.lossAtStopPct > 0 ? riskKr / (p.lossAtStopPct / 100) : 0;
   const num = (v, d = 2) => v == null ? '–' : v.toLocaleString('sv-SE', { minimumFractionDigits: d, maximumFractionDigits: d });
   const item = (p, k, isMini) => `<div class="prod-item${k === 0 ? ' best' : ''}">
       <div><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.ava ? '<span class="tag">AVA</span>' : ''}</div>
@@ -200,9 +219,12 @@ async function loadProducts(symbol, status) {
         ${isMini ? `<dt>Knock-out</dt><dd class="num">${num(p.knockout)} <span class="muted">(${num(p.koDistPct, 1)} % bort, ${num(p.bufferAtr, 1)} ATR under stoppet)</span></dd>` : ''}
         <dt>Om stoppet nås</dt><dd class="num neg">≈ −${p.lossAtStopPct} %</dd>
         <dt>Vid TP1 / TP2</dt><dd class="num pos">≈ +${p.gainTp1Pct} % / +${p.gainTp2Pct} %</dd>
+        <dt>Köp för</dt><dd class="num"><b>${Math.round(invest(p)).toLocaleString('sv-SE')} kr</b> <span class="muted">≈ ${Math.floor(invest(p) / p.ask).toLocaleString('sv-SE')} st, risk ${Math.round(riskKr).toLocaleString('sv-SE')} kr</span></dd>
       </dl>
     </div>`;
   el.innerHTML = `<h3>Hävstång på Avanza ${active ? '' : '<span class="muted">(ingen köpsignal just nu – bara för bevakning)</span>'}</h3>
+    <p style="font-size:13px">Positionsstorlek: risk ${String(riskPct).replace('.', ',')} % av ${acct.toLocaleString('sv-SE')} kr × makrofaktor ${String(size).replace('.', ',')}
+    = <b>${Math.round(riskKr).toLocaleString('sv-SE')} kr</b> i förlust om stoppet nås.${size === 0 ? ' Makroläget är ogynnsamt, så positionsstorleken är 0.' : ''}</p>
     ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut.</p>
     <div class="prod">${r.minis.map((p, k) => item(p, k, true)).join('')}</div>`
     : '<p class="muted">Inget minifuture-papper klarar säkerhetskraven just nu.</p>'}
@@ -214,12 +236,19 @@ async function loadProducts(symbol, status) {
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
+function renderMacro(m) {
+  if (!m) return;
+  const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
+  $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
+    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>`;
+}
+
 async function loadSummary() {
   try {
     const s = await (await fetch('/api/summary')).json();
     const a = s.all;
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    $('#summary').innerHTML = `<span>Backtest, alla signaler (${a.n} st):</span>
+    $('#summary').innerHTML = `<span>Backtest med rapportspärr och makrofilter (${a.n} signaler):</span>
       <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
       <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
       <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
