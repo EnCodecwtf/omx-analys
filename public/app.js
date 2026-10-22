@@ -55,7 +55,7 @@ async function loadScan(refresh) {
     scanData = await res.json();
     $('#updated').textContent = 'Analys ' + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
     renderScan();
-    renderMacro(scanData.macro, scanData.stress);
+    renderMacro(scanData.macro, scanData.stress, scanData.cycle);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
     if (pick) openSymbol(pick.symbol, { keepView: !fromHash && !refresh, refresh });
@@ -238,13 +238,15 @@ async function loadProducts(symbol, status) {
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
-function renderMacro(m, st) {
+function renderMacro(m, st, cy) {
   if (!m) return;
+  const cycleLine = cy ? `<div style="margin-top:6px">Portfölj: <b>30–50 % guld</b> som ledig kassa.
+    Bitcoin-cykel: <b class="${cy.inWindow ? 'pos' : ''}">${esc(cy.label)}</b><div class="muted">${esc(cy.text)}</div></div>` : '';
   const stressLine = st ? `<div style="margin-top:6px">Krig och oro: <b class="${st.stressed ? 'neg' : 'pos'}">${st.stressed ? 'Förhöjd – halv position' : 'Normal – hel position'}</b></div>
     <ul>${st.parts.map(p => `<li class="${p.bad ? 'bad' : ''}">${esc(p.text)}</li>`).join('')}</ul>` : '';
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
-    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>${stressLine}`;
+    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>${stressLine}${cycleLine}`;
 }
 
 const newsList = items => items.length

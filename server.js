@@ -8,6 +8,7 @@ import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
 import { stressNow } from './lib/stress.js';
+import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend } from './lib/avanza.js';
@@ -112,7 +113,7 @@ async function scan() {
         tps: r.plan.tps.map(x => x.price), loggedAt: new Date().toISOString(),
       })));
     }
-    return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), rows };
+    return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), cycle: btcCycle(today()), rows };
   });
 }
 

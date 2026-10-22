@@ -205,3 +205,12 @@ test('Krigsspik eller akut oro ger halv position', async () => {
   const g = gprLevel(series, '2026-02-05');
   assert.ok(Math.abs(g.rel - 1.3) < 1e-9);
 });
+
+test('Bitcoins halveringscykel', async () => {
+  const { btcCycle } = await import('../lib/cycle.js');
+  assert.equal(btcCycle('2023-06-01').inWindow, true);   // 12 mån före halveringen 2024
+  assert.equal(btcCycle('2025-09-30').inWindow, true);   // 17 mån efter
+  const out = btcCycle('2026-10-22');
+  assert.equal(out.inWindow, false);
+  assert.equal(out.until, '2027-04-15');
+});

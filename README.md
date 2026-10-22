@@ -116,6 +116,26 @@ Studsstrategin körs med 6 % grundrisk och halv position vid oro. Allt är räkn
 - **Statsobligationer** hjälpte inte, eftersom räntechocken 2022 slog mot både aktier och obligationer.
 - **Bitcoin** höjde avkastningen men också nedgångarna.
 
+**Bitcoins halveringscykel** (`lib/cycle.js`): Regeln äger bitcoin från 12 månader före en halvering till 18 månader efter,
+och har kontanter annars. Räknat i SEK:
+
+| 2015–2026 | Per år | Största nedgång |
+|---|---|---|
+| Köp och behåll | +63 % | −82 % |
+| Cykel 12 mån före till 18 mån efter | +86 % | −61 % |
+| Cykel 12 mån före till 15 mån efter | +65 % | −61 % |
+
+Regeln var utanför marknaden under kraschen 2018 och 2022. Det finns bara tre cykler att testa på, och resultatet är känsligt för
+exakt datum. I portföljen gav cykeln:
+
+| Ledig kassa | Per år | Största nedgång |
+|---|---|---|
+| 40 % guld + 10 % bitcoin, köp och behåll | +63 % | −35 % |
+| 40 % guld + 10 % bitcoin-cykel | +65 % | −33 % |
+| 30 % guld + 20 % bitcoin-cykel | +75 % | −37 % |
+
+Nästa köpfönster öppnar 2027-04-15 (halveringen väntas runt april 2028). Läget visas i marknadspanelen.
+
 **Naturgas, kakao, kaffe** (studsstrategin, 10 år):
 
 | Råvara | Snitt per affär | Kommentar |
@@ -306,6 +326,7 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/log.js`: signallogg för framåttest
 - `lib/stress.js`: krigsrisk (GPR, läser Stata-fil) och akut oro (VIX9D/VIX)
 - `lib/news.js`: nyhetsrubriker från Google Nyheter
+- `lib/cycle.js`: bitcoins halveringscykel
 - `data/`: historiska rapportdatum och FOMC-kalender
 - `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)
