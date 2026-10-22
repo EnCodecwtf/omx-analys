@@ -150,6 +150,19 @@ Nästan hela avkastningen kommer från guld och bitcoin. Tradingdelen lägger ti
 hela portföljen i stället för av tradingkontot blir siffrorna mycket högre i teorin (96 % per år). Det kräver dock säkerhet
 långt över de 10 %, alltså hävstång på 15–20x, och går inte att genomföra med upplägget.
 
+**Portfölj 30/20/50:** 30 % guld hela tiden, 20 % bitcoin inom cykeln och guld utanför, samt 50 % tradingkonto. Risken är
+6 % av hela portföljen per affär, och säkerheten får inte överstiga tradingkontot.
+
+| Start | Minifutures 5x | Minifutures 10x | 5x med 4 % risk | 50/40/10 (ovan) |
+|---|---|---|---|---|
+| 2015-07-09 | 248 000 kr, +33 %/år, −38 % | 457 000 kr, +40 %/år, −41 % | 269 000 kr, +34 %/år, −30 % | 800 000 kr, +47 %/år, −28 % |
+| 2019-05-11 | 83 000 kr, +33 %/år, −38 % | 141 000 kr, +43 %/år, −41 % | 84 000 kr, +33 %/år, −30 % | 108 000 kr, +38 %/år, −28 % |
+| 2023-04-20 | 31 000 kr, +39 %/år, −27 % | 45 000 kr, +53 %/år, −30 % | 29 000 kr, +35 %/år, −23 % | 27 000 kr, +33 %/år, −19 % |
+
+Det sista talet i varje ruta är största nedgång. Med 6 % risk och ett stopp på cirka 4 % behöver en affär en exponering på cirka
+150 % av portföljen. Därför begränsas många affärer av säkerheten vid 5x. 10x ger plats för fler affärer, men är över appens
+säkerhetsgräns för aktier (6x).
+
 **Naturgas, kakao, kaffe** (studsstrategin, 10 år):
 
 | Råvara | Snitt per affär | Kommentar |
