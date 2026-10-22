@@ -131,6 +131,35 @@ på hur strategin fungerar framåt.
 Loggen sparas i `data/signal-log.json` (eller `LOG_FILE`). Med `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` sparas
 den i stället i Upstash Redis. Det rekommenderas på gratis hosting, där filer försvinner vid omstart.
 
+### Andra strategier (testade 2017–2026)
+Klassiska strategier testades med standardparametrar på 10 års data. Kostnaderna är 0,05 % spread per köp och sälj plus
+3 % finansiering per år på exponeringen:
+
+| Strategi | Avkastning per år | Största nedgång |
+|---|---|---|
+| OMXS30 köp och behåll (prisindex, med finansieringskostnad) | +4,5 % | −32 % |
+| Trendföljning 55/20, 10 marknader, lång och kort | −5 % | −67 % |
+| Trendföljning 55/20, 10 marknader, bara lång | +12 % | −38 % |
+| Trendföljning 20/10, bara lång | +11 % | −41 % |
+| Månadsskiftet på OMXS30 | −0,6 % | −21 % |
+| Momentum topp 5 OMXS30-aktier, månadsvis | +2,4 % | −36 % |
+
+De 10 marknaderna i trendtestet är OMX, DAX, Nasdaq 100, S&P 500, Euro Stoxx 50, guld, silver, Brent, koppar och bitcoin.
+Momentum är testat på dagens indexbolag, så resultatet är snarare för bra.
+
+Ingen av strategierna slog studsstrategin, och ingen ingår i appen. Trendföljningens blankningar och snabba utbrott förlorade på
+de många V-formade vändningarna 2019–2026.
+
+### Hög hävstång (10–20x)
+10–15 % risk per affär motsvarar ungefär att köra 10–20x hävstång. Så här gick det med starka köpsignaler:
+
+| | 10 % risk | 15 % risk |
+|---|---|---|
+| OMXS30 (kalibrerat) | +150 %/år, största nedgång −64 % | +142 %/år, största nedgång −81 % |
+| Nya nordiska aktier | −6 %/år, största nedgång −83 % (2025: +196 %, 2026: −72 %) | −34 %/år, största nedgång −90 % |
+
+Ett enskilt år på flera hundra procent går alltså att få med samma signaler, men följande år kan radera det.
+
 **Det här är inte investeringsrådgivning.**
 
 ## Hävstång på Avanza
