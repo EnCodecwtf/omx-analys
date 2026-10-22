@@ -110,3 +110,28 @@ test('Backtest kör utan att titta framåt', () => {
   for (const t of bt.trades) assert.ok(t.exitI > t.i);
   assert.ok(typeof bt.stats.n === 'number');
 });
+
+test('Avanza: bara papper med säker hävstång rekommenderas', async () => {
+  const { recommend } = await import('../lib/avanza.js');
+  const plan = { entry: 100, stop: 96, tps: [{ price: 103 }, { price: 106 }] };
+  const mini = (name, fin, ko, bid, ask, extra = {}) => ({ orderbookId: name, name, issuer: 'X', subType: 'MINI_FUTURE',
+    financingLevel: fin, stopLoss: ko, buyPrice: bid, sellPrice: ask, leverage: 100 / (100 - fin), totalValueTraded: 1000, ...extra });
+  const r = recommend({
+    minis: [
+      mini('OK', 75, 78, 25, 25.1),
+      mini('KO för nära', 92, 95, 8, 8.03),
+      mini('Slutsåld', 70, 73, 30, null),
+      mini('Hög spread', 72, 75, 28, 29),
+    ],
+    bulls: [
+      { orderbookId: 'B5', name: 'BULL X5', issuer: 'X', leverage: 5, buyPrice: 10, sellPrice: 10.01, totalValueTraded: 1 },
+      { orderbookId: 'B2', name: 'BULL X2', issuer: 'X', leverage: 2, buyPrice: 10, sellPrice: 10.01, totalValueTraded: 1 },
+    ],
+  }, { plan, atr: 2, isIndex: false });
+  assert.deepEqual(r.minis.map(m => m.name), ['OK']);
+  assert.deepEqual(r.bulls.map(b => b.name), ['BULL X2']);
+  assert.equal(r.rejected.soldOut, 1);
+  assert.equal(r.rejected.spread, 1);
+  assert.equal(r.rejected.knockout, 1);
+  assert.ok(r.minis[0].knockout <= plan.stop - 2);
+});

@@ -126,6 +126,8 @@ function renderDetail(d) {
     TP1 ligger på närmaste nivå 0,5–1,2 R bort och TP2 på nästa nivå upp till 2 R, för att målen ska nås ofta.
     Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
 
+  loadProducts(d.symbol, A.status);
+
   // Elliott
   const ew = A.elliott.primary, maj = A.elliottMajor.primary;
   const ewBlock = e => `<p><b>${esc(e.label)}</b> <span class="muted">· säkerhet ${e.confidence} %</span></p>
@@ -172,6 +174,44 @@ function renderDetail(d) {
     </table>
     <p class="muted" style="font-size:12px;margin-top:8px">Få signaler per aktie ger stor slumpvariation. Se det samlade backtestet överst i listan.
     Simulering: köp på öppningen dagen efter signalen, stoppet flyttas till köpkursen efter TP2. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
+}
+
+async function loadProducts(symbol, status) {
+  const el = $('#c-products');
+  el.innerHTML = '<h3>Hävstång på Avanza</h3><p class="muted">Hämtar minifutures och certifikat…</p>';
+  let r;
+  try {
+    const res = await fetch('/api/products?symbol=' + encodeURIComponent(symbol));
+    if (!res.ok) throw new Error((await res.json()).error);
+    r = await res.json();
+  } catch (e) {
+    el.innerHTML = `<h3>Hävstång på Avanza</h3><p class="muted">Kunde inte hämta produkter från Avanza: ${esc(e.message)}</p>`;
+    return;
+  }
+  if (current !== symbol) return;
+  const active = status === 'strong' || status === 'buy';
+  const num = (v, d = 2) => v == null ? '–' : v.toLocaleString('sv-SE', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const item = (p, k, isMini) => `<div class="prod-item${k === 0 ? ' best' : ''}">
+      <div><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.ava ? '<span class="tag">AVA</span>' : ''}</div>
+      <div class="muted" style="font-size:12px">${esc(p.kind)} · ${esc(p.issuer)}${k === 0 ? ' · förstahandsval' : ''}</div>
+      <dl class="kv">
+        <dt>Hävstång</dt><dd class="num">${num(p.leverage, 1)}x</dd>
+        <dt>Köp / sälj</dt><dd class="num">${num(p.bid)} / ${num(p.ask)} <span class="muted">(spread ${num(p.spreadPct)} %)</span></dd>
+        ${isMini ? `<dt>Knock-out</dt><dd class="num">${num(p.knockout)} <span class="muted">(${num(p.koDistPct, 1)} % bort, ${num(p.bufferAtr, 1)} ATR under stoppet)</span></dd>` : ''}
+        <dt>Om stoppet nås</dt><dd class="num neg">≈ −${p.lossAtStopPct} %</dd>
+        <dt>Vid TP1 / TP2</dt><dd class="num pos">≈ +${p.gainTp1Pct} % / +${p.gainTp2Pct} %</dd>
+      </dl>
+    </div>`;
+  el.innerHTML = `<h3>Hävstång på Avanza ${active ? '' : '<span class="muted">(ingen köpsignal just nu – bara för bevakning)</span>'}</h3>
+    ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut.</p>
+    <div class="prod">${r.minis.map((p, k) => item(p, k, true)).join('')}</div>`
+    : '<p class="muted">Inget minifuture-papper klarar säkerhetskraven just nu.</p>'}
+    ${r.bulls.length ? `<p style="font-size:13px;margin-top:14px">Alternativ: bull-certifikat med daglig hävstång. De har ingen knock-out, men värdet kan minska när kursen svänger mycket under längre innehav.</p>
+    <div class="prod">${r.bulls.map((p, k) => item(p, k + 1, false)).join('')}</div>` : ''}
+    <p class="muted" style="font-size:12px;margin-top:10px">Avanza hade ${r.checked} papper. Bortsorterade: ${r.rejected.soldOut} slutsålda eller utan säljkurs,
+    ${r.rejected.spread} med spread över ${r.rules.maxSpreadPct} %, ${r.rejected.knockout} med knock-out för nära stoppet, ${r.rejected.leverage} med för hög hävstång
+    (max ${r.rules.maxLev}x för minifutures, ${r.rules.maxBull}x för bull-certifikat, högst ${r.rules.maxLossPct} % förlust vid stopp).
+    Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
 async function loadSummary() {

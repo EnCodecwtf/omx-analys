@@ -54,6 +54,26 @@ backtestet per aktie och för alla signaler tillsammans, och markerar historiska
 
 **Det här är inte investeringsrådgivning.**
 
+## Hävstång på Avanza
+För varje aktie och för index hämtar appen alla långa minifutures, turbos och bull-certifikat från Avanzas produktlista.
+Den rekommenderar sedan **3 minifutures/turbos** och **2 bull-certifikat** som alternativ. Så väljs papperna:
+
+| Krav | Varför |
+|---|---|
+| Det finns både köp- och säljkurs | Papper som är slutsålda eller saknar säljkurs sorteras bort |
+| Spread högst 1,5 % | Hög spread gör att man förlorar pengar redan vid köpet |
+| Knock-out minst 1 ATR under signalens stopp | Stoppet på underliggande nås långt innan pappret kan slås ut |
+| Hävstång högst 12x (index) eller 6x (aktie) | Begränsar risken |
+| Förlust vid stopp högst 35 % av insatsen | Hävstång × avståndet till stoppet |
+| Bull-certifikat högst 5x (index) eller 3x (aktie) | Daglig hävstång tappar värde när kursen svänger mycket |
+
+Papper som klarar kraven rankas efter spread, hur nära hävstången ligger 7x (index) eller 4x (aktie), omsättning och om det
+är en Avanza Markets-produkt (AVA). Rekommendationerna har olika hävstång, så att det finns alternativ om ett papper blir
+slutsålt. För varje papper visas knock-out-nivå, ungefärlig förlust vid stopp och ungefärlig vinst vid TP1 och TP2.
+
+Datan kommer från Avanzas inofficiella webb-API (`/_api/market-warrant-filter`, `/_api/market-certificate-filter`), som kan
+ändras utan förvarning. Kurserna kan vara fördröjda. Kontrollera alltid köp- och säljkurs hos Avanza innan du handlar.
+
 ## Köra
 Kräver Node 18 eller senare och har inga andra beroenden.
 
@@ -74,5 +94,6 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/structure.js`: ZigZag, fraktaler, stöd/motstånd, FVG, Fibonacci
 - `lib/elliott.js`: Elliottvågor
 - `lib/analyze.js`: poäng, handelsplan och backtest
-- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`) och statiska filer
+- `lib/avanza.js`: urval av minifutures och certifikat på Avanza
+- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

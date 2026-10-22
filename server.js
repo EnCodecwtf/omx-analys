@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchBars } from './lib/data.js';
 import { evaluate, backtest } from './lib/analyze.js';
 import { computeIndicators } from './lib/indicators.js';
+import { fetchProducts, recommend } from './lib/avanza.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -120,6 +121,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await scan());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
+    if (url.pathname === '/api/products') {
+      const meta = bySymbol.get(url.searchParams.get('symbol'));
+      if (!meta?.avanzaId) return send(res, 404, { error: 'Okänd symbol' });
+      const bars = await fetchBars(meta.symbol);
+      const ev = evaluate(bars.slice(-CHART_BARS));
+      const products = await fetchProducts(meta.avanzaId);
+      return send(res, 200, { status: ev.status, stop: ev.plan.stop, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
+    }
     if (url.pathname === '/api/analysis') {
       const symbol = url.searchParams.get('symbol');
       if (!bySymbol.has(symbol)) return send(res, 404, { error: 'Okänd symbol' });
