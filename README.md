@@ -160,6 +160,43 @@ de många V-formade vändningarna 2019–2026.
 
 Ett enskilt år på flera hundra procent går alltså att få med samma signaler, men följande år kan radera det.
 
+### 10 år och cyklisk kombination (2017–2026)
+**Studsstrategin på 10 år** (starka köpsignaler, OMXS30):
+
+| Period | Affärer | TP1 | TP2 | Snitt per affär |
+|---|---|---|---|---|
+| 2017–2021 (aldrig sett) | 163 | 67 % | 55 % | +0,31 R |
+| 2022–2026 (kalibrerat) | 226 | 67 % | 56 % | +0,35 R |
+
+Aktielistan är dagens indexbolag. Det kallas överlevnadsfel och gör de tidiga åren något för bra.
+
+**Kontot med studsstrategin** och 4 % risk gav +51 % per år 2018–2026 med största nedgång −39 %. Åren som
+reglerna aldrig sett gav betydligt mindre:
+
+| År | 2018 | 2019 | 2020 | 2021 |
+|---|---|---|---|---|
+| Avkastning | −4 % | +66 % | +3 % | +56 % |
+
+Det är i snitt cirka +27 % per år.
+
+**Hävstång på index med trendfilter** (köp när indexet är över sitt 200-dagars medel) minskade nedgångarna men
+också avkastningen 2017–2026, på grund av V-formade vändningar. Med 3x hävstång:
+
+| Index | Köp och behåll | Med trendfilter |
+|---|---|---|
+| OMX | +4 %/år | −1 %/år |
+| S&P 500 | +20 %/år | +12 %/år |
+| Nasdaq 100 | +34 %/år | +30 %/år |
+
+**Kombination** av index (uppgångsfaser) och studsaffärer (rädda faser) på samma konto:
+
+| Kombination | Avkastning per år | Största nedgång |
+|---|---|---|
+| S&P 500 1x + studs 3 % | +49 % | −51 % |
+| Nasdaq 100 1x + studs 3 % | +57 % | −50 % |
+
+Avkastningen blir högre, men nedgångarna blir djupare (2018 och 2022). Nasdaq är vald i efterhand som den bästa marknaden.
+
 **Det här är inte investeringsrådgivning.**
 
 ## Hävstång på Avanza
