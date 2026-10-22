@@ -136,6 +136,20 @@ exakt datum. I portföljen gav cykeln:
 
 Nästa köpfönster öppnar 2027-04-15 (halveringen väntas runt april 2028). Läget visas i marknadspanelen.
 
+**Portfölj 50/40/10** (start 10 000 kr): 50 % guld hela tiden, 40 % bitcoin inom cykelns köpfönster och guld utanför, samt
+10 % tradingkonto för studsstrategin. Risken är 6 % av tradingkontot per affär, och säkerheten för minifutures på 5x får inte
+överstiga tradingkontot. Ombalansering sker varje månad. Kostnader för byten (0,5 %), ombalansering (0,2 %) och affärer ingår.
+
+| Start | Slutvärde 2026-10-22 | Per år | Största nedgång | Utan trading | OMXS30 |
+|---|---|---|---|---|---|
+| 2015-07-09 (första cykeln) | ca 800 000 kr | +47 % | −28 % | +45 % | +7 % |
+| 2019-05-11 (andra cykeln) | ca 108 000 kr | +38 % | −28 % | +34 % | +10 % |
+| 2023-04-20 (tredje cykeln) | ca 27 000 kr | +33 % | −19 % | +29 % | +10 % |
+
+Nästan hela avkastningen kommer från guld och bitcoin. Tradingdelen lägger till 2–4 procentenheter per år. Om 6 % risk tas av
+hela portföljen i stället för av tradingkontot blir siffrorna mycket högre i teorin (96 % per år). Det kräver dock säkerhet
+långt över de 10 %, alltså hävstång på 15–20x, och går inte att genomföra med upplägget.
+
 **Naturgas, kakao, kaffe** (studsstrategin, 10 år):
 
 | Råvara | Snitt per affär | Kommentar |
