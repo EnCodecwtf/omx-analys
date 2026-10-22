@@ -412,15 +412,18 @@ Data hämtas från Yahoo Finance (dagsdata, 5 år) och cachas i 15 minuter. Knap
 Listan finns i `symbols.json` och följer revideringen av OMXS30 i juli 2025. Nasdaq reviderar indexet i januari och juli. Uppdatera
 listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 
-### Publicera
-1. **Render:** skapa en ny Blueprint från repot. `render.yaml` sätter upp en gratis webbtjänst.
-2. **Upstash Redis (gratis):** skapa en databas och lägg in `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` i Render.
-   Utan den försvinner signalloggen när Render startar om.
-3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne, till exempel
-   `omx-elias-7f3k9`. Lägg samma ämne i `NTFY_TOPIC` och appens adress i `APP_URL` i Render.
-4. **Daglig skanning:** Render söver gratistjänster efter 15 minuter. Lägg appens adress som repo-hemlighet `APP_URL`
-   (Settings → Secrets and variables → Actions). Då väcker `.github/workflows/daily-scan.yml` appen kl. 18.20 varje
-   vardag. Nya starka köpsignaler sparas i signalloggen och skickas som notis.
+### Publicera på Vercel (gratis)
+1. **Vercel:** Add New → Project → välj repot `omx-analys` → Deploy. Inga byggsteg behövs. `vercel.json` skickar alla anrop
+   till `api/index.js` och tar med `public/`, `symbols.json` och `data/`.
+2. **Upstash Redis (gratis):** Storage → Upstash for Redis, eller ett eget konto på console.upstash.com. Lägg in
+   `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` under Settings → Environment Variables. Vercels egna namn
+   (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) fungerar också. Utan Redis kan signalloggen inte sparas på Vercel.
+3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne. Lägg samma ämne i
+   `NTFY_TOPIC` och appens adress i `APP_URL`. Gör en ny deploy efter att variablerna är satta.
+4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` vardagar kl. 17 UTC (18–19 svensk tid). Det fungerar på
+   gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas som notis.
+
+Lokalt körs appen som vanlig server med `npm start`.
 
 | Miljövariabel | Vad den gör |
 |---|---|
@@ -429,7 +432,7 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 | `NTFY_TOPIC` | ntfy-ämne för aviseringar. Utan den skickas inga notiser |
 | `NTFY_URL` | Egen ntfy-server, standard https://ntfy.sh |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Sparar signalloggen i Upstash Redis |
-| `LOG_FILE` | Fil för signalloggen utan Redis, standard `data/signal-log.json` |
+| `LOG_FILE` | Fil för signalloggen utan Redis, standard `data/signal-log.json` (lokalt) |
 
 ## Struktur
 - `lib/indicators.js`: EMA, RSI, ATR, MACD
@@ -445,5 +448,6 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/cycle.js`: bitcoins halveringscykel
 - `lib/notify.js`: aviseringar via ntfy
 - `data/`: historiska rapportdatum och FOMC-kalender
+- `api/index.js`, `vercel.json`: körning på Vercel
 - `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

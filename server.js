@@ -1,7 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchBars } from './lib/data.js';
 import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyze.js';
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
@@ -190,12 +190,26 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
-const server = http.createServer(async (req, res) => {
+export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x');
+  // Vercel skickar alla sökvägar till /api och lägger den riktiga i __path.
+  if (url.searchParams.has('__path')) {
+    url.pathname = url.searchParams.get('__path');
+    url.searchParams.delete('__path');
+  }
   try {
     if (url.pathname === '/api/scan') {
       if (url.searchParams.has('refresh')) cache.clear();
       return send(res, 200, await scan());
+    }
+    // Anropas av Vercel Cron varje vardagskväll: sparar nya starka köpsignaler
+    // i signalloggen och skickar avisering.
+    if (url.pathname === '/api/cron/scan') {
+      cache.delete('scan');
+      const before = (await signalLog.entries()).length;
+      const s = await scan();
+      const after = (await signalLog.entries()).length;
+      return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), logged: after - before });
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {
@@ -231,9 +245,12 @@ const server = http.createServer(async (req, res) => {
     console.error(err);
     send(res, 500, { error: err.message });
   }
-});
+}
 
-server.listen(PORT, () => console.log(`OMX Analys körs på http://localhost:${PORT}`));
-
-// Kör skannern varje timme så att signaler loggas även när ingen har appen öppen.
-setInterval(() => { cache.delete('scan'); scan().catch(err => console.error('Skanningen misslyckades:', err.message)); }, 60 * 60 * 1000).unref();
+// Lokalt (npm start) körs en vanlig server. På Vercel används handler som
+// serverlös funktion via api/index.js.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  http.createServer(handler).listen(PORT, () => console.log(`OMX Analys körs på http://localhost:${PORT}`));
+  // Kör skannern varje timme så att signaler loggas även när ingen har appen öppen.
+  setInterval(() => { cache.delete('scan'); scan().catch(err => console.error('Skanningen misslyckades:', err.message)); }, 60 * 60 * 1000).unref();
+}
