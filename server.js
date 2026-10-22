@@ -6,6 +6,7 @@ import { fetchBars } from './lib/data.js';
 import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyze.js';
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
+import * as signalLog from './lib/log.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend } from './lib/avanza.js';
 
@@ -64,10 +65,18 @@ async function backtestFor(s, bars) {
   const bt = backtest(bars, {
     reports: s.isIndex ? [] : reportDates(s.symbol),
     reportBlock: s.isIndex ? 0 : REPORT_BLOCK_DAYS,
-    allow: t => macroAt(dayOf(t)).score >= 0,
+    allow: t => macroAt(dayOf(t)).score >= 1,
   });
-  for (const t of bt.trades) t.status = macroAt(dayOf(t.t)).score >= 1 ? 'strong' : 'buy';
+  for (const t of bt.trades) t.status = 'strong';
   return bt;
+}
+
+// En stapel är slutgiltig när dagen är slut på Stockholmsbörsen (efter 18.00).
+function isFinal(t) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false })
+    .formatToParts(new Date()).map(p => [p.type, p.value]));
+  const todaySthlm = `${parts.year}-${parts.month}-${parts.day}`;
+  return dayOf(t) < todaySthlm || +parts.hour >= 18;
 }
 
 async function scan() {
@@ -89,6 +98,13 @@ async function scan() {
         return { symbol: s.symbol, name: s.name, isIndex: !!s.isIndex, error: err.message };
       }
     });
+    const signals = rows.filter(r => r.status === 'strong' && isFinal(r.t));
+    if (signals.length) {
+      await signalLog.record(signals.map(r => ({
+        date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+        tps: r.plan.tps.map(x => x.price), loggedAt: new Date().toISOString(),
+      })));
+    }
     return { updated: Date.now(), macro: (await macro())(today()), rows };
   });
 }
@@ -112,6 +128,25 @@ async function summary() {
     });
     return { updated: Date.now(), all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')) };
   });
+}
+
+// Signalloggen med utfall räknat från kurserna efter signaldagen.
+async function logView() {
+  const list = await signalLog.entries();
+  const out = [];
+  for (const e of list) {
+    let o;
+    try { o = signalLog.outcome(e, await fetchBars(e.symbol)); } catch { o = { state: 'okänd' }; }
+    out.push({ ...e, ...o });
+  }
+  out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
+  const closed = out.filter(x => x.state === 'stängd');
+  const pct = k => closed.length ? Math.round(1000 * closed.filter(x => x.hit >= k).length / closed.length) / 10 : null;
+  return {
+    entries: out,
+    stats: { n: out.length, closed: closed.length, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
+      avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null },
+  };
 }
 
 async function analysis(symbol) {
@@ -153,6 +188,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await scan());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
+    if (url.pathname === '/api/log') return send(res, 200, await logView());
     if (url.pathname === '/api/macro') return send(res, 200, (await macro())(today()));
     if (url.pathname === '/api/products') {
       const meta = bySymbol.get(url.searchParams.get('symbol'));
@@ -180,3 +216,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => console.log(`OMX Analys körs på http://localhost:${PORT}`));
+
+// Kör skannern varje timme så att signaler loggas även när ingen har appen öppen.
+setInterval(() => { cache.delete('scan'); scan().catch(err => console.error('Skanningen misslyckades:', err.message)); }, 60 * 60 * 1000).unref();

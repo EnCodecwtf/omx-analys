@@ -111,7 +111,7 @@ function renderDetail(d) {
   // Signal
   const col = A.score >= 50 ? 'var(--green)' : A.score >= 30 ? 'var(--amber)' : 'var(--muted)';
   const explain = {
-    strong: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt. Marknadsläget är gynnsamt: full position.',
+    strong: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt, och marknadsläget är gynnsamt.',
     buy: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt. Marknadsläget är neutralt: halv position.',
     watch: 'Intressant läge, men alla krav för köpsignal är inte uppfyllda än. Vänta på vändning vid stöd.',
     neutral: 'Inget tydligt köpläge just nu.',
@@ -243,12 +243,33 @@ function renderMacro(m) {
     <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>`;
 }
 
+async function loadLog() {
+  try {
+    const d = await (await fetch('/api/log')).json();
+    const s = d.stats;
+    const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
+    const state = e => e.state === 'stängd'
+      ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
+      : e.state === 'öppen' ? `öppen${e.hit ? ' · TP' + e.hit : ''}` : esc(e.state);
+    $('#log-body').innerHTML = d.entries.length
+      ? `<p>${s.n} signaler sparade sedan start, ${s.closed} stängda och ${s.open} öppna.
+          Stängda: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.</p>
+        <table><tr><th>Datum</th><th>Aktie</th><th class="r">Köp</th><th class="r">Utfall</th></tr>
+        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}</td>
+          <td class="r num">${e.entry ? fmt(e.entry) : '–'}</td><td class="r">${state(e)}</td></tr>`).join('')}</table>`
+      : '<p>Inga signaler sparade än. Varje stark köpsignal sparas när dagens stängningskurs är klar, och utfallet följs med samma regler som backtestet. Det är det riktiga beviset på om strategin fungerar.</p>';
+    for (const el of $('#log-body').querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+  } catch {
+    $('#log-body').textContent = 'Kunde inte läsa signalloggen.';
+  }
+}
+
 async function loadSummary() {
   try {
     const s = await (await fetch('/api/summary')).json();
     const a = s.all;
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    $('#summary').innerHTML = `<span>Backtest med rapportspärr och makrofilter (${a.n} signaler):</span>
+    $('#summary').innerHTML = `<span>Backtest, starka köpsignaler med rapportspärr och makrofilter (${a.n} st):</span>
       <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
       <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
       <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
@@ -260,3 +281,4 @@ async function loadSummary() {
 
 loadScan(false);
 loadSummary();
+loadLog();

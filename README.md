@@ -20,9 +20,8 @@ MACD, stängning över gårdagens topp, engulfing eller hammare, divergens). Öv
 
 | Status | Krav |
 |---|---|
-| **STARK KÖPSIGNAL** | Alla krav för köpsignal och makropoäng 1 eller mer: full position |
-| **KÖPSIGNAL** | Poäng ≥ 42, priset under EMA 200, priset testar en stödzon, RSI vänder upp från under 40, MACD-histogrammet vänder upp, det finns en giltig Elliottvågräkning och makropoängen är 0: halv position |
-| **BEVAKA** | Bra läge men alla krav är inte uppfyllda, eller köpsignalen är spärrad av rapport eller makro |
+| **STARK KÖPSIGNAL** | Poäng ≥ 42, priset under EMA 200, priset testar en stödzon, RSI vänder upp från under 40, MACD-histogrammet vänder upp, det finns en giltig Elliottvågräkning, ingen rapport inom 10 handelsdagar och makropoäng 1 eller mer |
+| **BEVAKA** | Bra läge men alla krav är inte uppfyllda, eller signalen är spärrad av rapport eller makro |
 | **AVVAKTA** | Överköpt eller sen fas |
 
 **Handelsplan:** Stoppet läggs under stödzonen och de senaste fem dagarnas botten, minst 1 ATR bort. Målen tas från
@@ -59,13 +58,13 @@ Att också sälja dagen före rapporten gav inget extra.
 | VIX under 15 | −1 |
 | Räntebesked från Fed (FOMC) inom 7 dagar (`data/fomc.json`) | −1 |
 
-Makropoängen avgör positionsstorleken:
+Bara makropoäng 1 eller mer ger köpsignal:
 
-| Makropoäng | Position | TP1 | TP2 | Snitt per affär |
+| Makropoäng | OMXS30-aktier: TP1 | TP2 | Snitt per affär | Nya nordiska aktier: snitt per affär |
 |---|---|---|---|---|
-| Under 0 | Inga nya köp | 62 % | 46 % | +0,08 R |
-| 0 | Halv | 67 % | 60 % | +0,28 R |
-| 1 eller mer | Full | 81 % | 75 % | +0,73 R |
+| Under 0 | 62 % | 46 % | +0,08 R | – |
+| 0 | 64 % | 57 % | +0,22 R | −0,05 R |
+| 1 eller mer | 81 % | 75 % | +0,74 R | +0,29 R |
 
 Strategin fungerar bäst när marknaden är rädd. Översålda storbolag studsar då kraftigast.
 
@@ -89,29 +88,48 @@ Krav: TP1 ska nås i minst 60 % av affärerna och TP2 i minst 54 %. Så simulera
 - Öppnar kursen under stoppet säljs positionen på öppningskursen. Det gör stora förluster efter rapporter synliga.
 - Courtage ingår inte.
 
-| OMXS30 2022–2026, med rapportspärr och makrofilter | Affärer | TP1 | TP2 | TP3 | Snitt per affär |
+| 2022–2026, starka köpsignaler | Affärer | TP1 | TP2 | TP3 | Snitt per affär |
 |---|---|---|---|---|---|
-| Alla signaler | 184 | 74,5 % | 67,4 % | 46,2 % | +0,53 R |
-| Stark köpsignal | 108 | 81,5 % | 75,0 % | 57,4 % | +0,74 R |
-| Köpsignal | 76 | 64,5 % | 56,6 % | 30,3 % | +0,22 R |
+| OMXS30 (reglerna togs fram här) | 114 | 81,6 % | 73,7 % | 55,3 % | +0,71 R |
+| 82 nordiska storbolag som reglerna aldrig sett | 280 | 71 % | 59 % | – | +0,29 R |
+
+Testet på aldrig sedda aktier är det ärligaste måttet. Det omfattar resten av Large Cap Stockholm samt Oslo, Helsingfors och
+Köpenhamn. Fördelen höll i både 2022–2024 och 2025–2026, men den var ungefär 40 % av vad OMX-testet visar.
 
 ### Kontosimulering
-Simuleringen gäller 10 000 kr, 2023 till oktober 2026, och använder OMXS30-aktierna:
+Simuleringen gäller 10 000 kr, 2023 till oktober 2026, och använder bara starka köpsignaler:
 
 - **Positionsstorlek efter risk:** varje affär storleksanpassas så att en förlust vid stopp är den valda andelen av kontot.
 - **Hävstång:** via minifutures, med högst 10 samtidiga positioner.
-- **Kostnad:** 0,3 % av exponeringen per affär för spread och finansiering.
+- **Kostnad:** 0,3 % av exponeringen per affär.
 
-| Risk per affär | Avkastning per år | Största nedgång |
-|---|---|---|
-| 2 % | +35 % | −19 % |
-| 3 % | +53 % | −27 % |
-| 4 % | +71 % | −34 % |
-| 6 % | +107 % | −48 % |
+| Risk per affär | OMXS30 | Största nedgång | Nya nordiska aktier | Största nedgång |
+|---|---|---|---|---|
+| 2 % | +30 %/år | −17 % | +9 %/år | −24 % |
+| 3 % | +45 %/år | −24 % | +11 %/år | −35 % |
+| 4 % | +61 %/år | −31 % | +12 %/år | −44 % |
+| 6 % | +92 %/år | −44 % | +9 %/år | −60 % |
 
-**Varning:** Reglerna, rapportspärren och makropoängen är framtagna på samma period som de testas på. På aktier
-från USA och DAX som reglerna inte sett var fördelen per affär ungefär en tredjedel så stor. Räkna med klart lägre avkastning
-framåt. Alla Stockholmsaktier faller dessutom ofta samtidigt, så flera stopp kan nås samma dag.
+Räkna med ett resultat mellan kolumnerna. **100 % per år går inte att nå med rimlig risk.** Signalerna kommer i klungor när
+marknaden är rädd. Om marknaden fortsätter ned förlorar många positioner samtidigt.
+
+**Testat men inte infört, eftersom inget förbättrade resultatet:**
+
+| Förändring | Resultat |
+|---|---|
+| Följande stopp efter TP2 (2–3 ATR) i stället för TP3 | +0,52–0,53 R mot +0,525 R, lägre avkastning per år |
+| Tidsgräns 10–15 dagar om TP1 inte nås | Lägre TP1-träff och lägre avkastning |
+| Tak för total risk (12–30 %) | Stryker de bästa signalerna, som kommer i klungor. 20 % tak gav 32 %/år mot 99 % utan tak, med samma nedgång |
+| Fler aktier (Large Cap och övriga Norden) | Fler affärer men svagare. Avkastningen blev lägre än med bara OMXS30 |
+| Olika risk för olika signalnivåer | Liten förbättring. Ersattes av regeln att bara starka signaler handlas |
+
+### Signallogg (framåttest)
+Varje stark köpsignal sparas när dagens stängningskurs är klar, efter 18.00 svensk tid. Servern kör skannern varje timme.
+Utfallet räknas sedan med samma regler som backtestet. Loggen visas under "Signallogg" i appen och är det enda riktiga beviset
+på hur strategin fungerar framåt.
+
+Loggen sparas i `data/signal-log.json` (eller `LOG_FILE`). Med `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` sparas
+den i stället i Upstash Redis. Det rekommenderas på gratis hosting, där filer försvinner vid omstart.
 
 **Det här är inte investeringsrådgivning.**
 
@@ -158,6 +176,7 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 - `lib/avanza.js`: urval av minifutures och certifikat på Avanza
 - `lib/events.js`: rapportdatum (Yahoo Finance) och räntebesked
 - `lib/macro.js`: marknadsläge (OMXS30-trend, bredd, VIX, FOMC)
+- `lib/log.js`: signallogg för framåttest
 - `data/`: historiska rapportdatum och FOMC-kalender
-- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`) och statiska filer
+- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

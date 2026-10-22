@@ -159,9 +159,8 @@ test('Rapportspärr och makrofilter gör köpsignaler till BEVAKA', async () => 
   const r2 = applyGuards(base(), { report: { date: '2027-01-30' }, reportDays: 60, macro: { score: -1, size: 0 } });
   assert.equal(r2.status, 'watch');
   const r3 = applyGuards(base(), { report: { date: '2027-01-30' }, reportDays: 60, macro: { score: 0, size: 0.5 } });
-  assert.equal(r3.status, 'buy');
+  assert.equal(r3.status, 'watch');
   assert.equal(applyGuards(base(), { macro: { score: 2, size: 1 } }).status, 'strong');
-  assert.equal(r3.guards.size, 0.5);
 });
 
 test('Rapportdatum uppskattas från förra året och handelsdagar räknas', async () => {
@@ -180,4 +179,16 @@ test('Makropoäng', async () => {
   const m = buildMacro({ omxBars, vixBars, stockBars })(new Date((1_700_000_000 + 299 * 86400) * 1000).toISOString().slice(0, 10));
   assert.ok(m.score >= 2);
   assert.ok(m.size >= 1 || m.fomcDays <= 7);
+});
+
+test('Signalloggen följer utfallet med samma regler som backtestet', async () => {
+  const { outcome } = await import('../lib/log.js');
+  const day = i => new Date((1_700_000_000 + i * 86400) * 1000).toISOString().slice(0, 10);
+  const bars = Array.from({ length: 10 }, (_, i) => ({ t: 1_700_000_000 + i * 86400, o: 100 + i, h: 101 + i, l: 99 + i, c: 100.5 + i }));
+  const e = { date: day(0), stop: 95, tps: [103, 106, 120] };
+  const o = outcome(e, bars);
+  assert.equal(o.entry, 101);
+  assert.equal(o.hit, 2);
+  assert.equal(o.state, 'öppen');
+  assert.equal(outcome({ ...e, date: day(9) }, bars).state, 'väntar på köp');
 });
