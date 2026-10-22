@@ -135,3 +135,17 @@ test('Avanza: bara papper med säker hävstång rekommenderas', async () => {
   assert.equal(r.rejected.knockout, 1);
   assert.ok(r.minis[0].knockout <= plan.stop - 2);
 });
+
+test('Backtest av säljsignaler: stopp över och mål under köpkursen', async () => {
+  const { invertBars } = await import('../lib/analyze.js');
+  const bars = path([200, 150, 175, 130, 150, 110, 125, 95, 110, 80, 95, 70, 80, 60], 25);
+  const inv = invertBars(bars, 10000);
+  assert.ok(Math.abs(inv[0].c - 10000 / bars[0].c) < 1e-9);
+  assert.ok(inv[0].h >= inv[0].l);
+  const bt = backtest(bars, { start: 210, side: 'short' });
+  for (const t of bt.trades) {
+    assert.equal(t.side, 'short');
+    assert.ok(t.stop > t.entry);
+    assert.ok(t.tps[0] < t.entry);
+  }
+});
