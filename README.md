@@ -68,7 +68,7 @@ Bara makropoäng 1 eller mer ger köpsignal:
 
 Strategin fungerar bäst när marknaden är rädd. Översålda storbolag studsar då kraftigast.
 
-### Krig och oro (positionsstorlek)
+### Krig och oro (riskfaktor 1 för positionsstorleken)
 Två mått sätter positionen till hälften när de slår till:
 
 - **Krigsspik:** geopolitiskt riskindex (GPR, Caldara och Iacoviello, matteoiacoviello.com/gpr.htm) som 7-dagarssnitt minst 15 % över
@@ -170,6 +170,43 @@ säkerhetsgräns för aktier (6x).
 | Naturgas | +0,05 R | Ingen fördel. Volatilitet 70 % per år. Börshandlade produkter tappar dessutom värde vid byte av terminskontrakt |
 | Kakao | +0,15 R köp, +0,95 R blankning | Blankningarna är bara 30 affärer, nästan alla i boomen och kraschen 2024–2025. Inte pålitligt |
 | Kaffe | +0,01 R | Ingen fördel |
+
+### Makroparametrar: räntor, dollar, olja, Fed (2017–2026)
+24 parametrar testades på 376 starka signaler. Gränserna (tredjedelar) sattes bara på 2017–2021, och resultatet kontrollerades
+sedan på 2022–2026. En parameter räknas som robust om den pekar åt samma håll med minst 0,15 R skillnad i båda perioderna.
+
+**Robusta parametrar:**
+
+| Parameter | Dåligt läge | Bra läge |
+|---|---|---|
+| Dagar till Feds räntebesked | Under 15 dagar: +0,07 / +0,09 R | Över 34 dagar: +0,46 / +0,51 R |
+| Dollar (DXY) mot 50-dagarssnitt | Över: +0,19 / +0,26 R | Under: +0,57 / +0,70 R |
+| Dollar, 200-dagarssnitt, DXY 20 dagar, USD/SEK 20 dagar | Samma mönster som ovan, eftersom det är samma faktor | |
+| GPR (krig) mot normalt | Hög: +0,35 / +0,29 R | Låg: +0,51 / +0,69 R |
+
+Siffrorna är 2017–2021 / 2022–2026.
+
+**Inte robusta:** 10-årsräntans nivå och förändring, räntekurvan (10 år − 3 mån), 3-månadersräntan, Brent (20 dagar,
+5 dagar och mot 200-dagarssnittet), guld 20 dagar, koppar mot guld, OMXS30 5 och 20 dagar, VIX-nivå, VIX9D/VIX ensam,
+antal Fed-tal de närmaste 3 dagarna, om Fed-ordföranden talar inom 3 dagar, samt S&P 500 mot 200-dagarssnittet.
+Fed-talen kommer från federalreserve.gov/json/ne-speeches.json.
+
+**Positionsstorlek i appen:** Tre riskfaktorer halverar var och en positionen:
+1. Krigsspik eller akut oro.
+2. Räntebesked inom 15 dagar.
+3. Dollar över 50-dagarssnittet.
+
+| Regel | 2017–2021 (regler valda här) | 2022–2026 (test) | Hela perioden |
+|---|---|---|---|
+| Bara krig/oro, 6 % grundrisk | +22 %/år, största nedgång −32 % | +73 %/år, −27 % | +45 %/år, −32 % |
+| Alla tre, 6 % grundrisk | +23 %/år, −17 % | +53 %/år, −21 % | +37 %/år, −21 % |
+| Alla tre, 8 % grundrisk | +29 %/år, −22 % | +72 %/år, −28 % | +49 %/år, −28 % |
+| Alla tre, 10 % grundrisk | +35 %/år, −27 % | +91 %/år, −34 % | +60 %/år, −34 % |
+
+Bara cirka 10 % av affärerna får full storlek.
+
+**Rättning:** `data/fomc.json` saknade räntebesked före 2022, så makropoängen drog aldrig av för räntebesked 2017–2021.
+Datum för 2015–2021 är nu tillagda från Feds historiska sidor (fomchistorical<år>.htm), inklusive extramötena i mars 2020.
 
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med

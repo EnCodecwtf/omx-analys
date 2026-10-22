@@ -196,7 +196,7 @@ test('Signalloggen följer utfallet med samma regler som backtestet', async () =
 test('Krigsspik eller akut oro ger halv position', async () => {
   const { applyGuards } = await import('../lib/analyze.js');
   const { gprLevel } = await import('../lib/stress.js');
-  const ev = applyGuards({ status: 'buy', warnings: [] }, { macro: { score: 1, size: 1 }, stress: { stressed: true, size: 0.5 } });
+  const ev = applyGuards({ status: 'buy', warnings: [] }, { macro: { score: 1, size: 1 }, stress: { stressed: true, factors: 1, size: 0.5 } });
   assert.equal(ev.status, 'strong');
   assert.equal(ev.guards.size, 0.5);
   const series = {};

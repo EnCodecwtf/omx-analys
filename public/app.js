@@ -19,7 +19,7 @@ let scanData = null;
 let lastDetail = null;
 const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignoreras */ } } };
 $('#acct').value = store.get('acct', '10000');
-$('#risk').value = store.get('risk', '3');
+$('#risk').value = store.get('risk', '6');
 for (const id of ['acct', 'risk']) $('#' + id).addEventListener('input', () => {
   store.set(id, $('#' + id).value);
   if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
@@ -126,7 +126,7 @@ function renderDetail(d) {
     <dl class="kv" style="margin-top:10px">
       ${A.guards?.report ? `<dt>Nästa rapport</dt><dd>${esc(A.guards.report.date)} <span class="muted">(om ${A.guards.report.days} handelsdagar, ${esc(A.guards.report.source)})</span></dd>` : ''}
       ${A.guards?.macro ? `<dt>Makro</dt><dd>${esc(A.guards.macro.label)} <span class="muted">(poäng ${A.guards.macro.score})</span></dd>` : ''}
-      ${A.guards?.stress ? `<dt>Krig och oro</dt><dd>${A.guards.stress.stressed ? 'Förhöjd – halv position' : 'Normal'}</dd>` : ''}
+      ${A.guards?.stress ? `<dt>Riskfaktorer</dt><dd>${A.guards.stress.factors ? `${A.guards.stress.factors} av 3 – positionen × ${String(A.guards.stress.size).replace('.', ',')}` : 'Inga'}</dd>` : ''}
     </dl>`;
 
   // Handelsplan
@@ -242,7 +242,8 @@ function renderMacro(m, st, cy) {
   if (!m) return;
   const cycleLine = cy ? `<div style="margin-top:6px">Portfölj: <b>30–50 % guld</b> som ledig kassa.
     Bitcoin-cykel: <b class="${cy.inWindow ? 'pos' : ''}">${esc(cy.label)}</b><div class="muted">${esc(cy.text)}</div></div>` : '';
-  const stressLine = st ? `<div style="margin-top:6px">Krig och oro: <b class="${st.stressed ? 'neg' : 'pos'}">${st.stressed ? 'Förhöjd – halv position' : 'Normal – hel position'}</b></div>
+  const sizeText = s => s === 1 ? 'hel position' : s === 0.5 ? 'halv position' : s === 0.25 ? 'en fjärdedels position' : 'en åttondels position';
+  const stressLine = st ? `<div style="margin-top:6px">Positionsstorlek: <b class="${st.size < 1 ? 'neg' : 'pos'}">${sizeText(st.size)}</b> <span class="muted">(${st.factors ?? 0} av 3 riskfaktorer)</span></div>
     <ul>${st.parts.map(p => `<li class="${p.bad ? 'bad' : ''}">${esc(p.text)}</li>`).join('')}</ul>` : '';
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
