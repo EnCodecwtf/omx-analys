@@ -1,0 +1,118 @@
+import http from 'node:http';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fetchBars } from './lib/data.js';
+import { evaluate, backtest } from './lib/analyze.js';
+import { computeIndicators } from './lib/indicators.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = process.env.PORT || 3000;
+const CHART_BARS = 500;
+const CACHE_MS = 15 * 60 * 1000;
+
+const symbols = JSON.parse(await fs.readFile(path.join(__dirname, 'symbols.json'), 'utf8'));
+const universe = [{ ...symbols.index, isIndex: true }, ...symbols.stocks];
+const bySymbol = new Map(universe.map(s => [s.symbol, s]));
+
+const r4 = x => Math.round(x * 1e4) / 1e4;
+const cache = new Map();
+async function cached(key, fn) {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+  const value = await fn();
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: limit }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }));
+  return out;
+}
+
+async function scan() {
+  return cached('scan', async () => {
+    const rows = await mapLimit(universe, 6, async s => {
+      try {
+        const bars = await fetchBars(s.symbol);
+        const ev = evaluate(bars.slice(-CHART_BARS));
+        const prevClose = bars[bars.length - 2]?.c;
+        return {
+          symbol: s.symbol, name: s.name, isIndex: !!s.isIndex,
+          price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
+          t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
+          elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
+          plan: ev.plan,
+          spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
+        };
+      } catch (err) {
+        return { symbol: s.symbol, name: s.name, isIndex: !!s.isIndex, error: err.message };
+      }
+    });
+    return { updated: Date.now(), rows };
+  });
+}
+
+async function analysis(symbol) {
+  return cached(`a:${symbol}`, async () => {
+    const meta = bySymbol.get(symbol);
+    const all = await fetchBars(symbol);
+    const bars = all.slice(-CHART_BARS);
+    const ev = evaluate(bars);
+    const ind = computeIndicators(all);
+    const off = all.length - bars.length;
+    const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
+    const bt = backtest(all);
+    return {
+      symbol, name: meta.name, isIndex: !!meta.isIndex,
+      bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
+      ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
+      analysis: ev,
+      backtest: {
+        stats: bt.stats,
+        trades: bt.trades.map(t => ({ ...t, exitT: all[t.exitI]?.t })),
+      },
+    };
+  });
+}
+
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+
+function send(res, status, body, type = 'application/json; charset=utf-8') {
+  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+  res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://x');
+  try {
+    if (url.pathname === '/api/scan') {
+      if (url.searchParams.has('refresh')) cache.clear();
+      return send(res, 200, await scan());
+    }
+    if (url.pathname === '/api/analysis') {
+      const symbol = url.searchParams.get('symbol');
+      if (!bySymbol.has(symbol)) return send(res, 404, { error: 'Okänd symbol' });
+      return send(res, 200, await analysis(symbol));
+    }
+    let file = url.pathname === '/' ? '/index.html' : url.pathname;
+    const full = path.normalize(path.join(__dirname, 'public', file));
+    if (!full.startsWith(path.join(__dirname, 'public'))) return send(res, 403, 'Forbidden', 'text/plain');
+    const data = await fs.readFile(full);
+    send(res, 200, data, MIME[path.extname(full)] || 'application/octet-stream');
+  } catch (err) {
+    if (err.code === 'ENOENT') return send(res, 404, 'Hittades inte', 'text/plain; charset=utf-8');
+    console.error(err);
+    send(res, 500, { error: err.message });
+  }
+});
+
+server.listen(PORT, () => console.log(`OMX Analys körs på http://localhost:${PORT}`));

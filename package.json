@@ -1,0 +1,12 @@
+{
+  "name": "omx-analys",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Teknisk analys av OMXS30 och dess aktier: stöd/motstånd, FVG, Elliottvågor och köpsignaler med vinstmål.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" }
+}

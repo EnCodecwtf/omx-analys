@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <title>OMX Analys</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="26" height="26">
+      <span>OMX Analys</span>
+    </div>
+    <div class="top-right">
+      <span id="updated" class="muted"></span>
+      <button id="refresh" class="btn" title="Hämta ny data">Uppdatera</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="scanner">
+      <div class="scanner-head">
+        <h2>OMXS30-skanner</h2>
+        <div class="filters" role="tablist">
+          <button class="chip active" data-filter="all">Alla</button>
+          <button class="chip" data-filter="signals">Köpsignaler</button>
+          <button class="chip" data-filter="watch">Bevaka</button>
+        </div>
+      </div>
+      <div id="scan-list" class="scan-list"><div class="loading">Hämtar och analyserar 31 instrument…</div></div>
+    </aside>
+
+    <section class="detail" id="detail">
+      <div class="detail-head">
+        <button id="back" class="btn back" aria-label="Tillbaka till listan">‹</button>
+        <div>
+          <h1 id="d-name">–</h1>
+          <div id="d-sub" class="muted"></div>
+        </div>
+        <div id="d-badge"></div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="layers">
+          <label><input type="checkbox" data-layer="zones" checked> Stöd/motstånd</label>
+          <label><input type="checkbox" data-layer="fvg" checked> FVG</label>
+          <label><input type="checkbox" data-layer="elliott" checked> Elliott</label>
+          <label><input type="checkbox" data-layer="zigzag"> ZigZag</label>
+          <label><input type="checkbox" data-layer="fib"> Fibonacci</label>
+          <label><input type="checkbox" data-layer="ema" checked> EMA</label>
+          <label><input type="checkbox" data-layer="plan" checked> Handelsplan</label>
+          <label><input type="checkbox" data-layer="history" checked> Historiska signaler</label>
+        </div>
+        <canvas id="chart"></canvas>
+        <canvas id="rsi-chart" class="rsi"></canvas>
+        <div id="tooltip" class="tooltip" hidden></div>
+      </div>
+
+      <div class="cards">
+        <article class="card" id="c-signal"></article>
+        <article class="card" id="c-plan"></article>
+        <article class="card" id="c-elliott"></article>
+        <article class="card" id="c-levels"></article>
+        <article class="card" id="c-backtest"></article>
+      </div>
+
+      <p class="disclaimer">
+        Analysen är automatisk och bygger på historiska kurser från Yahoo Finance, som kommer med fördröjning. Den är inte
+        investeringsrådgivning. Historiskt resultat är ingen garanti för framtiden. Använd alltid stoppnivån och anpassa
+        positionsstorleken så att en förlust på 1 R är en förlust du har råd med.
+      </p>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

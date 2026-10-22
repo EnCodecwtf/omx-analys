@@ -1,0 +1,174 @@
+import { PriceChart } from './chart.js';
+
+const $ = s => document.querySelector(s);
+const STATUS = {
+  strong: { text: 'STARK KÖPSIGNAL', order: 0 },
+  buy: { text: 'KÖPSIGNAL', order: 1 },
+  watch: { text: 'BEVAKA', order: 2 },
+  neutral: { text: 'NEUTRAL', order: 3 },
+  avoid: { text: 'AVVAKTA', order: 4 },
+};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = v => v == null ? '–' : v >= 1000
+  ? v.toLocaleString('sv-SE', { maximumFractionDigits: 0 })
+  : v.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pct = (a, b) => ((a / b - 1) * 100).toFixed(1).replace('.', ',') + ' %';
+const badge = (s, big) => `<span class="badge ${s}${big ? ' big' : ''}">${STATUS[s].text}</span>`;
+
+let scanData = null;
+let filter = 'all';
+let current = null;
+const chart = new PriceChart($('#chart'), $('#rsi-chart'), $('#tooltip'));
+
+for (const cb of document.querySelectorAll('[data-layer]')) {
+  cb.addEventListener('change', () => chart.setLayer(cb.dataset.layer, cb.checked));
+}
+for (const b of document.querySelectorAll('[data-filter]')) {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
+    filter = b.dataset.filter;
+    renderScan();
+  });
+}
+$('#refresh').addEventListener('click', () => loadScan(true));
+$('#back').addEventListener('click', () => { document.body.classList.remove('show-detail'); history.replaceState(null, '', '#'); });
+
+function spark(values, up) {
+  const w = 64, h = 22, lo = Math.min(...values), hi = Math.max(...values);
+  const pts = values.map((v, i) => `${(i / (values.length - 1) * w).toFixed(1)},${(h - (v - lo) / (hi - lo || 1) * h).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="1.5" points="${pts}"/></svg>`;
+}
+
+async function loadScan(refresh) {
+  $('#refresh').disabled = true;
+  if (!scanData) $('#scan-list').innerHTML = '<div class="loading">Hämtar och analyserar 31 instrument…</div>';
+  try {
+    const res = await fetch('/api/scan' + (refresh ? '?refresh=1' : ''));
+    scanData = await res.json();
+    $('#updated').textContent = 'Analys ' + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    renderScan();
+    const fromHash = decodeURIComponent(location.hash.slice(1));
+    const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
+    if (pick) openSymbol(pick.symbol, { keepView: !fromHash && !refresh, refresh });
+  } catch (e) {
+    $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta data: ${esc(e.message)}</div>`;
+  } finally {
+    $('#refresh').disabled = false;
+  }
+}
+
+function renderScan() {
+  const rows = scanData.rows.slice().sort((a, b) =>
+    (b.isIndex - a.isIndex) || ((STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9)) || ((b.score ?? 0) - (a.score ?? 0)));
+  const visible = rows.filter(r => r.isIndex || filter === 'all'
+    || (filter === 'signals' && (r.status === 'strong' || r.status === 'buy'))
+    || (filter === 'watch' && r.status === 'watch'));
+  const list = $('#scan-list');
+  list.innerHTML = visible.map(r => {
+    if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
+    const up = r.changePct >= 0;
+    return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
+      <div class="name">${esc(r.name)} ${badge(r.status)}</div>
+      <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
+        <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
+      </div>
+      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+    </div>`;
+  }).join('') + (visible.length <= 1 ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
+  for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+}
+
+async function openSymbol(symbol, { keepView, refresh } = {}) {
+  current = symbol;
+  document.querySelectorAll('.row').forEach(r => r.classList.toggle('active', r.dataset.symbol === symbol));
+  if (!keepView) { document.body.classList.add('show-detail'); history.replaceState(null, '', '#' + encodeURIComponent(symbol)); }
+  $('#d-name').textContent = scanData?.rows.find(r => r.symbol === symbol)?.name || symbol;
+  $('#d-sub').textContent = 'Laddar analys…';
+  const res = await fetch('/api/analysis?symbol=' + encodeURIComponent(symbol) + (refresh ? '&r=' + Date.now() : ''));
+  const d = await res.json();
+  if (current !== symbol) return;
+  renderDetail(d);
+}
+
+function renderDetail(d) {
+  const A = d.analysis, pl = A.plan;
+  const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
+  $('#d-name').textContent = d.name;
+  $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}`;
+  $('#d-badge').innerHTML = badge(A.status, true);
+  chart.setData(d);
+
+  // Signal
+  const col = A.score >= 50 ? 'var(--green)' : A.score >= 30 ? 'var(--amber)' : 'var(--muted)';
+  const explain = {
+    strong: 'Översåld rekyl som vänder upp vid en stark stödzon, och flera faktorer pekar åt samma håll.',
+    buy: 'Flera faktorer pekar på ett köpläge och momentum har börjat vända upp.',
+    watch: 'Priset är i ett intressant läge men har inte vänt upp än. Vänta på vändning.',
+    neutral: 'Inget tydligt köpläge just nu.',
+    avoid: 'Sent eller överköpt läge. Vänta på en rekyl.',
+  }[A.status];
+  $('#c-signal').innerHTML = `<h3>Signal</h3>
+    <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
+    <p>${explain}</p>
+    <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
+    ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}`;
+
+  // Handelsplan
+  const active = A.status === 'strong' || A.status === 'buy';
+  $('#c-plan').innerHTML = `<h3>Handelsplan ${active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
+    <table>
+      <tr><th></th><th class="r">Nivå</th><th class="r">Avstånd</th><th class="r">R</th></tr>
+      <tr class="plan-row"><td>Köp</td><td class="r num">${fmt(pl.entry)}</td><td class="r num">–</td><td class="r">–</td></tr>
+      <tr class="plan-row sl"><td>Stopp</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
+      ${pl.tps.map((t, k) => `<tr class="plan-row tp"><td>TP${k + 1}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
+    </table>
+    <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP1 är nådd.
+    Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
+
+  // Elliott
+  const ew = A.elliott.primary, maj = A.elliottMajor.primary;
+  const ewBlock = e => `<p><b>${esc(e.label)}</b> <span class="muted">· säkerhet ${e.confidence} %</span></p>
+    <p>${esc(e.text)}</p>
+    <dl class="kv">
+      ${e.zone ? `<dt>${e.bias > 0 && e.setup ? 'Köpzon' : 'Zon'}</dt><dd class="num">${fmt(e.zone[0])} – ${fmt(e.zone[1])}</dd>` : ''}
+      ${e.invalidation != null ? `<dt>Ogiltig under/över</dt><dd class="num">${fmt(e.invalidation)}</dd>` : ''}
+      ${e.targets.map(t => `<dt>${esc(t.label)}</dt><dd class="num">${fmt(t.price)}</dd>`).join('')}
+    </dl>
+    <p class="muted" style="font-size:12px">${e.notes.map(esc).join(' · ')}</p>`;
+  $('#c-elliott').innerHTML = `<h3>Elliottvågor</h3>
+    ${ew ? ewBlock(ew) : '<p class="muted">Ingen giltig vågräkning hittades i den senaste strukturen.</p>'}
+    ${A.elliott.alternatives.length ? `<p class="muted" style="font-size:12px">Alternativ: ${A.elliott.alternatives.map(a => `${esc(a.label)} (${a.confidence} %)`).join(', ')}</p>` : ''}
+    ${maj ? `<p style="font-size:13px;margin-top:10px"><span class="muted">Högre grad:</span> ${esc(maj.label)} <span class="muted">(${maj.confidence} %)</span></p>` : ''}`;
+
+  // Nivåer
+  const zoneName = { support: 'Stöd', resistance: 'Motstånd', inside: 'Pris i zonen' };
+  $('#c-levels').innerHTML = `<h3>Stöd, motstånd och FVG</h3>
+    <table>
+      <tr><th>Typ</th><th class="r">Zon</th><th class="r">Styrka</th><th class="r">Avstånd</th></tr>
+      ${A.zones.map(z => `<tr><td class="${z.kind === 'resistance' ? 'neg' : z.kind === 'support' ? 'pos' : ''}">${zoneName[z.kind]}${z.flipped ? ' <span class="muted">↺</span>' : ''}</td>
+        <td class="r num">${fmt(z.lo)} – ${fmt(z.hi)}</td><td class="r num">${z.score} · ${z.touches}×</td><td class="r num">${pct((z.lo + z.hi) / 2, A.price)}</td></tr>`).join('')}
+      ${A.fvgs.slice(-6).reverse().map(g => `<tr><td style="color:${g.type === 'bull' ? '#2dd4bf' : '#f472b6'}">FVG ${g.type === 'bull' ? '↑' : '↓'}</td>
+        <td class="r num">${fmt(g.lo)} – ${fmt(g.hi)}</td><td class="r num">${g.fillPct} % fylld</td><td class="r num">${pct((g.lo + g.hi) / 2, A.price)}</td></tr>`).join('')}
+    </table>
+    <p class="muted" style="font-size:12px;margin-top:8px">↺ betyder att zonen har bytt roll, till exempel från motstånd till stöd. Styrkan väger ihop antal träffar och hur nya de är.</p>`;
+
+  // Backtest
+  const s = d.backtest.stats;
+  const recent = d.backtest.trades.slice(-6).reverse();
+  $('#c-backtest').innerHTML = `<h3>Backtest – ${esc(d.name)}, cirka 4 år</h3>
+    <div class="stats">
+      <div class="stat"><b class="num">${s.n}</b><span>signaler</span></div>
+      <div class="stat"><b class="num">${s.tp1Rate ?? '–'} %</b><span>nådde TP1</span></div>
+      <div class="stat"><b class="num">${s.winRate ?? '–'} %</b><span>vinnare</span></div>
+      <div class="stat"><b class="num ${s.avgR > 0 ? 'pos' : 'neg'}">${s.avgR == null ? '–' : String(s.avgR).replace('.', ',')}</b><span>snitt R</span></div>
+    </div>
+    <table>
+      <tr><th>Datum</th><th>Signal</th><th class="r">Köp</th><th class="r">Mål</th><th class="r">Utfall</th></tr>
+      ${recent.map(t => `<tr><td>${new Date(t.t * 1000).toLocaleDateString('sv-SE')}</td><td>${t.status === 'strong' ? 'Stark' : 'Köp'}</td>
+        <td class="r num">${fmt(t.entry)}</td><td class="r">${t.hit ? 'TP' + t.hit : '–'}</td>
+        <td class="r num ${t.open ? '' : t.r > 0 ? 'pos' : 'neg'}">${t.open ? 'pågår' : (t.r > 0 ? '+' : '') + String(t.r).replace('.', ',') + ' R'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Inga signaler under perioden.</td></tr>'}
+    </table>
+    <p class="muted" style="font-size:12px;margin-top:8px">Simulering: köp på öppningen dagen efter signalen. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
+}
+
+loadScan(false);
