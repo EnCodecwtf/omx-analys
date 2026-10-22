@@ -20,27 +20,37 @@ MACD, stängning över gårdagens topp, engulfing eller hammare, divergens). Öv
 
 | Status | Krav |
 |---|---|
-| **STARK KÖPSIGNAL** | Poäng ≥ 50, RSI vänder upp från under 40, och priset testar en stödzon |
-| **KÖPSIGNAL** | Poäng ≥ 42 och RSI vänder upp, eller stöd + MACD vänder upp |
-| **BEVAKA** | Bra läge men ingen vändning ännu |
+| **STARK KÖPSIGNAL** | Samma krav som KÖPSIGNAL, och dessutom har RSI varit under 32 de senaste dagarna |
+| **KÖPSIGNAL** | Poäng ≥ 42, priset under EMA 200, priset testar en stödzon, RSI vänder upp från under 40, MACD-histogrammet vänder upp och det finns en giltig Elliottvågräkning |
+| **BEVAKA** | Bra läge men alla krav är inte uppfyllda än |
 | **AVVAKTA** | Överköpt eller sen fas |
 
-**Handelsplan:** Stoppet läggs under stödzonen och de senaste fem dagarnas botten, minst 1 ATR bort. Vinstmålen tas från
-riktiga nivåer: motståndszoner, bearish FVG, tidigare toppar, Fibonacci-extensioner och Elliottmål. TP1 ligger minst 1 R bort, och
-ett mål som ligger vid ett motstånd läggs strax under motståndet. Om det inte finns någon nivå används R-multiplar.
+**Handelsplan:** Stoppet läggs under stödzonen och de senaste fem dagarnas botten, minst 1 ATR bort. Målen tas från
+riktiga nivåer: motståndszoner, bearish FVG, tidigare toppar, Fibonacci-extensioner och Elliottmål. Mål vid ett motstånd
+läggs strax under motståndet.
 
-### Kalibrering och backtest
-Vikterna är satta efter ett backtest på OMXS30-aktierna för 2022–2026. Varje signal köps på nästa dags öppning, en tredjedel
-säljs vid varje mål och stoppet flyttas till köpkursen efter TP1. Om stopp och mål nås samma dag räknas stoppet.
+- **TP1:** närmaste nivå 0,5–1,2 R bort, annars 0,8 R
+- **TP2:** nästa nivå upp till 2 R bort, annars 1,2 R
+- **TP3:** nästa tydliga nivå, för den sista tredjedelen
 
-| | Affärer | Nådde TP1 | Snitt per affär |
-|---|---|---|---|
-| Första versionen (trendföljande) | 251 | 33 % | −0,02 R |
-| Nuvarande version | 695 | 54 % | +0,28 R |
+Sälj en tredjedel vid varje mål och flytta stoppet till köpkursen när TP2 är nådd.
 
-Det som har fungerat bäst på storbolagen i OMXS30 är att köpa en översåld rekyl som vänder upp vid ett stöd. Att jaga en redan
-stark trend har fungerat sämre. Vikterna är kalibrerade på samma data som de testas på, och courtage ingår inte, så räkna med
-sämre resultat i verkligheten. Appen visar backtestet för varje aktie och markerar historiska signaler i grafen.
+### Backtest
+Krav: TP1 ska nås i minst 60 % av affärerna och TP2 i minst 54 %. Simuleringen köper på nästa dags öppning. Om stopp och
+mål nås samma dag räknas stoppet. En aktie kan bara ha en affär åt gången. Courtage ingår inte.
+
+| OMXS30 2022–2026 | Affärer | TP1 | TP2 | TP3 | Snitt per affär |
+|---|---|---|---|---|---|
+| Alla signaler | 270 | 71,5 % | 60,0 % | 40,4 % | +0,40 R |
+| Stark köpsignal | 139 | 70,5 % | 59,0 % | 38,1 % | +0,43 R |
+| Köpsignal | 131 | 72,5 % | 61,1 % | 42,7 % | +0,38 R |
+
+Reglerna valdes på data för 2022–2024 och kontrollerades på 2025–2026, och träffsäkerheten blev ungefär lika hög i båda
+perioderna. Det viktigaste filtret är att priset ligger under EMA 200. Rekyler i aktier som redan ligger i stark upptrend
+nådde TP2 i bara cirka 47 % av fallen.
+
+Resultatet varierar mellan åren: 2023 nådde 59 % av signalerna TP2 och 2026 hittills 52 %. Appen visar
+backtestet per aktie och för alla signaler tillsammans, och markerar historiska signaler i grafen.
 
 **Det här är inte investeringsrådgivning.**
 

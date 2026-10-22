@@ -101,9 +101,9 @@ function renderDetail(d) {
   // Signal
   const col = A.score >= 50 ? 'var(--green)' : A.score >= 30 ? 'var(--amber)' : 'var(--muted)';
   const explain = {
-    strong: 'Översåld rekyl som vänder upp vid en stark stödzon, och flera faktorer pekar åt samma håll.',
-    buy: 'Flera faktorer pekar på ett köpläge och momentum har börjat vända upp.',
-    watch: 'Priset är i ett intressant läge men har inte vänt upp än. Vänta på vändning.',
+    strong: 'Kraftigt översåld rekyl under EMA 200 som vänder upp vid en stödzon. RSI och MACD vänder samtidigt.',
+    buy: 'Rekyl under EMA 200 som vänder upp vid en stödzon. RSI och MACD vänder samtidigt.',
+    watch: 'Intressant läge, men alla krav för köpsignal är inte uppfyllda än. Vänta på vändning vid stöd.',
     neutral: 'Inget tydligt köpläge just nu.',
     avoid: 'Sent eller överköpt läge. Vänta på en rekyl.',
   }[A.status];
@@ -122,7 +122,8 @@ function renderDetail(d) {
       <tr class="plan-row sl"><td>Stopp</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
       ${pl.tps.map((t, k) => `<tr class="plan-row tp"><td>TP${k + 1}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
     </table>
-    <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP1 är nådd.
+    <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP2 är nådd.
+    TP1 ligger på närmaste nivå 0,5–1,2 R bort och TP2 på nästa nivå upp till 2 R, för att målen ska nås ofta.
     Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
 
   // Elliott
@@ -159,7 +160,8 @@ function renderDetail(d) {
     <div class="stats">
       <div class="stat"><b class="num">${s.n}</b><span>signaler</span></div>
       <div class="stat"><b class="num">${s.tp1Rate ?? '–'} %</b><span>nådde TP1</span></div>
-      <div class="stat"><b class="num">${s.winRate ?? '–'} %</b><span>vinnare</span></div>
+      <div class="stat"><b class="num">${s.tp2Rate ?? '–'} %</b><span>nådde TP2</span></div>
+      <div class="stat"><b class="num">${s.tp3Rate ?? '–'} %</b><span>nådde TP3</span></div>
       <div class="stat"><b class="num ${s.avgR > 0 ? 'pos' : 'neg'}">${s.avgR == null ? '–' : String(s.avgR).replace('.', ',')}</b><span>snitt R</span></div>
     </div>
     <table>
@@ -168,7 +170,24 @@ function renderDetail(d) {
         <td class="r num">${fmt(t.entry)}</td><td class="r">${t.hit ? 'TP' + t.hit : '–'}</td>
         <td class="r num ${t.open ? '' : t.r > 0 ? 'pos' : 'neg'}">${t.open ? 'pågår' : (t.r > 0 ? '+' : '') + String(t.r).replace('.', ',') + ' R'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Inga signaler under perioden.</td></tr>'}
     </table>
-    <p class="muted" style="font-size:12px;margin-top:8px">Simulering: köp på öppningen dagen efter signalen. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
+    <p class="muted" style="font-size:12px;margin-top:8px">Få signaler per aktie ger stor slumpvariation. Se det samlade backtestet överst i listan.
+    Simulering: köp på öppningen dagen efter signalen, stoppet flyttas till köpkursen efter TP2. Om stopp och mål nås samma dag räknas stoppet. Courtage och glidning ingår inte.</p>`;
+}
+
+async function loadSummary() {
+  try {
+    const s = await (await fetch('/api/summary')).json();
+    const a = s.all;
+    const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
+    $('#summary').innerHTML = `<span>Backtest, alla signaler (${a.n} st):</span>
+      <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
+      <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
+      <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
+      <span class="pill">Snitt <b>${String(a.avgR).replace('.', ',')} R</b></span>`;
+  } catch {
+    $('#summary').textContent = '';
+  }
 }
 
 loadScan(false);
+loadSummary();

@@ -100,7 +100,7 @@ test('Handelsplanen har stopp under och stigande mål över köpkursen', () => {
   assert.equal(tps.length, 3);
   assert.ok(tps[0].price > entry);
   assert.ok(tps[0].price < tps[1].price && tps[1].price < tps[2].price);
-  assert.ok(tps[0].r >= 1);
+  assert.ok(tps[0].r >= 0.5);
   assert.ok(['strong', 'buy', 'watch', 'neutral', 'avoid'].includes(ev.status));
 });
 

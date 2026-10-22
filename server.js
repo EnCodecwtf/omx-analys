@@ -60,6 +60,27 @@ async function scan() {
   });
 }
 
+// Samlat backtest för alla instrument. Tar några sekunder, så det räknas i
+// bakgrunden och hämtas separat av gränssnittet.
+async function summary() {
+  return cached('summary', async () => {
+    const trades = [];
+    for (const s of universe) {
+      try {
+        const bt = backtest(await fetchBars(s.symbol));
+        trades.push(...bt.trades.filter(t => !t.open));
+      } catch { /* instrumentet hoppas över */ }
+      await new Promise(r => setImmediate(r));
+    }
+    const rate = (list, k) => list.length ? Math.round(1000 * list.filter(x => x.hit >= k).length / list.length) / 10 : null;
+    const stats = list => ({
+      n: list.length, tp1Rate: rate(list, 1), tp2Rate: rate(list, 2), tp3Rate: rate(list, 3),
+      avgR: list.length ? Math.round(100 * list.reduce((a, x) => a + x.r, 0) / list.length) / 100 : null,
+    });
+    return { updated: Date.now(), all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')) };
+  });
+}
+
 async function analysis(symbol) {
   return cached(`a:${symbol}`, async () => {
     const meta = bySymbol.get(symbol);
@@ -98,6 +119,7 @@ const server = http.createServer(async (req, res) => {
       if (url.searchParams.has('refresh')) cache.clear();
       return send(res, 200, await scan());
     }
+    if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/analysis') {
       const symbol = url.searchParams.get('symbol');
       if (!bySymbol.has(symbol)) return send(res, 404, { error: 'Okänd symbol' });
