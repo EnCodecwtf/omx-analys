@@ -378,6 +378,29 @@ Månadsskiftet (dag −1 till +2) gav −0,20 / −0,02 % och byter tecken mella
 **Slutsats:** löningsdagen och dagen efter är positiva i alla fyra mätningar, men effekten är liten (cirka 0,1 % extra per
 dag) och inte statistiskt säker i varje period för sig. Används inte i appen.
 
+### Stoppet: bredare, inget eller tidigare (2017–2026)
+Samma signaler (dagens OMXS30-bolag, 387 st) med olika stopphantering. Resultat i R mot appens stoppavstånd, 2017–21 / 2022–26.
+
+| Variant | Vinst | Till stopp | Sämsta | Snitt | Snitt per riskerad krona |
+|---|---|---|---|---|---|
+| Som appen (1R, break-even efter TP2) | 58 / 58 % | 32 / 31 % | −1,6 R | +0,32 / +0,35 R | +0,33 |
+| Break-even efter TP1 | 67 / 65 % | 32 / 31 % | −1,6 R | +0,27 / +0,26 R | +0,27 |
+| Stopp 1,5R | 68 / 66 % | 24 / 24 % | −2,8 R | +0,39 / +0,38 R | +0,26 |
+| Stopp 2R | 75 / 73 % | 18 / 17 % | −3,0 R | +0,45 / +0,49 R | +0,24 |
+| Inget stopp, sälj efter 20 dagar | 76 / 73 % | 0 % | −11,8 R | +0,56 / +0,47 R | – |
+| Inget stopp, sälj efter 60 dagar | 91 / 86 % | 0 % | −11,0 R | +1,02 / +0,83 R | – |
+| Tidsstopp: sälj om TP1 inte nåtts på 5 dagar | 52 / 58 % | 22 / 18 % | −1,6 R | +0,14 / +0,28 R | +0,21 |
+| Stopp 0,5R | 39 / 42 % | 50 / 51 % | −1,3 R | +0,20 / +0,19 R | +0,39 |
+
+Ett bredare stopp kräver en mindre position för samma risk i kronor, så snittet ska delas med stoppets bredd.
+
+**Bolag som senare åkte ur OMXS30** (82 signaler medan de var med): som appen −0,02 R, stopp 1,5R −0,22 R, stopp 2R −0,16 R,
+inget stopp 20 dagar −0,11 R (sämsta −8,1 R), inget stopp 60 dagar −0,01 R (sämsta −13 R).
+
+**Slutsats:** fler vinnande affärer utan stopp är en effekt av att testet bara har med bolag som klarade sig. Med bolagen som
+föll blir det sämre, och en enda affär kan kosta 8–13 gånger den planerade risken. Appens stopp ger bäst resultat per riskerad
+krona. Break-even efter TP1 ger fler vinnande affärer (65–67 %) men lägre snitt.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
