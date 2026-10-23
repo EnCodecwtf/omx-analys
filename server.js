@@ -12,7 +12,7 @@ import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators } from './lib/indicators.js';
-import { fetchProducts, recommend } from './lib/avanza.js';
+import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -111,7 +111,7 @@ async function scan() {
     if (signals.length) {
       const added = await signalLog.record(signals.map(r => ({
         date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
-        tps: r.plan.tps.map(x => x.price), size: r.size, loggedAt: new Date().toISOString(),
+        tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString(),
       })));
       for (const e of added) await notifySignal(e);
     }
@@ -170,7 +170,7 @@ async function analysis(symbol) {
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
     const bt = await backtestFor(meta, all);
     return {
-      symbol, name: meta.name, isIndex: !!meta.isIndex,
+      symbol, name: meta.name, isIndex: !!meta.isIndex, avanzaUrl: avanzaUrl(meta),
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
       analysis: ev,

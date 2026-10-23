@@ -104,7 +104,7 @@ function renderDetail(d) {
   const A = d.analysis, pl = A.plan;
   const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
   $('#d-name').textContent = d.name;
-  $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}`;
+  $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
   $('#d-badge').innerHTML = badge(A.status, true);
   chart.setData(d);
 
