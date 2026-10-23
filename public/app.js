@@ -81,7 +81,7 @@ function renderScan() {
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som saknas">${r.checks - r.missing.length} av ${r.checks} krav</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
   }).join('') + (visible.length <= 1 ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -107,8 +107,8 @@ function checklist(A) {
   const missing = list.filter(c => !c.ok);
   const active = A.status === 'strong' || A.status === 'buy';
   const head = active ? 'Alla krav för köpsignal är uppfyllda.'
-    : missing.length === 1 ? `<b>Ett krav saknas:</b> ${esc(missing[0].text.toLowerCase())}.`
-    : `<b>${missing.length} av ${list.length} krav saknas</b> för köpsignal.`;
+    : `<b>${list.length - missing.length} av ${list.length} krav uppfyllda.</b> ${missing.length === 1
+      ? `Det som saknas för köpsignal: ${esc(missing[0].text.toLowerCase())}.` : `${missing.length} saknas för köpsignal.`}`;
   return `<div class="checklist"><p style="margin:0 0 6px">${head}</p><ul>${list.map(c => `<li class="${c.ok ? 'ok' : 'bad'}">
       <span class="mark">${c.ok ? '✓' : '✗'}</span><span>${esc(c.text)}<span class="muted"> – ${esc(c.now.replace(/(\d)\.(\d)/g, '$1,$2'))}</span></span></li>`).join('')}</ul></div>`;
 }
