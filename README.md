@@ -397,6 +397,18 @@ Ett bredare stopp kräver en mindre position för samma risk i kronor, så snitt
 **Bolag som senare åkte ur OMXS30** (82 signaler medan de var med): som appen −0,02 R, stopp 1,5R −0,22 R, stopp 2R −0,16 R,
 inget stopp 20 dagar −0,11 R (sämsta −8,1 R), inget stopp 60 dagar −0,01 R (sämsta −13 R).
 
+**Tätare stopp, efter 0,3 % avgift per affär** (per riskerad krona, dagens bolag 2017–21 / 2022–26 och bolag som åkte ur):
+
+| Stopp | Vinst | Till stopp | Per riskerad krona | Bolag som åkte ur |
+|---|---|---|---|---|
+| 1R (som appen) | 58 / 58 % | 32 / 31 % | +0,23 / +0,27 | −0,08 |
+| 0,75R | 48 / 50 % | 39 / 39 % | +0,22 / +0,27 | −0,13 |
+| 0,5R | 39 / 42 % | 50 / 51 % | +0,23 / +0,22 | −0,17 |
+| 0,33R | 32 / 30 % | 63 / 65 % | −0,03 / +0,07 | −0,27 |
+
+Ett tätare stopp ger mindre förluster per affär men fler förluster, större position för samma risk och högre avgift per
+riskerad krona. Det blir inte bättre än appens stopp.
+
 **Slutsats:** fler vinnande affärer utan stopp är en effekt av att testet bara har med bolag som klarade sig. Med bolagen som
 föll blir det sämre, och en enda affär kan kosta 8–13 gånger den planerade risken. Appens stopp ger bäst resultat per riskerad
 krona. Break-even efter TP1 ger fler vinnande affärer (65–67 %) men lägre snitt.
