@@ -288,6 +288,31 @@ Täckande blankare såg lovande ut veckovis, men med en händelse per tillfälle
 **Slutsats:** varken insynsköp eller blankning ger en robust fördel efter avgifter, varken som filter eller som egen strategi.
 Inget av det används i appen.
 
+### Krypto: fler signaler, även på helger (2016–2026)
+Daglig data från Yahoo (BTC-USD, ETH-USD, SOL-USD). Kostnad 0,2 % per affär på en kryptobörs, 0,5 % för ETP:er på Avanza.
+
+**Appens regler på bitcoin:** köpsignalen (rekyl vid stöd) gav −0,20 / −0,21 R (2017–21 / 2022–26), säljsignalen
+−0,38 / −0,25 R. Rekylstrategin fungerar inte på krypto.
+
+**Utbrott till ny 20-dagarstopp när kursen är över EMA 200, sälj efter 7 dagar** (snitt per affär efter avgifter, jämfört
+med att äga samma antal dagar över EMA 200):
+
+| | 2017–19 | 2020–21 | 2022–23 | 2024–26 |
+|---|---|---|---|---|
+| Bitcoin, utbrott | +4,80 % | +4,05 % | +2,49 % | +1,19 % |
+| Bitcoin, alla dagar över EMA 200 | +3,17 % | +1,75 % | +0,47 % | +0,71 % |
+| Ether, utbrott | −0,54 % (6) | +5,11 % | +0,01 % | +2,33 % |
+| Ether, alla dagar över EMA 200 | −1,53 % | +2,94 % | +0,18 % | +0,98 % |
+
+Bitcoin slår jämförelsen i alla fyra perioderna, med 13 affärer om året och 25 % av tiden i marknaden. Ether slår den i
+tre av fyra. Utan hävstång gav bitcoin 45 %/år med största nedgång −53 % (köp och behåll: 60 %/år, −83 %). Med 2x
+hävstång: 2022 −2 %, 2023 +110 %, 2024 +20 %, 2025 +30 %, 2026 −15 %. 3x gav sämre resultat än 2x. Bara vardagar
+(Avanza-ETP, 0,5 %) gav 29 %/år utan hävstång. RSI(2) under 10 över EMA 200 gav +0,7 % per affär i alla perioder på
+bitcoin men inte på ether. Fredag–måndag (helgeffekt) gav +0,50 / −0,05 %.
+
+**Slutsats:** utbrott i upptrend är det första korta upplägget som håller i alla perioder, men bara på krypto, med stora
+svängningar (spridning 10 % per affär, sämsta −25 %) och svagare de senaste åren.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
