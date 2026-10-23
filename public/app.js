@@ -173,7 +173,12 @@ function renderDetail(d) {
   $('#c-elliott').innerHTML = `<h3>Elliottvågor</h3>
     ${ew ? ewBlock(ew) : '<p class="muted">Ingen giltig vågräkning hittades i den senaste strukturen.</p>'}
     ${A.elliott.alternatives.length ? `<p class="muted" style="font-size:12px">Alternativ: ${A.elliott.alternatives.map(a => `${esc(a.label)} (${a.confidence} %)`).join(', ')}</p>` : ''}
-    ${maj ? `<p style="font-size:13px;margin-top:10px"><span class="muted">Högre grad:</span> ${esc(maj.label)} <span class="muted">(${maj.confidence} %)</span></p>` : ''}`;
+    ${maj ? `<p style="font-size:13px;margin-top:10px"><span class="muted">Högre grad:</span> ${esc(maj.label)} <span class="muted">(${maj.confidence} %)</span></p>` : ''}
+    <h4 style="margin:14px 0 6px">Formationer</h4>
+    ${(d.patterns || []).length ? `<ul class="reasons">${d.patterns.map(p => `<li><span class="${p.dir === 'bull' ? 'pos' : 'neg'}">${p.dir === 'bull' ? '▲' : '▼'}</span><span><b>${esc(p.label)}</b>
+      <span class="muted">– ${p.breakout ? (p.dir === 'bull' ? 'bröt upp i dag vid' : 'bröt ned i dag vid') : p.brokeAgo != null ? `${p.dir === 'bull' ? 'bröt upp' : 'bröt ned'} för ${p.brokeAgo} dagar sedan,${p.above ? '' : ' men är tillbaka,'} nivå` : 'bildas, utbrott vid'} ${fmt(p.level)}, mål ${fmt(p.target)}</span></span></li>`).join('')}</ul>`
+      : '<p class="muted" style="font-size:13px">Ingen head & shoulders, dubbelbotten/-topp, cup & handle eller triangel nära utbrott just nu.</p>'}
+    <p class="muted" style="font-size:12px">Visas som information. Formationerna gav ingen fördel efter avgifter i backtestet 2017–2026 och påverkar inte signalen.</p>`;
 
   // Nivåer
   const zoneName = { support: 'Stöd', resistance: 'Motstånd', inside: 'Pris i zonen' };

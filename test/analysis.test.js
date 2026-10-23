@@ -243,3 +243,23 @@ test('Kravlistan förklarar varför en signal inte är redo', async () => {
   const g = applyGuards({ status: 'buy', warnings: [], checklist: [] }, { report: { date: '2026-11-02' }, reportDays: 5, macro: { score: 1, size: 1, label: 'Gynnsamt' } });
   assert.deepEqual(g.checklist.map(c => [c.key, c.ok]), [['report', false], ['macro', true]]);
 });
+
+test('Formationer: inverterad head & shoulders, dubbelbotten och dubbeltopp', async () => {
+  const { detectPatterns } = await import('../lib/patterns.js');
+  const found = (pts, type, dir) => {
+    const bars = path(pts, 10);
+    for (let n = 60; n <= bars.length; n++) {
+      const p = detectPatterns(bars.slice(0, n)).find(x => x.type === type && x.dir === dir && x.breakout);
+      if (p) return p;
+    }
+    return null;
+  };
+  const ihs = found([150, 140, 150, 130, 110, 120, 100, 120, 110, 130], 'ihs', 'bull');
+  assert.ok(ihs, 'inverterad H&S hittas');
+  assert.ok(ihs.target > ihs.level && ihs.stop < ihs.level);
+  const dbl = found([150, 140, 150, 130, 110, 125, 110, 135], 'dbl', 'bull');
+  assert.ok(dbl && Math.abs(dbl.level - 125.3) < 1, 'dubbelbotten bryter mellantoppen');
+  const top = found([100, 110, 100, 120, 140, 125, 140, 115], 'dbl', 'bear');
+  assert.ok(top && top.target < top.level && top.stop > top.level, 'dubbeltopp är ett säljmönster');
+  assert.equal(found([100, 120, 100, 120, 100, 120, 100, 120], 'ihs', 'bull'), null);
+});

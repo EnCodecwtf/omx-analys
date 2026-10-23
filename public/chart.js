@@ -22,7 +22,7 @@ export class PriceChart {
   constructor(canvas, rsiCanvas, tooltip) {
     this.cv = canvas; this.rcv = rsiCanvas; this.tip = tooltip;
     this.ctx = canvas.getContext('2d'); this.rctx = rsiCanvas.getContext('2d');
-    this.layers = { zones: true, fvg: true, elliott: true, zigzag: false, fib: false, ema: true, plan: true, history: true };
+    this.layers = { zones: true, fvg: true, elliott: true, zigzag: false, fib: false, patterns: true, ema: true, plan: true, history: true };
     this.data = null; this.hover = null;
     this.pointers = new Map();
     this.bind();
@@ -260,6 +260,22 @@ export class PriceChart {
         ctx.strokeStyle = 'rgba(96,165,250,.7)'; ctx.setLineDash([4, 3]); ctx.strokeRect(x1, y1, PW - x1, y2 - y1); ctx.setLineDash([]);
         ctx.fillStyle = '#93c5fd'; ctx.font = '10px Inter, system-ui, sans-serif'; ctx.textAlign = 'left';
         ctx.fillText(p.bias > 0 && p.setup ? 'Elliott köpzon' : 'Elliott målzon', x1 + 4, y1 - 6);
+      }
+    }
+
+    // Formationer (head & shoulders, dubbelbotten, cup & handle, triangel)
+    if (this.layers.patterns && d.patterns) {
+      for (const p of d.patterns) {
+        const col = p.dir === 'bull' ? '52,211,153' : '248,113,113';
+        ctx.strokeStyle = `rgba(${col},.8)`; ctx.lineWidth = 1.4; ctx.beginPath();
+        p.points.forEach((q, k) => { const x = this.x(q.i), y = this.y(q.price); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+        ctx.stroke();
+        ctx.setLineDash([6, 4]); ctx.beginPath();
+        ctx.moveTo(this.x(p.neck[0].i), this.y(p.neck[0].price)); ctx.lineTo(this.x(p.neck[1].i), this.y(p.neck[1].price)); ctx.stroke(); ctx.setLineDash([]);
+        const top = p.points.reduce((a, q) => (p.dir === 'bull' ? q.price > a.price : q.price < a.price) ? q : a, p.points[0]);
+        ctx.fillStyle = `rgba(${col},1)`; ctx.font = '600 10px Inter, system-ui, sans-serif'; ctx.textAlign = 'center';
+        const mid = p.points[Math.floor(p.points.length / 2)];
+        ctx.fillText(p.label, this.x(mid.i), this.y(top.price) + (p.dir === 'bull' ? -10 : 16));
       }
     }
 

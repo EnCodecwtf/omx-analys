@@ -233,6 +233,28 @@ och över 3 % +0,89 R.
 affärer än dåliga (färre R totalt), och att släppa in fler signaler när inflationen faller gav ungefär samma
 tillskott som motprovet.
 
+### Klassiska formationer (2017–2026, överlevnadsfritt)
+`lib/patterns.js` hittar inverterad head & shoulders, dubbelbotten, cup & handle och stigande triangel (köp när kursen
+stänger över halslinjen eller mellantoppen), samt head & shoulders och dubbeltopp (sälj). Mönstren byggs av
+ZigZag-svängarna (2,5 ATR). Stoppet ligger under sista bottnen och målet är mönstrets höjd från utbrottet.
+Testet gäller bara bolag som var med i OMXS30 på signaldagen. Avgifter: 0,3 % (swing) och 0,2 % (max 5 dagar).
+
+| Mönster | Swing 2017–21 / 2022–26 | Max 5 dagar 2017–21 / 2022–26 |
+|---|---|---|
+| Inverterad head & shoulders | −0,29 / −0,04 R (27/30) | −0,05 / +0,04 R |
+| Dubbelbotten | −0,15 / +0,00 R (38/44) | −0,08 / +0,06 R |
+| Cup & handle | −0,38 / −0,35 R (4/4) | −0,12 / +0,02 R |
+| Stigande triangel | +0,07 / +0,07 R (8/13) | +0,15 / −0,06 R |
+| Alla köpmönster, ingen rapport, makro ≥ 1 | +0,08 / +0,13 R (22/17) | −0,04 / +0,03 R |
+| Head & shoulders (sälj) | +0,28 / +0,03 R (21/32) | +0,07 / +0,01 R |
+| Dubbeltopp (sälj) | −0,33 / −0,15 R (60/76) | −0,05 / −0,02 R |
+
+Som filter på appens signaler: ett köpmönster som bildas gav +0,25 / +0,10 R mot +0,31 / +0,32 R utan, och ett
+säljmönster de senaste 20 dagarna +0,36 / +0,09 R mot +0,26 / +0,36 R utan. Ingen skillnad håller i båda perioderna.
+
+**Slutsats:** formationerna ger ingen fördel efter avgifter och påverkar inte signalerna. De visas i grafen och i
+Elliott-kortet som information, när utbrottet skett de senaste 20 dagarna eller kursen är mer än halvvägs mot det.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att

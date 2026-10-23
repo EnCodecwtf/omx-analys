@@ -13,6 +13,7 @@ import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
+import { relevantPatterns } from './lib/patterns.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -174,6 +175,8 @@ async function analysis(symbol) {
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
       analysis: ev,
+      // Formationer visas som information. De klarade inte backtestet (se README).
+      patterns: relevantPatterns(bars),
       backtest: {
         stats: bt.stats,
         trades: bt.trades.map(t => ({ ...t, exitT: all[t.exitI]?.t })),
