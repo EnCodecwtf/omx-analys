@@ -361,6 +361,23 @@ Väderdatan är faktiskt utfall. Marknaden handlar på prognoser, så utfallet �
 
 **Slutsats:** väder och krig ger ingen robust fördel på råvarorna. Inget läggs in i appen.
 
+### Lönings- och månadsskifteseffekten (OMXS30, 2010–2026)
+Svenska löner betalas den 25:e (vardagen före vid helg), och mycket månadssparande i fonder dras då. Snittavkastning per dag
+i OMXS30 (stängning till stängning) och i XACT OMXS30 (från 2013), 2010–17 / 2018–26. En vanlig dag gav +0,03 / +0,04 %.
+
+| Dag | OMXS30 | XACT OMXS30 |
+|---|---|---|
+| Löningsdagen | +0,15 / +0,09 % | +0,04 / +0,15 % |
+| Dagen efter | +0,13 / +0,13 % | +0,13 / +0,17 % |
+| Två dagar efter | +0,26 / +0,04 % | +0,07 / +0,03 % |
+
+Att äga index löningsdagen till två dagar efter (efter 0,1 % avgift): +0,44 / +0,16 % per månad (t 2,4 / 1,1)
+i OMXS30 och +0,13 / +0,25 % (t 0,4 / 1,7) i XACT, cirka 2–5 % om året med 3 dagar i marknaden per månad.
+Månadsskiftet (dag −1 till +2) gav −0,20 / −0,02 % och byter tecken mellan indexet och fonden.
+
+**Slutsats:** löningsdagen och dagen efter är positiva i alla fyra mätningar, men effekten är liten (cirka 0,1 % extra per
+dag) och inte statistiskt säker i varje period för sig. Används inte i appen.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
