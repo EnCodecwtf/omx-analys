@@ -208,6 +208,31 @@ Bara cirka 10 % av affärerna får full storlek.
 **Rättning:** `data/fomc.json` saknade räntebesked före 2022, så makropoängen drog aldrig av för räntebesked 2017–2021.
 Datum för 2015–2021 är nu tillagda från Feds historiska sidor (fomchistorical<år>.htm), inklusive extramötena i mars 2020.
 
+### Truflation (amerikansk inflation varje dag)
+Truflations inflationstakt för USA hämtades från TRUF Network (publik ström `st1e321de22ece39a258bc2588dd2871`
+från `0x4710a8d8f0d845da110086812a32de6d90d7ff5c`, daglig sedan 2010; före 2021 är serien bakåträknad).
+Värdet dagen före signalen användes.
+
+**Appens signaler 2022-11–2026 (makro ≥ 1, rapportspärr):**
+
+| Regel | Signaler/år | TP1 | TP2 | Snitt |
+|---|---|---|---|---|
+| Som appen | 29 | 82 % | 74 % | +0,71 R |
+| Spärr om inflationen stiger mer än 0,3 procentenheter på 30 dagar | 23 | 83 % | 76 % | +0,80 R |
+| Spärr om inflationen stiger alls på 30 dagar | 14 | 85 % | 80 % | +0,90 R |
+| Spärr om inflationen är över 3 % | 23 | 82 % | 71 % | +0,65 R |
+| Neutralt makro räcker om inflationen faller (30 dagar) | 41 | 78 % | 70 % | +0,59 R |
+| Neutralt makro räcker om inflationen stiger (motprov) | 36 | 76 % | 69 % | +0,60 R |
+
+**Överlevnadsfritt 2017–2021 / 2022–2026 (356 signaler):** inflationens riktning (30, 60 och 90 dagar) byter tecken
+mellan perioderna: fallande inflation gav +0,18 / +0,37 R och stigande +0,45 / +0,16 R. Inflationsnivån över 2,4 % gav
++0,13 / +0,10 R mot +0,36 / +0,69 R under, men på appens egna signaler gav nivån över 2,4 % fortfarande +0,66 R
+och över 3 % +0,89 R.
+
+**Slutsats:** inte robust, så Truflation påverkar inte signalerna. Spärrarna som höjer snittet tar bort fler bra
+affärer än dåliga (färre R totalt), och att släppa in fler signaler när inflationen faller gav ungefär samma
+tillskott som motprovet.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
