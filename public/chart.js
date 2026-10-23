@@ -125,7 +125,7 @@ export class PriceChart {
     let lo = Infinity, hi = -Infinity;
     for (let i = i0; i <= i1; i++) { lo = Math.min(lo, bars[i][3]); hi = Math.max(hi, bars[i][2]); }
     if (!isFinite(lo)) return;
-    if (this.layers.plan && i1 >= this.n - 1) {
+    if (this.layers.plan && A.plan && i1 >= this.n - 1) {
       lo = Math.min(lo, A.plan.stop);
       hi = Math.max(hi, A.plan.tps[0].price);
     }
@@ -292,7 +292,7 @@ export class PriceChart {
 
     // Handelsplan
     const axisTags = [];
-    if (this.layers.plan) {
+    if (this.layers.plan && A.plan) {
       const x1 = this.x(this.n - 1);
       const line = (price, col, label, dash) => {
         const y = this.y(price);
@@ -341,7 +341,8 @@ export class PriceChart {
       this.tip.innerHTML = `<b>${dt}</b> &nbsp;Ö ${fmt(o)} H ${fmt(h)} L ${fmt(l)} S ${fmt(c)} ` +
         `<span class="${ch >= 0 ? 'pos' : 'neg'}">${ch >= 0 ? '+' : ''}${ch.toFixed(2)} %</span>` +
         (v ? ` &nbsp;Vol ${(v / 1e6).toFixed(2)} M` : '') +
-        (trade ? `<br>${trade.status === 'strong' ? 'Stark köpsignal' : 'Köpsignal'} · utfall ${trade.open ? 'pågår' : (trade.r > 0 ? '+' : '') + trade.r + ' R'} · ${trade.hit ? `nådde TP${trade.hit}` : 'nådde inget mål'}` : '');
+        (trade && trade.pct != null ? `<br>Krypto-utbrott · utfall efter 7 dagar ${trade.open ? 'pågår' : (trade.pct > 0 ? '+' : '') + trade.pct + ' %'}` : '') +
+        (trade && trade.pct == null ? `<br>${trade.status === 'strong' ? 'Stark köpsignal' : 'Köpsignal'} · utfall ${trade.open ? 'pågår' : (trade.r > 0 ? '+' : '') + trade.r + ' R'} · ${trade.hit ? `nådde TP${trade.hit}` : 'nådde inget mål'}` : '');
     } else {
       this.tip.hidden = true;
     }

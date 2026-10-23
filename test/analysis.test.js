@@ -263,3 +263,26 @@ test('Formationer: inverterad head & shoulders, dubbelbotten och dubbeltopp', as
   assert.ok(top && top.target < top.level && top.stop > top.level, 'dubbeltopp är ett säljmönster');
   assert.equal(found([100, 120, 100, 120, 100, 120, 100, 120], 'ihs', 'bull'), null);
 });
+
+test('Krypto-utbrott: signal, backtest och utfall', async () => {
+  const { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } = await import('../lib/crypto.js');
+  // Stigande kurs med rekyler: över EMA 200 och nya 20-dagarstoppar.
+  const bars = path([100, 150, 140, 200, 185, 260, 240, 330], 40);
+  const sig = cryptoSignal(bars);
+  assert.equal(sig.status, 'strong');
+  assert.ok(sig.checklist.every(c => c.ok));
+  const bt = cryptoBacktest(bars);
+  assert.ok(bt.stats.n > 0);
+  for (let k = 1; k < bt.trades.length; k++) assert.ok(bt.trades[k].i > bt.trades[k - 1].exitI, 'affärerna överlappar inte');
+  const t = bt.trades[0];
+  assert.equal(t.exitI - t.i, 7);
+  const date = new Date(t.t * 1000).toISOString().slice(0, 10);
+  const o = cryptoOutcome({ date }, bars);
+  assert.equal(o.state, 'stängd');
+  assert.equal(o.pct, t.pct);
+  // Fallande kurs: ingen signal.
+  assert.notEqual(cryptoSignal(path([300, 200, 220, 150, 160, 100], 40)).status, 'strong');
+  // Dagens ofärdiga stapel tas bort.
+  const now = new Date(bars[bars.length - 1].t * 1000);
+  assert.equal(completeBars(bars, now).length, bars.length - 1);
+});

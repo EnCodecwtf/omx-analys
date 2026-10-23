@@ -22,7 +22,8 @@ $('#acct').value = store.get('acct', '10000');
 $('#risk').value = store.get('risk', '6');
 for (const id of ['acct', 'risk']) $('#' + id).addEventListener('input', () => {
   store.set(id, $('#' + id).value);
-  if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
+  if (lastDetail?.isCrypto) renderCryptoCards(lastDetail);
+  else if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
 });
 let filter = 'all';
 let current = null;
@@ -49,7 +50,7 @@ function spark(values, up) {
 
 async function loadScan(refresh) {
   $('#refresh').disabled = true;
-  if (!scanData) $('#scan-list').innerHTML = '<div class="loading">Hämtar och analyserar 31 instrument…</div>';
+  if (!scanData) $('#scan-list').innerHTML = '<div class="loading">Hämtar och analyserar alla instrument…</div>';
   try {
     const res = await fetch('/api/scan' + (refresh ? '?refresh=1' : ''));
     scanData = await res.json();
@@ -81,7 +82,7 @@ function renderScan() {
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
   }).join('') + (visible.length <= 1 ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -113,15 +114,73 @@ function checklist(A) {
       <span class="mark">${c.ok ? '✓' : '✗'}</span><span>${esc(c.text)}<span class="muted"> – ${esc(c.now.replace(/(\d)\.(\d)/g, '$1,$2'))}</span></span></li>`).join('')}</ul></div>`;
 }
 
+// Krypto-utbrott: egen signal, plan och backtest (procent i stället för R).
+function renderCryptoCards(d) {
+  const A = d.analysis, cs = A.crypto;
+  const active = A.status === 'strong';
+  const explain = {
+    strong: 'Ny 20-dagarstopp och kursen ligger över EMA 200. Köp och sälj efter 7 dagar.',
+    watch: 'Upptrend och kursen är nära 20-dagarstoppen. Signal kommer om den stänger över toppen.',
+    neutral: 'Inget utbrott just nu.',
+  }[A.status];
+  $('#c-signal').innerHTML = `<h3>Signal · krypto-utbrott</h3>
+    <p>${explain}</p>
+    ${checklist(A)}
+    <p class="muted" style="font-size:12px">En annan strategi än OMX-signalerna: köp styrka i stället för rekyler. Den slog att bara äga
+    samma dagar i alla perioder 2017–2026, men svänger mycket: en enskild affär har gått −25 %.</p>`;
+  const acct = Math.max(0, +$('#acct').value || 0);
+  $('#c-plan').innerHTML = `<h3>Handelsplan ${active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
+    <dl class="kv">
+      <dt>Köp</dt><dd>${active ? `nu, runt <span class="num">${fmt(cs.price)}</span>` : `vid stängning över <span class="num">${fmt(cs.level)}</span>`}</dd>
+      <dt>Sälj</dt><dd>${active ? `${esc(cs.exitDate)}, oavsett kurs` : '7 dagar efter köpet, oavsett kurs'}</dd>
+      <dt>Storlek</dt><dd>${Math.round(cs.size * 100)} % av kontot = <b>${Math.round(acct * cs.size).toLocaleString('sv-SE')} kr</b>, utan hävstång</dd>
+      <dt>Stopp</dt><dd>Inget. Backtestet säljer alltid efter 7 dagar. 2x hävstång gav större nedgångar och 3x sämre resultat.</dd>
+    </dl>`;
+  $('#c-products').innerHTML = `<h3>Var man handlar</h3>
+    <p style="font-size:13px">Signalerna räknas på dygnets stängning (UTC) och kommer även på helger.</p>
+    <ul style="font-size:13px;margin:6px 0 0 18px;padding:0">
+      <li><b>Kryptobörs</b> (alla dagar): följer strategin som den är testad, cirka 0,2 % i avgift och spread.</li>
+      <li><b>ETP på Avanza</b> (bara vardagar): helgsignaler köps på måndagen. I testet gav det 29 % om året mot 45 % på en kryptobörs, utan hävstång.</li>
+    </ul>`;
+}
+
+function renderCryptoBacktest(d) {
+  const s = d.backtest.stats;
+  const recent = d.backtest.trades.slice(-8).reverse();
+  const num = v => v == null ? '–' : String(v).replace('.', ',');
+  $('#c-backtest').innerHTML = `<h3>Backtest – ${esc(d.name)}, cirka 4 år</h3>
+    <div class="stats">
+      <div class="stat"><b class="num">${s.n}</b><span>affärer</span></div>
+      <div class="stat"><b class="num">${num(s.winRate)} %</b><span>med vinst</span></div>
+      <div class="stat"><b class="num ${s.avgPct > 0 ? 'pos' : 'neg'}">${s.avgPct > 0 ? '+' : ''}${num(s.avgPct)} %</b><span>snitt per affär</span></div>
+    </div>
+    <table>
+      <tr><th>Datum</th><th class="r">Köp</th><th class="r">Sälj</th><th class="r">Utfall</th></tr>
+      ${recent.map(t => `<tr><td>${new Date(t.t * 1000).toLocaleDateString('sv-SE')}</td><td class="r num">${fmt(t.entry)}</td><td class="r num">${fmt(t.exit)}</td>
+        <td class="r num ${t.open ? '' : t.pct > 0 ? 'pos' : 'neg'}">${t.open ? 'pågår' : (t.pct > 0 ? '+' : '') + num(t.pct) + ' %'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Inga signaler under perioden.</td></tr>'}
+    </table>
+    <p class="muted" style="font-size:12px;margin-top:8px">Köp på öppningen dagen efter signalen och sälj på stängningen 7 dagar senare, efter 0,2 % i avgift.</p>`;
+}
+
 function renderDetail(d) {
   lastDetail = d;
-  const A = d.analysis, pl = A.plan;
+  const A = d.analysis;
   const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
   $('#d-name').textContent = d.name;
   $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
   $('#d-badge').innerHTML = badge(A.status, true);
   chart.setData(d);
 
+  if (d.isCrypto) renderCryptoCards(d);
+  else renderSignalCards(d);
+  loadCompanyNews(d.symbol, d.name);
+
+  // Elliott
+  renderElliott(d);
+}
+
+function renderSignalCards(d) {
+  const A = d.analysis, pl = A.plan;
   // Signal
   const col = A.score >= 50 ? 'var(--green)' : A.score >= 30 ? 'var(--amber)' : 'var(--muted)';
   const explain = {
@@ -158,9 +217,10 @@ function renderDetail(d) {
     Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
 
   loadProducts(d.symbol, A.status);
-  loadCompanyNews(d.symbol, d.name);
+}
 
-  // Elliott
+function renderElliott(d) {
+  const A = d.analysis;
   const ew = A.elliott.primary, maj = A.elliottMajor.primary;
   const ewBlock = e => `<p><b>${esc(e.label)}</b> <span class="muted">· säkerhet ${e.confidence} %</span></p>
     <p>${esc(e.text)}</p>
@@ -193,6 +253,7 @@ function renderDetail(d) {
     <p class="muted" style="font-size:12px;margin-top:8px">↺ betyder att zonen har bytt roll, till exempel från motstånd till stöd. Styrkan väger ihop antal träffar och hur nya de är.</p>`;
 
   // Backtest
+  if (d.isCrypto) { renderCryptoBacktest(d); return; }
   const s = d.backtest.stats;
   const recent = d.backtest.trades.slice(-6).reverse();
   $('#c-backtest').innerHTML = `<h3>Backtest – ${esc(d.name)}, cirka 4 år</h3>
@@ -305,12 +366,15 @@ async function loadLog() {
     const d = await (await fetch('/api/log')).json();
     const s = d.stats;
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    const state = e => e.state === 'stängd'
+    const state = e => e.kind === 'crypto' && e.pct != null
+      ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.state === 'öppen' ? 'öppen ' : ''}${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
+      : e.state === 'stängd'
       ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
       : e.state === 'öppen' ? `öppen${e.hit ? ' · TP' + e.hit : ''}` : esc(e.state);
     $('#log-body').innerHTML = d.entries.length
       ? `<p>${s.n} signaler sparade sedan start, ${s.closed} stängda och ${s.open} öppna.
-          Stängda: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.</p>
+          Stängda OMX: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.
+          ${s.crypto?.closed ? `Stängda krypto: ${s.crypto.closed}, snitt ${String(s.crypto.avgPct).replace('.', ',')} %.` : ''}</p>
         <table><tr><th>Datum</th><th>Aktie</th><th class="r">Köp</th><th class="r">Utfall</th></tr>
         ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}</td>
           <td class="r num">${e.entry ? fmt(e.entry) : '–'}</td><td class="r">${state(e)}</td></tr>`).join('')}</table>`
@@ -330,7 +394,9 @@ async function loadSummary() {
       <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
       <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
       <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
-      <span class="pill">Snitt <b>${String(a.avgR).replace('.', ',')} R</b></span>`;
+      <span class="pill">Snitt <b>${String(a.avgR).replace('.', ',')} R</b></span>
+      ${s.crypto?.n ? `<br><span>Krypto-utbrott (${s.crypto.n} st): </span><span class="pill">Vinst <b>${pc(s.crypto.winRate)}</b></span>
+      <span class="pill">Snitt <b class="${s.crypto.avgPct > 0 ? 'pos' : 'neg'}">${s.crypto.avgPct > 0 ? '+' : ''}${String(s.crypto.avgPct).replace('.', ',')} %</b></span>` : ''}`;
   } catch {
     $('#summary').textContent = '';
   }

@@ -31,5 +31,9 @@
     {"symbol": "TEL2-B.ST", "name": "Tele2 B", "avanzaId": "5386"},
     {"symbol": "TELIA.ST", "name": "Telia", "avanzaId": "5479"},
     {"symbol": "VOLV-B.ST", "name": "Volvo B", "avanzaId": "5269", "newsQuery": "(\"AB Volvo\" OR Volvokoncernen OR Volvoaktien) -\"Volvo Cars\""}
+  ],
+  "crypto": [
+    {"symbol": "BTC-USD", "name": "Bitcoin"},
+    {"symbol": "ETH-USD", "name": "Ether"}
   ]
 }

@@ -313,6 +313,24 @@ bitcoin men inte på ether. Fredag–måndag (helgeffekt) gav +0,50 / −0,05 %.
 **Slutsats:** utbrott i upptrend är det första korta upplägget som håller i alla perioder, men bara på krypto, med stora
 svängningar (spridning 10 % per affär, sämsta −25 %) och svagare de senaste åren.
 
+**En signal i veckan:** OMX-signalerna (överlevnadsfritt) gav 0,78 signaler per vecka 2018–2026. Med bitcoin- och
+ether-utbrotten blir det 1,18 per vecka, minst en signal i 51 % av veckorna och längsta tomma period 14 veckor (39 med
+bara OMX). Kontosimulering från 10 000 kr 2018 (OMX 6 % risk per R med appens riskfaktorer, krypto 30 % av kontot per affär,
+utan hävstång):
+
+| Kombination | Slutvärde | Per år | Största nedgång |
+|---|---|---|---|
+| Bara OMX | 78 666 kr | +26 % | −45 % |
+| OMX + bitcoin | 145 213 kr | +35 % | −49 % |
+| OMX + bitcoin + ether | 286 131 kr | +46 % | −45 % |
+
+År för OMX + bitcoin + ether: 2018 −5 %, 2019 +78 %, 2020 +54 %, 2021 +127 %, 2022 −33 %, 2023 +100 %, 2024 +76 %,
+2025 +84 %, 2026 +12 %. Simuleringen bokar varje affär när den stängs och tar inte hänsyn till att affärer överlappar.
+
+**I appen:** bitcoin och ether finns i skannern som "Krypto". Signalen kommer när dygnets stängning (UTC) är på ny
+20-dagarstopp över EMA 200, och planen är att köpa och sälja efter 7 dagar med 30 % av kontot. Skanningen körs varje kväll,
+även helger, och kryptosignalerna sparas i signalloggen med utfall i procent (`lib/crypto.js`).
+
 ### Råvaror: guld, olja, naturgas och kakao med väder och krig (2010–2026)
 Terminspriser från Yahoo (GC=F, BZ=F, NG=F, CC=F) och fonderna UNG och BNO som kontroll, eftersom de har kostnaden för att
 rulla kontrakten inräknad. Väder från NASA POWER: nederbörd på fem orter i Elfenbenskusten och Ghana (kakao) och temperatur

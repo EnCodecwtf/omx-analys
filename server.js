@@ -14,6 +14,7 @@ import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
+import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -22,7 +23,8 @@ const CACHE_MS = 15 * 60 * 1000;
 
 const symbols = JSON.parse(await fs.readFile(path.join(__dirname, 'symbols.json'), 'utf8'));
 const universe = [{ ...symbols.index, isIndex: true }, ...symbols.stocks];
-const bySymbol = new Map(universe.map(s => [s.symbol, s]));
+const cryptos = (symbols.crypto || []).map(s => ({ ...s, isCrypto: true }));
+const bySymbol = new Map([...universe, ...cryptos].map(s => [s.symbol, s]));
 
 const r4 = x => Math.round(x * 1e4) / 1e4;
 const cache = new Map();
@@ -108,12 +110,28 @@ async function scan() {
         return { symbol: s.symbol, name: s.name, isIndex: !!s.isIndex, error: err.message };
       }
     });
-    const signals = rows.filter(r => r.status === 'strong' && isFinal(r.t));
+    for (const s of cryptos) {
+      try {
+        const all = completeBars(await fetchBars(s.symbol));
+        const ev = evaluate(all.slice(-CHART_BARS));
+        const cs = cryptoSignal(all);
+        rows.push({
+          symbol: s.symbol, name: s.name, isCrypto: true,
+          price: cs.price, changePct: Math.round((cs.price / all[all.length - 2].c - 1) * 10000) / 100,
+          t: all[all.length - 1].t, status: cs.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi, elliott: null,
+          crypto: cs, missing: cs.checklist.filter(c => !c.ok).map(c => c.key), checks: cs.checklist.length, size: cs.size,
+          spark: all.slice(-60).map(b => Math.round(b.c * 100) / 100),
+        });
+      } catch (err) {
+        rows.push({ symbol: s.symbol, name: s.name, isCrypto: true, error: err.message });
+      }
+    }
+    const signals = rows.filter(r => r.status === 'strong' && (r.isCrypto || isFinal(r.t)));
     if (signals.length) {
-      const added = await signalLog.record(signals.map(r => ({
-        date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
-        tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString(),
-      })));
+      const added = await signalLog.record(signals.map(r => r.isCrypto
+        ? { kind: 'crypto', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, exitDate: r.crypto.exitDate, days: r.crypto.days, size: r.size, loggedAt: new Date().toISOString() }
+        : { date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+          tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() }));
       for (const e of added) await notifySignal(e);
     }
     return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), cycle: btcCycle(today()), rows };
@@ -137,7 +155,13 @@ async function summary() {
       n: list.length, tp1Rate: rate(list, 1), tp2Rate: rate(list, 2), tp3Rate: rate(list, 3),
       avgR: list.length ? Math.round(100 * list.reduce((a, x) => a + x.r, 0) / list.length) / 100 : null,
     });
-    return { updated: Date.now(), all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')) };
+    const ct = [];
+    for (const s of cryptos) {
+      try { ct.push(...cryptoBacktest(completeBars(await fetchBars(s.symbol))).trades.filter(t => !t.open)); } catch { /* hoppas över */ }
+    }
+    const crypto = { n: ct.length, winRate: ct.length ? Math.round(1000 * ct.filter(t => t.pct > 0).length / ct.length) / 10 : null,
+      avgPct: ct.length ? Math.round(100 * ct.reduce((a, t) => a + t.pct, 0) / ct.length) / 100 : null };
+    return { updated: Date.now(), all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')), crypto };
   });
 }
 
@@ -147,22 +171,29 @@ async function logView() {
   const out = [];
   for (const e of list) {
     let o;
-    try { o = signalLog.outcome(e, await fetchBars(e.symbol)); } catch { o = { state: 'okänd' }; }
+    try {
+      const bars = await fetchBars(e.symbol);
+      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : signalLog.outcome(e, bars);
+    } catch { o = { state: 'okänd' }; }
     out.push({ ...e, ...o });
   }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
-  const closed = out.filter(x => x.state === 'stängd');
+  // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
+  const closed = out.filter(x => x.state === 'stängd' && x.kind !== 'crypto');
+  const cClosed = out.filter(x => x.state === 'stängd' && x.kind === 'crypto');
   const pct = k => closed.length ? Math.round(1000 * closed.filter(x => x.hit >= k).length / closed.length) / 10 : null;
   return {
     entries: out,
     stats: { n: out.length, closed: closed.length, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
-      avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null },
+      avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null,
+      crypto: { closed: cClosed.length, avgPct: cClosed.length ? Math.round(100 * cClosed.reduce((s, x) => s + x.pct, 0) / cClosed.length) / 100 : null } },
   };
 }
 
 async function analysis(symbol) {
   return cached(`a:${symbol}`, async () => {
     const meta = bySymbol.get(symbol);
+    if (meta.isCrypto) return cryptoAnalysis(meta);
     const all = await fetchBars(symbol);
     const bars = all.slice(-CHART_BARS);
     const ev = applyGuards(evaluate(bars), await guards(meta));
@@ -185,6 +216,29 @@ async function analysis(symbol) {
   });
 }
 
+// Kryptosidan: samma graf och analys av strukturen, men signalen kommer från
+// utbrottsstrategin och backtestet räknas i procent.
+async function cryptoAnalysis(meta) {
+  const all = completeBars(await fetchBars(meta.symbol));
+  const bars = all.slice(-CHART_BARS);
+  const ev = evaluate(bars);
+  const cs = cryptoSignal(all);
+  // Rekylstrategins stopp och mål gäller inte här, så handelsplanen ritas inte.
+  Object.assign(ev, { status: cs.status, checklist: cs.checklist, crypto: cs, warnings: [], blocked: null, plan: null });
+  const ind = computeIndicators(all);
+  const off = all.length - bars.length;
+  const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
+  const bt = cryptoBacktest(all);
+  return {
+    symbol: meta.symbol, name: meta.name, isCrypto: true,
+    bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
+    ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
+    analysis: ev,
+    patterns: relevantPatterns(bars),
+    backtest: { stats: bt.stats, trades: bt.trades.map(t => ({ ...t, r: t.pct })) },
+  };
+}
+
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 
@@ -205,8 +259,8 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh')) cache.clear();
       return send(res, 200, await scan());
     }
-    // Anropas av Vercel Cron varje vardagskväll: sparar nya starka köpsignaler
-    // i signalloggen och skickar avisering.
+    // Anropas av Vercel Cron varje kväll (krypto handlas även på helger): sparar
+    // nya starka köpsignaler i signalloggen och skickar avisering.
     if (url.pathname === '/api/cron/scan') {
       cache.delete('scan');
       const before = (await signalLog.entries()).length;
