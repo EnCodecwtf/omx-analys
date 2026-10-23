@@ -423,6 +423,24 @@ positionsstorleken, vid 30 % blir den en fjärdedel. Toppen uppdateras automatis
 
 Bitcoin och Ether visas bara under fliken Krypto, så att listan i övrigt är ren OMX.
 
+### Vinstmål och RR (2017–2026)
+378 signaler (dagens bolag 2017–21 / 2022–26 och bolag som åkte ur), snitt per affär i R efter 0,3 % avgift.
+
+| Mål | Vinst | Snitt 2017–21 / 2022–26 / åkte ur | Summa | Förluster i rad | Nedgång |
+|---|---|---|---|---|---|
+| Som appen (nivåer, cirka 0,8 / 1,5 / 2,5R) | 57 / 58 / 46 % | +0,23 / +0,27 / −0,08 R | 69 R | 12 | −31 R |
+| 1 / 2 / 3R | 51 / 51 / 38 % | +0,29 / +0,33 / −0,02 R | 91 R | 15 | −37 R |
+| 1,5 / 3 / 4,5R | 48 / 46 / 33 % | +0,42 / +0,41 / +0,01 R | 124 R | 16 | −39 R |
+| Allt vid 3R | 46 / 45 / 33 % | +0,51 / +0,47 / −0,01 R | 142 R | 16 | −44 R |
+| TP1 som appen, resten följer 2 ATR | 67 / 64 / 54 % | +0,13 / +0,18 / −0,09 R | – | – | – |
+
+Att bara ta signaler där TP2 ligger minst 1,5R bort gav +0,13 / +0,64 / −0,53 R och håller inte.
+Nedgången är summan i R utan riskfaktorer och utan hänsyn till att affärer överlappar, så den ska bara jämföras mellan raderna.
+
+**Slutsats:** högre mål ger klart mer per affär i alla tre grupperna, men färre vinnande affärer och längre förlustsviter.
+Appens mål är valda för hög träffsäkerhet (TP1 över 60 %, TP2 minst 54 %). Att låta vinnarna löpa med följande stopp
+gav sämre resultat.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
