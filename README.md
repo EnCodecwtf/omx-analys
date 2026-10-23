@@ -255,6 +255,39 @@ säljmönster de senaste 20 dagarna +0,36 / +0,09 R mot +0,26 / +0,36 R utan. In
 **Slutsats:** formationerna ger ingen fördel efter avgifter och påverkar inte signalerna. De visas i grafen och i
 Elliott-kortet som information, när utbrottet skett de senaste 20 dagarna eller kursen är mer än halvvägs mot det.
 
+### Insynshandel och blankning (Finansinspektionen, 2017–2026)
+Data från FI: insynsregistret (marknadssok.fi.se, export per bolag och år, 6 774 köp och försäljningar av aktier på
+handelsplats, utan aktieprogram) och blankningsregistret (fi.se, historiska och aktuella positioner över 0,5 %, summerade
+per bolag och dag). Insynsaffärer räknas från publiceringsdagen, så inget används innan det var känt. Bara bolag som var
+med i OMXS30 på dagen. Överavkastning är mot OMXS30 och före avgifter (cirka 0,2 % per affär).
+
+**Som filter på appens signaler (2017–21 / 2022–26, alla: +0,29 / +0,26 R):**
+
+| Läge | Utfall |
+|---|---|
+| Insynsköp netto senaste 90 dagarna | +0,52 / +0,22 R (övriga +0,15 / +0,32 R) |
+| Minst 2 insynsköpare senaste 90 dagarna | +0,36 / +0,17 R |
+| Blankning minst 2 % | +0,67 / −0,27 R |
+| Blankningen ökat senaste 4 veckorna | +0,47 / −0,18 R |
+
+Alla byter riktning mellan perioderna.
+
+**Egna strategier, köp dagen efter (överavkastning efter 5 / 10 / 20 dagar, 2017–21 → 2022–26):**
+
+| Händelse | 5 dagar | 10 dagar | 20 dagar |
+|---|---|---|---|
+| Insynsköp netto samma dag (747) | +0,11 → +0,22 % | +0,33 → +0,21 % | +0,46 → +0,12 % |
+| Insynsköp minst 1 Mkr (366) | −0,26 → +0,25 % | −0,38 → +0,50 % | −0,24 → +0,49 % |
+| VD eller ordförande köper minst 0,5 Mkr (232) | −0,70 → −0,02 % | −0,81 → −0,15 % | −1,49 → −0,35 % |
+| Kluster: minst 2 köpare inom 30 dagar (427) | −0,03 → +0,00 % | +0,46 → +0,11 % | +0,39 → −0,29 % |
+| Hög blankning (minst 3 %) som minskar minst 0,5 procentenheter på 4 veckor (106) | +0,45 → +0,02 % | +0,16 → +0,99 % | +2,15 → +0,38 % |
+
+Täckande blankare såg lovande ut veckovis, men med en händelse per tillfälle (20 dagars spärr) är inget t-värde över cirka
+2. Resultatet drivs av några få stora rörelser i SBB och Sinch, och 12 varianter av gränserna ger blandade tecken.
+
+**Slutsats:** varken insynsköp eller blankning ger en robust fördel efter avgifter, varken som filter eller som egen strategi.
+Inget av det används i appen.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
