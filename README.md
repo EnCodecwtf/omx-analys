@@ -313,6 +313,36 @@ bitcoin men inte på ether. Fredag–måndag (helgeffekt) gav +0,50 / −0,05 %.
 **Slutsats:** utbrott i upptrend är det första korta upplägget som håller i alla perioder, men bara på krypto, med stora
 svängningar (spridning 10 % per affär, sämsta −25 %) och svagare de senaste åren.
 
+### Råvaror: guld, olja, naturgas och kakao med väder och krig (2010–2026)
+Terminspriser från Yahoo (GC=F, BZ=F, NG=F, CC=F) och fonderna UNG och BNO som kontroll, eftersom de har kostnaden för att
+rulla kontrakten inräknad. Väder från NASA POWER: nederbörd på fem orter i Elfenbenskusten och Ghana (kakao) och temperatur
+i sex amerikanska storstäder (uppvärmnings- och kylbehov, naturgas), jämfört med samma period de tio föregående åren.
+Krig och oro från GPR-indexet. Snitt per affär efter avgift, 2010–17 / 2018–26.
+
+| Strategi | Guld | Olja | Naturgas | Kakao |
+|---|---|---|---|---|
+| Köp och behåll 7 dagar (jämförelse) | −0,16 / +0,13 % | −0,14 / +0,22 % | −0,41 / +0,20 % | −0,44 / +0,09 % |
+| 20-dagars utbrott upp, 7 dagar | +0,20 / −0,12 % | +0,58 / +0,53 % | −1,00 / −1,02 % | −0,41 / +0,21 % |
+| 20-dagars utbrott ned, blanka 7 dagar | +0,33 / −0,95 % | +0,40 / −0,29 % | −2,18 / −2,24 % | −1,00 / −1,77 % |
+| RSI(2) under 10 över EMA 200 | −0,31 / +0,01 % | −1,20 / +0,65 % | +0,63 / −0,47 % | −1,20 / −0,43 % |
+
+**Krig och oro:** guld efter en ny krigsspik (GPR över 1,3) gav +0,23 / −0,25 % på 5 dagar och −1,13 / +0,27 % på 20 dagar.
+Olja −0,74 / +0,09 % och −0,29 / +1,35 %. Hög GPR förbättrade inte utbrotten i guld eller olja.
+
+**Kakao och nederbörd:** torrt (under 70 % av normalt på 30 dagar) gav +0,09 / +0,44 % per vecka, normalt −0,69 / −0,27 %
+och blött −0,14 / +0,53 %. Köp när torka börjar (60 dagar under 70 %): +2,10 / +7,47 % på 40 dagar men bara 6 och 11 fall
+(t under 1).
+
+**Naturgas och temperatur:** kallare vinter än normalt de senaste 7 dagarna gav +0,46 / −5,89 % per vecka. Varmare än
+normalt −1,21 / +1,17 %. Säsong per månad byter tecken mellan perioderna utom juni–juli (negativa) och april (positiv).
+Väderdatan är faktiskt utfall. Marknaden handlar på prognoser, så utfallet är redan inräknat i priset.
+
+**Enda mönstret som håller:** naturgas faller tillbaka efter en 20-dagarstopp. Att blanka UNG i 7 dagar efter en ny
+20-dagarstopp gav +1,08 / +1,88 / +1,23 / +1,27 % i fyra delperioder (jämförelse att alltid blanka: +0,50 / +0,97 / +0,17 /
+−0,33 %), men bara cirka 6 affärer om året och t 1,5 totalt.
+
+**Slutsats:** väder och krig ger ingen robust fördel på råvarorna. Inget läggs in i appen.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
