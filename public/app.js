@@ -348,7 +348,8 @@ function renderMacro(m, st, cy) {
     <ul>${st.parts.map(p => `<li class="${p.bad ? 'bad' : ''}">${esc(p.text)}</li>`).join('')}</ul>` : '';
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
-    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}</li>`).join('')}</ul>${stressLine}${cycleLine}`;
+    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}${p.need ? `<div class="need">${esc(p.need)}</div>` : ''}</li>`).join('')}</ul>
+    ${m.summary ? `<div class="macro-sum">${esc(m.summary)}</div>` : ''}${stressLine}${cycleLine}`;
 }
 
 const newsList = items => items.length

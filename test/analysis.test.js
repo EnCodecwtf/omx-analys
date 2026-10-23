@@ -300,3 +300,14 @@ test('Förlustsviter och nedgångar för panelen "Vad är normalt?"', async () =
   assert.equal(s.lossShare, 67);
   assert.equal(equityStats([]).lossShare, null);
 });
+
+test('Makroläget förklarar vad som saknas', async () => {
+  const { buildMacro } = await import('../lib/macro.js');
+  const up = path([100, 140], 260);
+  const m = buildMacro({ omxBars: up, vixBars: up.map(b => ({ ...b, c: 18 })), stockBars: [up] })(new Date(up[up.length - 1].t * 1000).toISOString().slice(0, 10));
+  assert.equal(m.score, 0);
+  assert.match(m.summary, /kräver poäng 1, så 1 poäng saknas/);
+  const omx = m.parts.find(p => p.text.startsWith('OMXS30'));
+  assert.match(omx.need, /\+1 om OMXS30 faller .* % till under EMA 200/);
+  assert.match(m.parts.find(p => p.text.startsWith('VIX')).need, /\+1 om VIX stiger till 20 \(2 enheter upp\)/);
+});
