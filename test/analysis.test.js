@@ -230,3 +230,16 @@ test('Avisering skickas bara när ett ämne är satt', async () => {
   assert.equal(calls[0].init.headers.Click, 'https://exempel.se/#VOLV-B.ST');
   assert.match(calls[0].init.body, /Halv position/);
 });
+
+test('Kravlistan förklarar varför en signal inte är redo', async () => {
+  const { applyGuards } = await import('../lib/analyze.js');
+  const bars = path([100, 140, 120, 160, 110, 130, 95, 125, 90, 115, 85, 120], 12);
+  for (let n = 220; n <= bars.length; n++) {
+    const ev = evaluate(bars.slice(0, n));
+    const allOk = ev.checklist.every(c => c.ok);
+    assert.equal(allOk, ev.status === 'buy' || ev.status === 'strong', `stapel ${n}`);
+    for (const c of ev.checklist) assert.ok(c.text && c.now);
+  }
+  const g = applyGuards({ status: 'buy', warnings: [], checklist: [] }, { report: { date: '2026-11-02' }, reportDays: 5, macro: { score: 1, size: 1, label: 'Gynnsamt' } });
+  assert.deepEqual(g.checklist.map(c => [c.key, c.ok]), [['report', false], ['macro', true]]);
+});

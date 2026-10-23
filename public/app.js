@@ -81,7 +81,7 @@ function renderScan() {
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta"><span>Poäng ${r.score}</span><span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som saknas">${r.checks - r.missing.length} av ${r.checks} krav</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
   }).join('') + (visible.length <= 1 ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -99,6 +99,20 @@ async function openSymbol(symbol, { keepView, refresh } = {}) {
   renderDetail(d);
 }
 
+// Visar varje krav för köpsignal och om det är uppfyllt, så att det syns
+// varför en signal inte är redo än.
+function checklist(A) {
+  const list = A.checklist || [];
+  if (!list.length) return '';
+  const missing = list.filter(c => !c.ok);
+  const active = A.status === 'strong' || A.status === 'buy';
+  const head = active ? 'Alla krav för köpsignal är uppfyllda.'
+    : missing.length === 1 ? `<b>Ett krav saknas:</b> ${esc(missing[0].text.toLowerCase())}.`
+    : `<b>${missing.length} av ${list.length} krav saknas</b> för köpsignal.`;
+  return `<div class="checklist"><p style="margin:0 0 6px">${head}</p><ul>${list.map(c => `<li class="${c.ok ? 'ok' : 'bad'}">
+      <span class="mark">${c.ok ? '✓' : '✗'}</span><span>${esc(c.text)}<span class="muted"> – ${esc(c.now.replace(/(\d)\.(\d)/g, '$1,$2'))}</span></span></li>`).join('')}</ul></div>`;
+}
+
 function renderDetail(d) {
   lastDetail = d;
   const A = d.analysis, pl = A.plan;
@@ -113,13 +127,14 @@ function renderDetail(d) {
   const explain = {
     strong: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt, och marknadsläget är gynnsamt.',
     buy: 'Rekyl under EMA 200 som vänder upp vid en stödzon, med RSI och MACD som vänder samtidigt. Marknadsläget är neutralt: halv position.',
-    watch: 'Intressant läge, men alla krav för köpsignal är inte uppfyllda än. Vänta på vändning vid stöd.',
+    watch: 'Intressant läge, men alla krav för köpsignal är inte uppfyllda än. Se vad som saknas nedan.',
     neutral: 'Inget tydligt köpläge just nu.',
     avoid: 'Sent eller överköpt läge. Vänta på en rekyl.',
   }[A.status];
   $('#c-signal').innerHTML = `<h3>Signal</h3>
     <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
     <p>${explain}</p>
+    ${checklist(A)}
     <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
     ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}
     ${A.blocked ? `<p class="warn">Utan spärren hade detta varit ${STATUS[A.blocked].text.toLowerCase()}.</p>` : ''}

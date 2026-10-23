@@ -100,7 +100,7 @@ async function scan() {
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan, blocked: ev.blocked || null, report: ev.guards.report, size: ev.guards.size,
+          plan: ev.plan, blocked: ev.blocked || null, missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, report: ev.guards.report, size: ev.guards.size,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
       } catch (err) {

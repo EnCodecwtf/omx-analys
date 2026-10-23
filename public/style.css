@@ -129,6 +129,12 @@ ul.news .muted { font-size: 11px; }
 .score-bar { flex: 1; height: 8px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
 .score-bar span { display: block; height: 100%; border-radius: 99px; }
 .score-val { font-size: 22px; font-weight: 700; }
+.checklist { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.checklist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.checklist li { display: flex; gap: 8px; }
+.checklist .mark { font-weight: 700; width: 14px; flex: none; }
+.checklist li.ok .mark { color: var(--green); }
+.checklist li.bad .mark { color: var(--red); }
 ul.reasons { list-style: none; margin: 0; padding: 0; }
 ul.reasons li { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px dashed var(--border); }
 ul.reasons li:last-child { border-bottom: 0; }
