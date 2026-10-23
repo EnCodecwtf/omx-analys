@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchBars } from './lib/data.js';
-import { evaluate, backtest, applyGuards, REPORT_BLOCK_DAYS } from './lib/analyze.js';
+import { evaluate, backtest, applyGuards, equityStats, REPORT_BLOCK_DAYS } from './lib/analyze.js';
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
@@ -161,7 +161,8 @@ async function summary() {
     }
     const crypto = { n: ct.length, winRate: ct.length ? Math.round(1000 * ct.filter(t => t.pct > 0).length / ct.length) / 10 : null,
       avgPct: ct.length ? Math.round(100 * ct.reduce((a, t) => a + t.pct, 0) / ct.length) / 100 : null };
-    return { updated: Date.now(), all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')), crypto };
+    const normal = equityStats(trades.slice().sort((a, b) => a.t - b.t).map(t => t.r));
+    return { updated: Date.now(), normal, all: stats(trades), strong: stats(trades.filter(t => t.status === 'strong')), buy: stats(trades.filter(t => t.status === 'buy')), crypto };
   });
 }
 
@@ -181,10 +182,11 @@ async function logView() {
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
   const closed = out.filter(x => x.state === 'stängd' && x.kind !== 'crypto');
   const cClosed = out.filter(x => x.state === 'stängd' && x.kind === 'crypto');
+  const current = equityStats(closed.slice().sort((a, b) => a.date.localeCompare(b.date)).map(x => x.r));
   const pct = k => closed.length ? Math.round(1000 * closed.filter(x => x.hit >= k).length / closed.length) / 10 : null;
   return {
     entries: out,
-    stats: { n: out.length, closed: closed.length, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
+    stats: { n: out.length, closed: closed.length, current, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
       avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null,
       crypto: { closed: cClosed.length, avgPct: cClosed.length ? Math.round(100 * cClosed.reduce((s, x) => s + x.pct, 0) / cClosed.length) / 100 : null } },
   };

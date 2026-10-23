@@ -413,6 +413,16 @@ riskerad krona. Det blir inte bättre än appens stopp.
 föll blir det sämre, och en enda affär kan kosta 8–13 gånger den planerade risken. Appens stopp ger bäst resultat per riskerad
 krona. Break-even efter TP1 ger fler vinnande affärer (65–67 %) men lägre snitt.
 
+### Vad är normalt? och nedgångsregeln
+Panelen "Vad är normalt?" under backtestet visar andel förluster, längsta förlustsvit, djupaste nedgång (R) och längsta tid
+utan ny topp: för 10 år med alla indexbolag (356 affärer: 44 % förluster, 10 i rad, −23,6 R, 112 affärer utan ny topp),
+för appens backtest och för signalloggen just nu. Om läget nu blir sämre än något som hänt i testerna säger panelen det.
+
+Nedgångsregeln: fyll i kontots högsta värde under grafen. När kontot är 20 % under toppen halveras risken i
+positionsstorleken, vid 30 % blir den en fjärdedel. Toppen uppdateras automatiskt när kontot når en ny högsta nivå.
+
+Bitcoin och Ether visas bara under fliken Krypto, så att listan i övrigt är ren OMX.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att

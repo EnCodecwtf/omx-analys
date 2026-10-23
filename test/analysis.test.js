@@ -286,3 +286,17 @@ test('Krypto-utbrott: signal, backtest och utfall', async () => {
   const now = new Date(bars[bars.length - 1].t * 1000);
   assert.equal(completeBars(bars, now).length, bars.length - 1);
 });
+
+test('Förlustsviter och nedgångar för panelen "Vad är normalt?"', async () => {
+  const { equityStats } = await import('../lib/analyze.js');
+  const s = equityStats([1, -1, -1, -1, 2, -0.5, 3, -1, -1]);
+  assert.equal(s.trades, 9);
+  assert.equal(s.longestLosing, 3);
+  assert.equal(s.maxDD, -3);
+  assert.equal(s.currentLosing, 2);
+  assert.equal(s.currentDD, -2);
+  assert.equal(s.sinceHigh, 2);
+  assert.equal(s.longestNoHigh, 5);
+  assert.equal(s.lossShare, 67);
+  assert.equal(equityStats([]).lossShare, null);
+});

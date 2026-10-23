@@ -20,8 +20,26 @@ let lastDetail = null;
 const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignoreras */ } } };
 $('#acct').value = store.get('acct', '10000');
 $('#risk').value = store.get('risk', '6');
-for (const id of ['acct', 'risk']) $('#' + id).addEventListener('input', () => {
+$('#peak').value = store.get('peak', $('#acct').value);
+
+// Nedgångsregel: bestämd i förväg så att beslutet inte fattas när det känns
+// som värst. 20 % under kontots högsta värde halverar risken, 30 % ger en fjärdedel.
+function ddFactor() {
+  const acct = +$('#acct').value || 0;
+  let peak = +$('#peak').value || 0;
+  if (acct > peak) { peak = acct; $('#peak').value = String(acct); store.set('peak', String(acct)); }
+  const dd = peak > 0 ? 1 - acct / peak : 0;
+  const factor = dd >= 0.3 ? 0.25 : dd >= 0.2 ? 0.5 : 1;
+  const el = $('#dd-rule');
+  el.className = 'dd-rule' + (factor < 1 ? ' bad' : '');
+  el.textContent = dd <= 0.001 ? 'Kontot är på sin högsta nivå: full risk.'
+    : `Kontot är ${Math.round(dd * 100)} % under toppen: ${factor === 1 ? 'full risk (halveras vid 20 %)' : factor === 0.5 ? 'halv risk tills kontot är mindre än 20 % under toppen' : 'en fjärdedels risk tills kontot är mindre än 30 % under toppen'}.`;
+  return factor;
+}
+ddFactor();
+for (const id of ['acct', 'risk', 'peak']) $('#' + id).addEventListener('input', () => {
   store.set(id, $('#' + id).value);
+  ddFactor();
   if (lastDetail?.isCrypto) renderCryptoCards(lastDetail);
   else if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
 });
@@ -70,9 +88,10 @@ async function loadScan(refresh) {
 function renderScan() {
   const rows = scanData.rows.slice().sort((a, b) =>
     (b.isIndex - a.isIndex) || ((STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9)) || ((b.score ?? 0) - (a.score ?? 0)));
-  const visible = rows.filter(r => r.isIndex || filter === 'all'
+  // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
+  const visible = rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
     || (filter === 'signals' && (r.status === 'strong' || r.status === 'buy'))
-    || (filter === 'watch' && r.status === 'watch'));
+    || (filter === 'watch' && r.status === 'watch')));
   const list = $('#scan-list');
   list.innerHTML = visible.map(r => {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
@@ -84,7 +103,7 @@ function renderScan() {
       </div>
       <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
-  }).join('') + (visible.length <= 1 ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
+  }).join('') + (visible.length <= (filter === 'crypto' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
 }
 
@@ -290,7 +309,8 @@ async function loadProducts(symbol, status) {
   const active = status === 'strong' || status === 'buy';
   const acct = Math.max(0, +$('#acct').value || 0), riskPct = Math.max(0, +$('#risk').value || 0);
   const size = r.size ?? 1;
-  const riskKr = acct * riskPct / 100 * size;
+  const dd = ddFactor();
+  const riskKr = acct * riskPct / 100 * size * dd;
   const invest = p => p.lossAtStopPct > 0 ? riskKr / (p.lossAtStopPct / 100) : 0;
   const num = (v, d = 2) => v == null ? '–' : v.toLocaleString('sv-SE', { minimumFractionDigits: d, maximumFractionDigits: d });
   const item = (p, k, isMini) => `<div class="prod-item${k === 0 ? ' best' : ''}">
@@ -307,7 +327,7 @@ async function loadProducts(symbol, status) {
     </div>`;
   el.innerHTML = `<h3>Hävstång på Avanza ${active ? '' : '<span class="muted">(ingen köpsignal just nu – bara för bevakning)</span>'}</h3>
     <p style="font-size:13px">Positionsstorlek: risk ${String(riskPct).replace('.', ',')} % av ${acct.toLocaleString('sv-SE')} kr × makrofaktor ${String(size).replace('.', ',')}
-    = <b>${Math.round(riskKr).toLocaleString('sv-SE')} kr</b> i förlust om stoppet nås.${size === 0 ? ' Makroläget är ogynnsamt, så positionsstorleken är 0.' : ''}</p>
+    ${dd < 1 ? ` × nedgångsregeln ${String(dd).replace('.', ',')}` : ''} = <b>${Math.round(riskKr).toLocaleString('sv-SE')} kr</b> i förlust om stoppet nås.${size === 0 ? ' Makroläget är ogynnsamt, så positionsstorleken är 0.' : ''}</p>
     ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut.</p>
     <div class="prod">${r.minis.map((p, k) => item(p, k, true)).join('')}</div>`
     : '<p class="muted">Inget minifuture-papper klarar säkerhetskraven just nu.</p>'}
@@ -361,10 +381,34 @@ async function loadCompanyNews(symbol, name) {
   }
 }
 
+// Vad är normalt? Historiska förlustsviter och nedgångar jämfört med läget nu,
+// så att en tung period kan bedömas mot vad strategin har klarat förut.
+const NORMAL_10Y = { trades: 356, lossShare: 44, longestLosing: 10, maxDD: -23.6, longestNoHigh: 112 };
+let normalBacktest = null, normalLive = null;
+function renderNormal() {
+  const n = normalBacktest, c = normalLive;
+  const r = v => v == null ? '–' : String(v).replace('.', ',');
+  const row = (lab, a, b, now) => `<tr><td>${lab}</td><td class="r num">${a}</td><td class="r num">${b}</td><td class="r num">${now}</td></tr>`;
+  $('#normal-body').innerHTML = `<p>Strategin har fungerat historiskt, men tunga perioder är en del av den. Jämför läget nu med vad som har hänt förut innan du ändrar något.</p>
+    <table class="normal-table">
+      <tr><th></th><th class="r">10 år, alla indexbolag</th><th class="r">Backtest i appen</th><th class="r">Signalloggen nu</th></tr>
+      ${row('Affärer', NORMAL_10Y.trades, r(n?.trades), r(c?.trades))}
+      ${row('Andel förluster', NORMAL_10Y.lossShare + ' %', n ? n.lossShare + ' %' : '–', c?.trades ? c.lossShare + ' %' : '–')}
+      ${row('Förluster i rad', `${NORMAL_10Y.longestLosing} som mest`, n ? `${n.longestLosing} som mest` : '–', c?.trades ? `${c.currentLosing} nu` : '–')}
+      ${row('Nedgång från toppen', `${r(NORMAL_10Y.maxDD)} R som mest`, n ? `${r(n.maxDD)} R som mest` : '–', c?.trades ? `${r(c.currentDD)} R nu` : '–')}
+      ${row('Affärer utan ny topp', `${NORMAL_10Y.longestNoHigh} som mest`, n ? `${n.longestNoHigh} som mest` : '–', c?.trades ? `${c.sinceHigh} nu` : '–')}
+    </table>
+    <p style="margin-top:8px">${c?.trades && (c.currentLosing > NORMAL_10Y.longestLosing || c.currentDD < NORMAL_10Y.maxDD)
+      ? '<b class="neg">Läget är sämre än något som hänt i testerna. Det kan betyda att strategin har slutat fungera: minska risken och se över den.</b>'
+      : 'Så länge läget nu ligger inom det som har hänt förut är det inget tecken på att strategin har slutat fungera. Följ reglerna.'}</p>
+    <p>Nedgångsregeln under grafen halverar risken när kontot är 20 % under sin topp och ger en fjärdedel vid 30 %. Fyll i kontots högsta värde där.</p>`;
+}
+
 async function loadLog() {
   try {
     const d = await (await fetch('/api/log')).json();
     const s = d.stats;
+    normalLive = s.current; renderNormal();
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
     const state = e => e.kind === 'crypto' && e.pct != null
       ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.state === 'öppen' ? 'öppen ' : ''}${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
@@ -388,15 +432,14 @@ async function loadLog() {
 async function loadSummary() {
   try {
     const s = await (await fetch('/api/summary')).json();
+    normalBacktest = s.normal; renderNormal();
     const a = s.all;
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
     $('#summary').innerHTML = `<span>Backtest, starka köpsignaler med rapportspärr och makrofilter (${a.n} st):</span>
       <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
       <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
       <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
-      <span class="pill">Snitt <b>${String(a.avgR).replace('.', ',')} R</b></span>
-      ${s.crypto?.n ? `<br><span>Krypto-utbrott (${s.crypto.n} st): </span><span class="pill">Vinst <b>${pc(s.crypto.winRate)}</b></span>
-      <span class="pill">Snitt <b class="${s.crypto.avgPct > 0 ? 'pos' : 'neg'}">${s.crypto.avgPct > 0 ? '+' : ''}${String(s.crypto.avgPct).replace('.', ',')} %</b></span>` : ''}`;
+      <span class="pill">Snitt <b>${String(a.avgR).replace('.', ',')} R</b></span>`;
   } catch {
     $('#summary').textContent = '';
   }
