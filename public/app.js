@@ -66,18 +66,19 @@ function spark(values, up) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="1.5" points="${pts}"/></svg>`;
 }
 
-async function loadScan(refresh) {
+async function loadScan(refresh, auto = false) {
   $('#refresh').disabled = true;
   if (!scanData) $('#scan-list').innerHTML = '<div class="loading">Hämtar och analyserar alla instrument…</div>';
   try {
     const res = await fetch('/api/scan' + (refresh ? '?refresh=1' : ''));
     scanData = await res.json();
-    $('#updated').textContent = 'Analys ' + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+    $('#updated').textContent = (marketOpen() ? 'Live · ' : 'Analys ') + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) + (marketOpen() ? ' · kurser cirka 15 min fördröjda' : '');
     renderScan();
     renderMacro(scanData.macro, scanData.stress, scanData.cycle);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
-    if (pick) openSymbol(pick.symbol, { keepView: !fromHash && !refresh, refresh });
+    // Vid automatisk uppdatering stannar vyn där den är (listan eller aktien).
+    if (pick) openSymbol(auto && current ? current : pick.symbol, { keepView: auto || (!fromHash && !refresh), refresh });
   } catch (e) {
     $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta data: ${esc(e.message)}</div>`;
   } finally {
@@ -97,7 +98,7 @@ function renderScan() {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
     const up = r.changePct >= 0;
     return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
-      <div class="name">${esc(r.name)} ${badge(r.status)}</div>
+      <div class="name">${esc(r.name)} ${badge(r.status)}${r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
@@ -212,6 +213,7 @@ function renderSignalCards(d) {
   $('#c-signal').innerHTML = `<h3>Signal</h3>
     <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
     <p>${explain}</p>
+    ${d.preliminary ? '<p class="warn" style="font-size:12px">Preliminärt: räknat på kursen just nu (cirka 15 minuter fördröjd). Signalen gäller först när dagen stänger 17:30, och köpet sker på öppningen nästa dag.</p>' : ''}
     ${checklist(A)}
     <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
     ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}
@@ -449,4 +451,13 @@ async function loadSummary() {
 loadScan(false);
 loadSummary();
 loadLog();
+
+// Börsen i Stockholm är öppen vardagar 09.00–17.30. Då uppdateras appen var
+// femte minut, så att signaler, kravlistor och öppna affärer följer kursen live.
+function marketOpen(now = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', hour: '2-digit', minute: '2-digit', weekday: 'short', hour12: false }).formatToParts(now).map(x => [x.type, x.value]));
+  const min = +p.hour * 60 + +p.minute;
+  return !/lör|sön/.test(p.weekday) && min >= 9 * 60 && min <= 17 * 60 + 35;
+}
+setInterval(() => { if (marketOpen() && !document.hidden) { loadScan(true, true); loadLog(); } }, 5 * 60 * 1000);
 loadMarketNews();

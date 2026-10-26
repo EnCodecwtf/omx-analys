@@ -7,7 +7,7 @@ import { evaluate, backtest, applyGuards, equityStats, REPORT_BLOCK_DAYS } from 
 import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
-import { notifySignal } from './lib/notify.js';
+import { notifySignal, notifyEvent } from './lib/notify.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
@@ -83,12 +83,17 @@ async function backtestFor(s, bars) {
   return bt;
 }
 
+// Klockan i Stockholm: datum, minuter efter midnatt och veckodag.
+function sthlm(now = new Date()) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short', hour12: false })
+    .formatToParts(now).map(p => [p.type, p.value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, min: +parts.hour * 60 + +parts.minute, weekend: /lör|sön/.test(parts.weekday) };
+}
+
 // En stapel är slutgiltig när dagen är slut på Stockholmsbörsen (efter 18.00).
 function isFinal(t) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false })
-    .formatToParts(new Date()).map(p => [p.type, p.value]));
-  const todaySthlm = `${parts.year}-${parts.month}-${parts.day}`;
-  return dayOf(t) < todaySthlm || +parts.hour >= 18;
+  const s = sthlm();
+  return dayOf(t) < s.date || s.min >= 18 * 60;
 }
 
 async function scan() {
@@ -103,7 +108,7 @@ async function scan() {
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan, blocked: ev.blocked || null, missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, report: ev.guards.report, size: ev.guards.size,
+          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinal(ev.t), missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, report: ev.guards.report, size: ev.guards.size,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
       } catch (err) {
@@ -136,6 +141,43 @@ async function scan() {
     }
     return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), cycle: btcCycle(today()), rows };
   });
+}
+
+// Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
+// ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
+// en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
+// schemaläggare (Vercel Hobby tillåter bara en körning per dag).
+async function liveCheck({ force = false } = {}) {
+  const s = sthlm();
+  const open = force || (!s.weekend && s.min >= 9 * 60 && s.min <= 17 * 60 + 40);
+  const sent = [];
+  for (const e of await signalLog.entries()) {
+    const id = `${e.date}|${e.symbol}`;
+    try {
+      if (e.kind === 'crypto') {
+        if (today() >= e.exitDate) for (const k of await signalLog.markAlerts(id, ['exit'])) if (await notifyEvent(e, k)) sent.push(`${e.symbol} ${k}`);
+        continue;
+      }
+      if (!open) continue;
+      const o = signalLog.outcome(e, await fetchBars(e.symbol));
+      if (o.state !== 'öppen' && o.state !== 'stängd') continue;
+      const kinds = ['tp1', 'tp2', 'tp3'].slice(0, o.hit || 0);
+      if (o.state === 'stängd' && o.hit < 3) kinds.push('stop');
+      // Affärer som stängdes för flera dagar sedan markeras utan notis.
+      if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
+      for (const k of await signalLog.markAlerts(id, kinds)) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
+    } catch (err) {
+      console.error('Live-kontrollen misslyckades för', e.symbol, err.message);
+    }
+  }
+  // Förvarning 16.30–17.30: köpsignal med kursen just nu, bekräftas vid stängningen.
+  if (!s.weekend && s.min >= 16 * 60 + 30 && s.min <= 17 * 60 + 30) {
+    cache.delete('scan');
+    for (const r of (await scan()).rows.filter(r => r.status === 'strong' && r.preliminary)) {
+      if (await signalLog.markWarning(`${s.date}|${r.symbol}`) && await notifyEvent({ name: r.name, symbol: r.symbol, close: r.price }, 'warn')) sent.push(`${r.symbol} warn`);
+    }
+  }
+  return { ok: true, marketOpen: open, sent };
 }
 
 // Samlat backtest för alla instrument. Tar några sekunder, så det räknas i
@@ -204,7 +246,7 @@ async function analysis(symbol) {
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
     const bt = await backtestFor(meta, all);
     return {
-      symbol, name: meta.name, isIndex: !!meta.isIndex, avanzaUrl: avanzaUrl(meta),
+      symbol, name: meta.name, isIndex: !!meta.isIndex, avanzaUrl: avanzaUrl(meta), preliminary: !isFinal(bars[bars.length - 1].t),
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
       analysis: ev,
@@ -268,7 +310,14 @@ export default async function handler(req, res) {
       const before = (await signalLog.entries()).length;
       const s = await scan();
       const after = (await signalLog.entries()).length;
-      return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), logged: after - before });
+      // Dagens sista kontroll av mål och stopp, även om ingen extern schemaläggare används.
+      const live = await liveCheck({ force: true });
+      return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), logged: after - before, alerts: live.sent });
+    }
+    if (url.pathname === '/api/cron/live') {
+      const secret = process.env.CRON_SECRET;
+      if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
+      return send(res, 200, await liveCheck());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {

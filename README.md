@@ -530,6 +530,15 @@ risken utan att höja resultatet.
 **Slutsats:** att vända efter ett stopp förlorar. Aktier som gått under stoppet studsar oftare tillbaka än fortsätter ned,
 samma rekyleffekt som strategin bygger på.
 
+### Live under dagen
+Under börsdagen (09.00–17.30) räknas signaler och kravlistor på dagens kurs så här långt, märkta *preliminär*. Appen
+uppdateras var femte minut när den är öppen. Yahoo ligger cirka 15 minuter efter.
+
+Köp vid stängningen gav samma resultat som köp på öppningen nästa dag (+0,23 / +0,26 R mot +0,23 / +0,27 R, 2017–21 /
+2022–26). Att köpa på en preliminär signal strax före stängningen, med 0,2 % sämre pris, gav +0,17 / +0,19 R. Köpet sker
+därför fortfarande på öppningen dagen efter att signalen bekräftats. Det som görs live är bevakningen av öppna affärer
+(notis vid TP1, TP2, TP3 och stopp) och en förvarning inför stängningen, se *Publicera på Vercel*.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
@@ -781,8 +790,14 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
    (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) fungerar också. Utan Redis kan signalloggen inte sparas på Vercel.
 3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne. Lägg samma ämne i
    `NTFY_TOPIC` och appens adress i `APP_URL`. Gör en ny deploy efter att variablerna är satta.
-4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` vardagar kl. 17 UTC (18–19 svensk tid). Det fungerar på
-   gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas som notis.
+4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` varje dag kl. 17 UTC (18–19 svensk tid). Det fungerar på
+   gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas
+   som notis, och dagens mål och stopp för öppna affärer kontrolleras.
+5. **Live under dagen:** Vercels gratisplan tillåter bara en schemalagd körning per dag. Skapa därför ett gratis jobb på
+   cron-job.org som anropar `https://<din-app>.vercel.app/api/cron/live?key=<CRON_SECRET>` var 10:e minut vardagar
+   09.00–17.40 (tidszon Europe/Stockholm), och lägg samma hemliga nyckel i `CRON_SECRET` i Vercel. Då skickas notis när en
+   öppen affär når TP1, TP2, TP3 eller stoppet, på säljdagen för krypto, och 16.30–17.30 en förvarning när en köpsignal
+   är uppfylld med kursen just nu (bekräftas vid stängningen).
 
 Lokalt körs appen som vanlig server med `npm start`.
 
@@ -794,6 +809,7 @@ Lokalt körs appen som vanlig server med `npm start`.
 | `NTFY_URL` | Egen ntfy-server, standard https://ntfy.sh |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Sparar signalloggen i Upstash Redis |
 | `LOG_FILE` | Fil för signalloggen utan Redis, standard `data/signal-log.json` (lokalt) |
+| `CRON_SECRET` | Nyckel som krävs för `/api/cron/live` (rekommenderas när den anropas utifrån) |
 
 ## Struktur
 - `lib/indicators.js`: EMA, RSI, ATR, MACD

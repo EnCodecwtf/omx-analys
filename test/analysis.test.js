@@ -311,3 +311,19 @@ test('Makroläget förklarar vad som saknas', async () => {
   assert.match(omx.need, /\+1 om OMXS30 faller .* % till under EMA 200/);
   assert.match(m.parts.find(p => p.text.startsWith('VIX')).need, /\+1 om VIX stiger till 20 \(2 enheter upp\)/);
 });
+
+test('Live-notiser: mål och stopp skickas med rätt text', async () => {
+  const { notifyEvent } = await import('../lib/notify.js');
+  const sent = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { sent.push({ url, ...opts }); return { ok: true }; };
+  try {
+    const e = { name: 'Volvo B', symbol: 'VOLV-B.ST', close: 250, stop: 240, tps: [258, 265, 275], date: '2026-10-20', days: 7 };
+    assert.equal(await notifyEvent(e, 'tp2', { entry: 251 }, { topic: 't', server: 'https://ntfy.example' }), true);
+    assert.match(sent[0].body, /flytta stoppet till köpkursen \(251,00\)/);
+    await notifyEvent(e, 'stop', { hit: 0, r: -1 }, { topic: 't', server: 'https://ntfy.example' });
+    assert.match(sent[1].body, /Stoppet \(240,00\) är nått.*Resultat −?-1 R/);
+    assert.equal(await notifyEvent(e, 'okänd', {}, { topic: 't', server: 'https://ntfy.example' }), false);
+    assert.equal(await notifyEvent(e, 'tp1', {}, { topic: '' }), false);
+  } finally { globalThis.fetch = realFetch; }
+});
