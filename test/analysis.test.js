@@ -327,3 +327,15 @@ test('Live-notiser: mål och stopp skickas med rätt text', async () => {
     assert.equal(await notifyEvent(e, 'tp1', {}, { topic: '' }), false);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test('Makrokalender och förklaring i klartext', async () => {
+  const { upcomingMacro } = await import('../lib/events.js');
+  const cal = upcomingMacro('2026-10-26', 4);
+  assert.equal(cal.length, 4);
+  assert.ok(cal.every((e, k) => k === 0 || e.date >= cal[k - 1].date));
+  assert.ok(cal.some(e => e.kind === 'fomc' && e.scored));
+  const { buildMacro } = await import('../lib/macro.js');
+  const up = path([100, 140], 260);
+  const m = buildMacro({ omxBars: up, vixBars: up.map(b => ({ ...b, c: 18 })), stockBars: [up] })(new Date(up[up.length - 1].t * 1000).toISOString().slice(0, 10));
+  assert.match(m.comment, /lugn och stigande/);
+});

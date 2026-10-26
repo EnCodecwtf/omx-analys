@@ -74,7 +74,7 @@ async function loadScan(refresh, auto = false) {
     scanData = await res.json();
     $('#updated').textContent = (marketOpen() ? 'Live · ' : 'Analys ') + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) + (marketOpen() ? ' · kurser cirka 15 min fördröjda' : '');
     renderScan();
-    renderMacro(scanData.macro, scanData.stress, scanData.cycle);
+    renderMacro(scanData.macro, scanData.stress, scanData.cycle, scanData.calendar);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
     // Vid automatisk uppdatering stannar vyn där den är (listan eller aktien).
@@ -341,8 +341,11 @@ async function loadProducts(symbol, status) {
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
-function renderMacro(m, st, cy) {
+function renderMacro(m, st, cy, cal) {
   if (!m) return;
+  const when = e => e.days === 0 ? 'idag' : e.days === 1 ? 'imorgon' : `om ${e.days} dagar`;
+  const calLine = cal?.length ? `<div style="margin-top:6px">Kommande makrobesked (svensk tid):<ul>${cal.map(e => `<li class="${e.scored && e.days <= 7 ? 'bad' : ''}">${esc(e.date)} ${esc(e.time)} · ${esc(e.label)} <span class="muted">(${when(e)}${e.scored ? ', påverkar poängen veckan före' : ''})</span></li>`).join('')}</ul>
+    <div class="need">Bara Feds räntebesked ingår i poängen. De andra kan ge stora rörelser samma dag och därmed ändra VIX och kurserna.</div></div>` : '';
   const cycleLine = cy ? `<div style="margin-top:6px">Portfölj: <b>30–50 % guld</b> som ledig kassa.
     Bitcoin-cykel: <b class="${cy.inWindow ? 'pos' : ''}">${esc(cy.label)}</b><div class="muted">${esc(cy.text)}</div></div>` : '';
   const sizeText = s => s === 1 ? 'hel position' : s === 0.5 ? 'halv position' : s === 0.25 ? 'en fjärdedels position' : 'en åttondels position';
@@ -351,7 +354,8 @@ function renderMacro(m, st, cy) {
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
     <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}${p.need ? `<div class="need">${esc(p.need)}</div>` : ''}</li>`).join('')}</ul>
-    ${m.summary ? `<div class="macro-sum">${esc(m.summary)}</div>` : ''}${stressLine}${cycleLine}`;
+    ${m.summary ? `<div class="macro-sum">${esc(m.summary)}</div>` : ''}
+    ${m.comment ? `<div class="macro-comment">${esc(m.comment)}</div>` : ''}${calLine}${stressLine}${cycleLine}`;
 }
 
 const newsList = items => items.length

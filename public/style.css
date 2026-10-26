@@ -60,6 +60,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 .macro li.bad { color: var(--red); }
 .macro li .need { color: var(--muted); font-size: 11px; margin: 1px 0 3px; }
 .macro-sum { margin-top: 6px; font-weight: 600; }
+.macro-comment { margin-top: 4px; }
 .sizing { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 12px; font-size: 13px; }
 .sizing input { width: 110px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; }
 .sizing #risk { width: 70px; }

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchBars } from './lib/data.js';
 import { evaluate, backtest, applyGuards, equityStats, REPORT_BLOCK_DAYS } from './lib/analyze.js';
-import { reportDates, nextReport, tradingDaysBetween } from './lib/events.js';
+import { reportDates, nextReport, tradingDaysBetween, upcomingMacro } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent } from './lib/notify.js';
@@ -139,7 +139,7 @@ async function scan() {
           tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() }));
       for (const e of added) await notifySignal(e);
     }
-    return { updated: Date.now(), macro: (await macro())(today()), stress: await stress(), cycle: btcCycle(today()), rows };
+    return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), rows };
   });
 }
 

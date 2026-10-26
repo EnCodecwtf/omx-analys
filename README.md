@@ -599,6 +599,12 @@ föll. Inget av det läggs in i appen. Det som görs live är bevakningen av öp
 Stegvis stopp ger fler vinnande affärer och kortare förlustsviter men cirka 40 % mindre vinst totalt, eftersom många
 affärer studsar ned till köpkursen efter TP1 innan de når TP2. Att låta sista tredjedelen löpa efter TP3 ger ingenting.
 
+### Förklaring av makroläget och makrokalender
+Makropanelen förklarar i klartext varför läget är bra eller dåligt för strategin och visar kommande makrobesked:
+Feds räntebesked (ingår i poängen, −1 veckan före), USA:s inflation (KPI) och jobbsiffror samt Riksbankens räntebesked
+(bara information). Datumen ligger i `data/macro-calendar.json` (från bls.gov och riksbank.se) och `data/fomc.json`, och
+behöver fyllas på när nya kalendrar publiceras.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
