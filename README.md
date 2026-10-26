@@ -463,6 +463,23 @@ lång över och kort under EMA 200 −0,1 % (−33 %).
 behöver inte vända strategin. De 21 extra signalerna om året utan makrofilter gav cirka +0,05 / +0,14 R per affär och
 −0,16 R i bolagen som åkte ur, alltså nästan ingen fördel.
 
+### Råvaror: studs på trendlinje och rekyler i upptrend (2010–2026)
+Guld, silver, olja (Brent), naturgas och kakao, terminer och fonderna GLD, SLV, BNO och UNG. Stopp och mål 2R, max 20 dagar,
+i R efter avgift (0,2–0,4 %), 2010–17 / 2018–26.
+
+| Signal | Guld | Silver | Olja | Naturgas | Kakao |
+|---|---|---|---|---|---|
+| Appens rekylsignal | +0,02 / −0,14 | +1,65 / −0,41 | −0,15 / +0,20 | −0,09 / +0,01 | +0,61 / +0,04 |
+| Appens trend-läge | −0,18 / +0,06 | +0,16 / −0,20 | −0,12 / −0,20 | −0,21 / −0,13 | +0,07 / −0,22 |
+| Studs på stigande trendlinje (två senaste bottnarna) | −0,45 / +0,36 | +0,01 / −0,40 | −0,06 / −0,66 | +0,15 / +0,01 | −0,24 / +0,07 |
+| Studs på EMA 50 i upptrend | −0,24 / −0,03 | −0,22 / −1,26 | −0,07 / −0,26 | −0,35 / +0,03 | −0,02 / +0,20 |
+| RSI(2) under 10 i upptrend | −0,07 / +0,20 | −0,13 / +0,06 | −0,24 / +0,12 | −0,10 / −0,11 | −0,29 / −0,38 |
+| Jämförelse: var 10:e dag i upptrend | −0,01 / +0,05 | −0,36 / +0,09 | −0,04 / +0,02 | −0,07 / −0,05 | −0,28 / +0,09 |
+
+Fonderna gav samma bild. Inget t-värde är över 2 i båda perioderna, och 15–30 affärer per period och råvara är för få.
+
+**Slutsats:** studsar på trendlinjer och rekyler i upptrend ger ingen fördel på råvarorna. Inget läggs in i appen.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
