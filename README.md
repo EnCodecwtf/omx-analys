@@ -547,7 +547,30 @@ stapel så här långt, och om den är stark köps det direkt till timmens kurs 
 | Som appen: signal på stängningen, köp nästa öppning | 71 | 82 % | 69 % | +0,52 R | 37 R |
 
 Av köpen under dagen var 43 samma dag som en stängningssignal (+0,48 R) och 40 signaler som försvann före stängningen
-(+0,19 R). Köp i dagens första timme gav +0,57 R (44 st), övriga timmar blandat. Det som görs live är bevakningen av öppna affärer
+(+0,19 R). Köp i dagens första timme gav +0,57 R (44 st), övriga timmar blandat.
+
+**Bättre köp och stopp under dagen** (bekräftade signaler, timdata aug 2024–mar 2026, 71 affärer):
+
+| Variant | Snitt | Summa |
+|---|---|---|
+| Köp på öppningen, stopp vid beröring (som nu) | +0,63 R | 45 R |
+| Köp kl. 10 | +0,64 R | 45 R |
+| Limitorder 0,2 ATR under signalkursen, annars köp 17.00 | +0,75 R | 53 R |
+| Stopp bara om en timme stänger under | +0,65 R | 46 R |
+| Stopp bara om dagen stänger under | +0,68 R | 47 R |
+| Limitorder 0,2 ATR plus stopp på timstängning | +0,77 R | 55 R |
+
+**Samma regler över 10 år med dagsdata** (378 signaler, 2017–21 / 2022–26 / bolag som åkte ur):
+
+| Variant | Utfall |
+|---|---|
+| Som nu | +0,23 / +0,27 / −0,08 R |
+| Limitorder 0,2 ATR under, annars stängningen | +0,22 / +0,30 / −0,10 R |
+| Stopp på dagsstängning | +0,23 / +0,33 / −0,28 R |
+| Båda | +0,21 / +0,37 / −0,28 R |
+
+Förbättringen de senaste två åren håller inte över tio år. Stopp på stängningen gav mycket större förluster i bolagen som
+föll. Inget av det läggs in i appen. Det som görs live är bevakningen av öppna affärer
 (notis vid TP1, TP2, TP3 och stopp) och en förvarning inför stängningen, se *Publicera på Vercel*.
 
 ### Nyheter
