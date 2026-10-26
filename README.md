@@ -504,6 +504,20 @@ perioderna eller har t under 1,7.
 **Slutsats:** inte heller COT- och lagerdata ger en fördel som håller. Det som saknas nu är betald data: analytikernas
 förväntningar inför lagerrapporterna (för att mäta överraskningar), orderflöde och optionsdata.
 
+### Motsatt affär och blankning efter stopp (2017–2026)
+378 signaler (dagens bolag 2017–21 / 2022–26 / bolag som åkte ur), R efter avgift. 133 gick till stoppet.
+
+| Variant | Utfall |
+|---|---|
+| Appens köp | +0,23 (t 2,2) / +0,27 (t 2,8) / −0,08 R |
+| Motsatt affär till alla signaler | −0,41 (t −4,0) / −0,44 (t −4,6) / −0,05 R |
+| Blanka efter stopp, mål 1R, max 5 dagar | −0,19 / −0,17 / −0,04 R |
+| Blanka efter stopp, mål 2R, max 20 dagar | −0,50 / −0,43 / +0,00 R |
+| Appens köp plus blankning efter stopp | +0,17 / +0,18 / −0,10 R |
+
+**Slutsats:** att vända efter ett stopp förlorar. Aktier som gått under stoppet studsar oftare tillbaka än fortsätter ned,
+samma rekyleffekt som strategin bygger på.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
