@@ -480,6 +480,30 @@ Fonderna gav samma bild. Inget t-värde är över 2 i båda perioderna, och 15�
 
 **Slutsats:** studsar på trendlinjer och rekyler i upptrend ger ingen fördel på råvarorna. Inget läggs in i appen.
 
+### Proffsdata: COT-positioner och EIA-lager (2011–2026)
+**CFTC Commitments of Traders** (cftc.gov, veckovis sedan 2008): nettopositioner för producenter, stora spekulanter och små
+aktörer i guld, silver, olja (WTI), naturgas, kakao, koppar och S&P 500. Index = läget inom de tre senaste årens spann.
+Rapporten gäller tisdag och publiceras fredag, så köp sker första handelsdagen efter fredagen. Överavkastning mot marknadens
+snitt för samma period, alla sju marknader, en signal i taget per marknad, 2011–17 / 2018–26:
+
+| Signal | 5 dagar | 20 dagar |
+|---|---|---|
+| Producenter extremt långa, köp | −0,06 / +0,40 % | −0,70 / +1,08 % |
+| Producenter extremt korta, sälj | +0,28 / −0,23 % | +0,20 / −0,27 % |
+| Spekulanter extremt korta, köp | +0,29 / +0,02 % | −0,06 / +0,57 % |
+| Spekulanter extremt långa, sälj | −0,03 / −0,33 % | +0,60 / −0,62 % |
+| Småspararna extremt långa, sälj | +0,38 / −0,18 % | +0,79 / −0,93 % |
+
+Inget t-värde över 1,2 och nästan alla byter tecken mellan perioderna.
+
+**EIA veckolager** (eia.gov): naturgas i lager och råoljelager, jämfört med femårssnittet för samma vecka, och veckans
+förändring jämfört med normal förändring. Publiceringsdagen räknas in. Bästa resultat: naturgaslager över 5 % under
+femårssnittet, köp UNG i 5 dagar +1,61 % (t 2,4), men bara mätbart 2018–26. Råolja: alla varianter byter tecken mellan
+perioderna eller har t under 1,7.
+
+**Slutsats:** inte heller COT- och lagerdata ger en fördel som håller. Det som saknas nu är betald data: analytikernas
+förväntningar inför lagerrapporterna (för att mäta överraskningar), orderflöde och optionsdata.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
