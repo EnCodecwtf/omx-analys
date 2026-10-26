@@ -573,6 +573,20 @@ Förbättringen de senaste två åren håller inte över tio år. Stopp på stä
 föll. Inget av det läggs in i appen. Det som görs live är bevakningen av öppna affärer
 (notis vid TP1, TP2, TP3 och stopp) och en förvarning inför stängningen, se *Publicera på Vercel*.
 
+### Flytta stoppet stegvis (2017–2026)
+378 signaler, R efter avgift (2017–21 / 2022–26 / bolag som åkte ur).
+
+| Regel | Utfall | Vinst | Summa | Förluster i rad |
+|---|---|---|---|---|
+| Som nu: stopp till köpkursen efter TP2 | +0,24 / +0,27 / −0,08 R | 57 / 58 / 46 % | 69 R | 12 |
+| Stopp till köpkursen efter TP1 | +0,19 / +0,17 / −0,10 R | 66 / 62 / 54 % | 43 R | 7 |
+| Köpkursen efter TP1, TP1 efter TP2 | +0,16 / +0,16 / −0,11 R | 66 / 62 / 54 % | 39 R | 7 |
+| Samma, sista tredjedelen följer 2,5 % efter TP3 | +0,15 / +0,16 / −0,12 R | 66 / 62 / 54 % | 36 R | 7 |
+| Som nu, sista tredjedelen följer 2,5 % efter TP3 | +0,24 / +0,26 / −0,07 R | 57 / 58 / 45 % | 68 R | 12 |
+
+Stegvis stopp ger fler vinnande affärer och kortare förlustsviter men cirka 40 % mindre vinst totalt, eftersom många
+affärer studsar ned till köpkursen efter TP1 innan de når TP2. Att låta sista tredjedelen löpa efter TP3 ger ingenting.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
