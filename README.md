@@ -536,7 +536,18 @@ uppdateras var femte minut när den är öppen. Yahoo ligger cirka 15 minuter ef
 
 Köp vid stängningen gav samma resultat som köp på öppningen nästa dag (+0,23 / +0,26 R mot +0,23 / +0,27 R, 2017–21 /
 2022–26). Att köpa på en preliminär signal strax före stängningen, med 0,2 % sämre pris, gav +0,17 / +0,19 R. Köpet sker
-därför fortfarande på öppningen dagen efter att signalen bekräftats. Det som görs live är bevakningen av öppna affärer
+därför fortfarande på öppningen dagen efter att signalen bekräftats.
+
+**Beslut under dagen med timdata** (aug 2024–maj 2026, dagens 31 instrument): varje timme räknas signalen med dagens
+stapel så här långt, och om den är stark köps det direkt till timmens kurs (0,1 % sämre pris). Stopp och mål följs timvis.
+
+| Sätt | Affärer | TP1 | Vinst | Snitt | Summa |
+|---|---|---|---|---|---|
+| Köp direkt under dagen | 83 | 78 % | 66 % | +0,34 R | 28 R |
+| Som appen: signal på stängningen, köp nästa öppning | 71 | 82 % | 69 % | +0,52 R | 37 R |
+
+Av köpen under dagen var 43 samma dag som en stängningssignal (+0,48 R) och 40 signaler som försvann före stängningen
+(+0,19 R). Köp i dagens första timme gav +0,57 R (44 st), övriga timmar blandat. Det som görs live är bevakningen av öppna affärer
 (notis vid TP1, TP2, TP3 och stopp) och en förvarning inför stängningen, se *Publicera på Vercel*.
 
 ### Nyheter
