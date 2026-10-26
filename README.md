@@ -515,6 +515,18 @@ förväntningar inför lagerrapporterna (för att mäta överraskningar), orderf
 | Blanka efter stopp, mål 2R, max 20 dagar | −0,50 / −0,43 / +0,00 R |
 | Appens köp plus blankning efter stopp | +0,17 / +0,18 / −0,10 R |
 
+**Nytt köp efter stoppet** (köp på öppningen dagen efter, nytt stopp 1R under):
+
+| Variant | Utfall |
+|---|---|
+| Mål = gamla köpkursen, max 20 dagar | +0,03 / +0,02 / −0,23 R (vinst 60 / 63 / 43 %) |
+| Gamla TP-nivåerna, max 20 dagar | +0,39 / +0,10 / −0,30 R |
+| Mål 1R och 2R, max 20 dagar | +0,22 / −0,01 / −0,18 R |
+| Totalt per signal, köp plus nytt köp | +0,24 / +0,27 / −0,18 R (utan nytt köp +0,23 / +0,27 / −0,08 R) |
+
+Ett nytt köp efter stoppet ger ungefär noll i de bolag som klarade sig och förlust i bolagen som åkte ur. Det dubblar
+risken utan att höja resultatet.
+
 **Slutsats:** att vända efter ett stopp förlorar. Aktier som gått under stoppet studsar oftare tillbaka än fortsätter ned,
 samma rekyleffekt som strategin bygger på.
 
