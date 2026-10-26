@@ -441,6 +441,28 @@ Nedgången är summan i R utan riskfaktorer och utan hänsyn till att affärer �
 Appens mål är valda för hög träffsäkerhet (TP1 över 60 %, TP2 minst 54 %). Att låta vinnarna löpa med följande stopp
 gav sämre resultat.
 
+### Upp- och nedtrend: köp i upptrend, blanka i nedtrend (2017–2026)
+Regim = OMXS30 över eller under EMA 200 på signaldagen. Aktier inklusive bolag som åkte ur OMXS30, efter avgift
+(2017–21 / 2022–26 / bolag som åkte ur).
+
+| Strategi | Utfall | Signaler/år |
+|---|---|---|
+| Som appen: rekyl köp, makro ≥ 1 | +0,27 / +0,25 / −0,08 R | 37 |
+| Rekyl köp i alla lägen | +0,20 / +0,21 / −0,11 R | 58 |
+| Rekyl köp, bara upptrend | +0,12 / +0,26 / −0,14 R | 34 |
+| Rekyl köp, bara nedtrend | +0,28 / +0,18 / −0,08 R | 28 |
+| Upptrend: köp rekyl i stark aktie (trend-läge) | −0,14 / +0,07 / −0,08 R | 54 |
+| Nedtrend: blanka studs i svag aktie | −0,44 / −0,21 / −0,20 R | 19 |
+| Upptrend: köp ny 20-dagarstopp, 7 dagar | −0,16 / −0,28 / −0,31 % | 229 |
+| Nedtrend: blanka ny 20-dagarsbotten, 7 dagar | −0,29 / +0,09 / +0,79 % | 88 |
+
+OMXS30-index 2017–2026: köp och behåll +7,8 %/år (största nedgång −32 %), lång över EMA 200 annars kassa +4,0 % (−19 %),
+lång över och kort under EMA 200 −0,1 % (−33 %).
+
+**Slutsats:** att blanka i nedtrend förlorar i alla varianter. Rekylköpen fungerar i både upp- och nedtrend, så trenden
+behöver inte vända strategin. De 21 extra signalerna om året utan makrofilter gav cirka +0,05 / +0,14 R per affär och
+−0,16 R i bolagen som åkte ur, alltså nästan ingen fördel.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
