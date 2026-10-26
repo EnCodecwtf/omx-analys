@@ -584,6 +584,18 @@ föll. Inget av det läggs in i appen. Det som görs live är bevakningen av öp
 | Samma, sista tredjedelen följer 2,5 % efter TP3 | +0,15 / +0,16 / −0,12 R | 66 / 62 / 54 % | 36 R | 7 |
 | Som nu, sista tredjedelen följer 2,5 % efter TP3 | +0,24 / +0,26 / −0,07 R | 57 / 58 / 45 % | 68 R | 12 |
 
+**Stoppet 1–3 % under nivån** (per riskerad krona, 2017–21 / 2022–26 / bolag som åkte ur):
+
+| Regel | Utfall | Summa | Förluster i rad |
+|---|---|---|---|
+| Som nu, stopp på köpkursen efter TP2 | +0,24 / +0,27 / −0,08 R | 69 R | 12 |
+| Som nu, stopp 1 % under köpkursen efter TP2 | +0,26 / +0,27 / −0,08 R | 72 R | 12 |
+| Som nu, stopp 2 % under köpkursen efter TP2 | +0,27 / +0,27 / −0,07 R | 73 R | 12 |
+| Stegvis, 1 % under köpkursen och TP1 | +0,16 / +0,24 / −0,10 R | 52 R | 9 |
+| Stegvis, 2 % under | +0,18 / +0,27 / −0,08 R | 62 R | 13 |
+| Ursprungligt stopp 1 % lägre | +0,22 / +0,25 / −0,16 R | 57 R | 12 |
+| Ursprungligt stopp 2 % lägre | +0,25 / +0,21 / −0,19 R | 50 R | 12 |
+
 Stegvis stopp ger fler vinnande affärer och kortare förlustsviter men cirka 40 % mindre vinst totalt, eftersom många
 affärer studsar ned till köpkursen efter TP1 innan de når TP2. Att låta sista tredjedelen löpa efter TP3 ger ingenting.
 
