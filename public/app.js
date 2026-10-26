@@ -352,10 +352,16 @@ function renderMacro(m, st, cy, cal) {
   const stressLine = st ? `<div style="margin-top:6px">Positionsstorlek: <b class="${st.size < 1 ? 'neg' : 'pos'}">${sizeText(st.size)}</b> <span class="muted">(${st.factors ?? 0} av 3 riskfaktorer)</span></div>
     <ul>${st.parts.map(p => `<li class="${p.bad ? 'bad' : ''}">${esc(p.text)}</li>`).join('')}</ul>` : '';
   const cls = m.score < 0 ? 'neg' : m.score === 0 ? '' : 'pos';
+  // Sammanfattningen syns alltid. Detaljerna fälls ihop så att listan med aktier
+  // inte trycks ned (valet sparas i webbläsaren).
+  const open = store.get('macroOpen', '0') === '1';
   $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
-    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}${p.need ? `<div class="need">${esc(p.need)}</div>` : ''}</li>`).join('')}</ul>
     ${m.summary ? `<div class="macro-sum">${esc(m.summary)}</div>` : ''}
-    ${m.comment ? `<div class="macro-comment">${esc(m.comment)}</div>` : ''}${calLine}${stressLine}${cycleLine}`;
+    ${m.comment ? `<div class="macro-comment">${esc(m.comment)}</div>` : ''}
+    <details id="macro-details"${open ? ' open' : ''}><summary>Detaljer: vad som behövs, makrokalender och positionsstorlek</summary>
+    <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}${p.need ? `<div class="need">${esc(p.need)}</div>` : ''}</li>`).join('')}</ul>
+    ${calLine}${stressLine}${cycleLine}</details>`;
+  $('#macro-details').addEventListener('toggle', e => store.set('macroOpen', e.target.open ? '1' : '0'));
 }
 
 const newsList = items => items.length

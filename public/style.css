@@ -46,7 +46,10 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 
 .layout { display: grid; grid-template-columns: 380px 1fr; min-height: calc(100vh - 53px); }
 .scanner { border-right: 1px solid var(--border); background: var(--panel); position: sticky; top: 53px; height: calc(100vh - 53px); overflow: auto; }
-.scanner-head { padding: 14px 16px 10px; position: sticky; top: 0; background: var(--panel); z-index: 2; border-bottom: 1px solid var(--border); }
+.scanner-sticky { padding: 14px 16px 10px; position: sticky; top: 0; background: var(--panel); z-index: 2; border-bottom: 1px solid var(--border); }
+.scanner-sticky h2 { margin-top: 0; }
+.scanner-head { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.macro details > summary { cursor: pointer; color: var(--blue); font-size: 12px; margin-top: 6px; }
 .filters { display: flex; gap: 6px; margin-top: 10px; }
 .chip { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .chip.active { color: var(--text); border-color: var(--blue); background: var(--blue-soft); }

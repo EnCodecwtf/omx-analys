@@ -22,7 +22,7 @@
 
   <main class="layout">
     <aside class="scanner">
-      <div class="scanner-head">
+      <div class="scanner-sticky">
         <h2>OMXS30-skanner</h2>
         <div class="filters" role="tablist">
           <button class="chip active" data-filter="all">Alla</button>
@@ -30,6 +30,8 @@
           <button class="chip" data-filter="watch">Bevaka</button>
           <button class="chip" data-filter="crypto">Krypto</button>
         </div>
+      </div>
+      <div class="scanner-head">
         <div id="macro" class="macro"></div>
         <div id="summary" class="summary muted">Räknar backtest för alla signaler…</div>
         <details id="normal" class="log">
