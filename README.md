@@ -605,6 +605,26 @@ Feds räntebesked (ingår i poängen, −1 veckan före), USA:s inflation (KPI) 
 (bara information). Datumen ligger i `data/macro-calendar.json` (från bls.gov och riksbank.se) och `data/fomc.json`, och
 behöver fyllas på när nya kalendrar publiceras.
 
+### Fler aktier: Large Cap Stockholm och S&P 500 (2017–2026)
+Appens regler oförändrade, utan rapportspärr (rapportdatum saknas för de nya bolagen), dagens bolag i listorna
+(överlevnadsfel åt det positiva hållet). Svenska bolag med OMXS30:s makroläge, amerikanska med S&P 500, VIX och Fed.
+
+| Bolag | 2017–21 | 2022–26 | Signaler/år |
+|---|---|---|---|
+| OMXS30, makrofilter | +0,22 R (157) | +0,21 R (236) | 47 |
+| Large Cap utom OMXS30, makrofilter | +0,21 R (430) | −0,01 R (877) | 148 |
+| S&P 500, makrofilter | +0,15 R (2 099) | +0,07 R (3 872) | 689 |
+
+**S&P 500 per amerikansk makropoäng:** 1: +0,12 / −0,03 R, 2: −0,17 / −0,10 R, 3: +0,62 / +0,33 R (vinst 72 / 61 %).
+Poäng 3 (S&P under EMA 200, under 40 % av aktierna över EMA 50, VIX minst 20 och inget räntebesked inom 7 dagar) gav
+plus varje år: 2018 +0,60, 2019 +1,09, 2020 +0,60, 2022 +0,26, 2023 +0,50, 2025 +0,64, 2026 +0,14 R. Men signalerna kom
+under bara 61 av cirka 510 veckor (2018: 13, 2020: 6, 2022: 24, 2023: 7, 2025: 7, 2026: 3). Att välja de 1–3 med högst
+poäng per vecka gav sämre resultat än att ta alla. För OMX-signalerna gav makropoäng 3 inget tydligt mönster
+(1: +0,22 / +0,57, 2: +0,04 / +0,11, 3: +0,64 / +0,20 R).
+
+**Slutsats:** fler aktier ger fler signaler i samma oroliga perioder, inte jämnare över året. Large Cap utanför OMXS30
+höll inte 2022–26. S&P 500 vid full rädsla (poäng 3) fungerar bra men kommer klumpvis.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
