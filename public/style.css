@@ -50,7 +50,8 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 .scanner-sticky h2 { margin-top: 0; }
 .scanner-head { padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .macro details > summary { cursor: pointer; color: var(--blue); font-size: 12px; margin-top: 6px; }
-.filters { display: flex; gap: 6px; margin-top: 10px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.filters .chip { white-space: nowrap; }
 .chip { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
 .chip.active { color: var(--text); border-color: var(--blue); background: var(--blue-soft); }
 
@@ -188,3 +189,4 @@ tr:last-child td { border-bottom: 0; }
 }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(92vw, 460px); background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 #push.on { border-color: var(--green); color: var(--green); }
+.meta .near { color: var(--amber); font-weight: 600; }

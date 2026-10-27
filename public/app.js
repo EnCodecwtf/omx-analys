@@ -101,10 +101,20 @@ async function loadScan(refresh, auto = false) {
   }
 }
 
+// Kortnamn för kraven i listan ("2 kvar: RSI, makro").
+const KEY_LABEL = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro', products: 'papper', breakout: 'utbrott' };
+// Sortering: köpsignaler först, sedan de med minst antal krav kvar, sedan poäng.
+// Indexet ligger alltid överst som referens.
+const isSignal = r => r.status === 'strong' || r.status === 'buy';
+const left = r => r.missing?.length ?? 99;
+function byCloseness(a, b) {
+  return (b.isIndex - a.isIndex) || (isSignal(b) - isSignal(a)) || (left(a) - left(b)) || ((b.score ?? 0) - (a.score ?? 0));
+}
+
 function renderScan() {
+  if (filter === 'log') { renderReleased(); return; }
   const src = filter === 'us' ? (usData?.rows || []) : scanData.rows;
-  const rows = src.slice().sort((a, b) =>
-    (b.isIndex - a.isIndex) || ((STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9)) || ((b.score ?? 0) - (a.score ?? 0)));
+  const rows = src.slice().sort(byCloseness);
   // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
   const visible = filter === 'us' ? rows : rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
     || (filter === 'signals' && (r.status === 'strong' || r.status === 'buy'))
@@ -122,7 +132,7 @@ function renderScan() {
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && !isSignal(r) ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
   }).join('') + (visible.length <= (filter === 'crypto' || filter === 'us' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -453,9 +463,36 @@ function renderNormal() {
     <p>Nedgångsregeln under grafen halverar risken när kontot är 20 % under sin topp och ger en fjärdedel vid 30 %. Fyll i kontots högsta värde där.</p>`;
 }
 
+// Alla släppta signaler på ett ställe: OMX, USA, krypto och panikvecka.
+// Öppna affärer överst, sedan avslutade, nyast först.
+let logData = null;
+const KIND = e => e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
+function renderReleased() {
+  const list = $('#scan-list');
+  if (!logData) { list.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
+  const live = e => e.state === 'öppen' || e.state === 'väntar på köp';
+  const es = logData.entries.slice().sort((a, b) => (live(b) - live(a)) || b.date.localeCompare(a.date));
+  const res = e => e.pct != null ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
+    : e.r != null && e.state === 'stängd' ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
+    : e.r != null ? `<span>${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>` : '–';
+  const plan = e => e.kind === 'panic' || e.kind === 'crypto'
+    ? `Köp ${e.entry ? fmt(e.entry) : 'på öppningen'} · säljdag ${esc(e.exitDate || '–')}`
+    : `Köp ${e.entry ? fmt(e.entry) : fmt(e.close)} · stopp ${fmt(e.stop)} · TP ${e.tps.map(fmt).join(' / ')}`;
+  const head = `<div class="us-head"><b>Släppta signaler</b> <span class="muted">(${logData.stats.n} st, ${logData.stats.open} öppna)</span>
+    <div class="muted" style="font-size:12px;margin-top:4px">Alla köpsignaler som har gått ut, med frysta nivåer och utfall räknat med samma regler som backtestet.</div></div>`;
+  list.innerHTML = head + (es.length ? es.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
+      <div class="name">${esc(e.name)} <span class="tag">${KIND(e)}</span>${live(e) ? ' <span class="badge strong">ÖPPEN</span>' : ''}</div>
+      <div class="right"><div class="num"><div>${res(e)}</div><div class="muted" style="font-size:12px">${esc(e.state)}${e.hit ? ' · TP' + e.hit : ''}</div></div></div>
+      <div class="meta"><span>${esc(e.date)}</span><span>${plan(e)}</span></div>
+    </div>`).join('') : '<div class="empty">Inga signaler har släppts än. De samlas här så fort de kommer, oavsett om de blir vinnare eller förlorare.</div>');
+  for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+}
+
 async function loadLog() {
   try {
     const d = await (await fetch('/api/log')).json();
+    logData = d;
+    if (filter === 'log') renderReleased();
     const s = d.stats;
     normalLive = s.current; renderNormal();
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
