@@ -694,6 +694,21 @@ redan är öppen sparas de tre mest fallna OMXS30-aktierna (de 5 senaste handels
 öppningen, sälj på stängningen 5 handelsdagar efter signaldagen, 10 % av kontot per aktie, utan hävstång och utan stopp.
 Påminnelse om säljdagen kommer kvällen före. `lib/panic.js`.
 
+### Blanka i toppen av en bearish FVG (2017–2026)
+Signal: kursen går upp i en ofylld bearish FVG och stänger under den samma dag. Blanka på nästa öppning, stopp 0,25 ATR över
+FVG:n, mål 1R, 2R eller tredjedelar, max 20 dagar. Jämförelse: köp när kursen går ned i en bullish FVG och stänger över den.
+Bolag som var med i OMXS30 på signaldagen, 6 842 signaler. Stoppet låg i snitt 3,7 % bort.
+
+| Signal (mål 1R) | Före avgift | 0,1 % | 0,3 % |
+|---|---|---|---|
+| Blanka vid bearish FVG | −0,10 / −0,11 R (t −3,8 / −4,6) | −0,14 / −0,16 R | −0,24 / −0,27 R |
+| Blanka vid bearish FVG under EMA 200 | −0,14 / −0,12 R | −0,18 / −0,16 R | −0,26 / −0,23 R |
+| Köp vid bullish FVG | +0,01 / −0,02 R | −0,04 / −0,07 R | −0,14 / −0,18 R |
+
+2017–21 / 2022–26. Med målen 2R och tredjedelar blev det lika dåligt. **Slutsats:** att blanka vid en bearish FVG förlorar
+redan före avgifter i båda perioderna, även i nedtrend. FVG ensam ger ingen signal åt något håll. I appen används FVG bara
+som en av flera faktorer i poängen (+2) för köpsignalerna.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
