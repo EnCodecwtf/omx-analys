@@ -1,0 +1,1709 @@
+{
+ "source": "Wikipedia, List of S&P 500 companies (2026-10-27). Bara bolag med minst tre långa hävstångspapper på Avanza.",
+ "stocks": [
+  {
+   "symbol": "MMM",
+   "name": "3M",
+   "sector": "Industrials",
+   "avanzaId": "3527"
+  },
+  {
+   "symbol": "ABT",
+   "name": "Abbott Laboratories",
+   "sector": "Health Care",
+   "avanzaId": "4206"
+  },
+  {
+   "symbol": "ABBV",
+   "name": "AbbVie",
+   "sector": "Health Care",
+   "avanzaId": "390389"
+  },
+  {
+   "symbol": "ACN",
+   "name": "Accenture",
+   "sector": "Information Technology",
+   "avanzaId": "4965"
+  },
+  {
+   "symbol": "ADBE",
+   "name": "Adobe Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "3929"
+  },
+  {
+   "symbol": "AMD",
+   "name": "Advanced Micro Devices",
+   "sector": "Information Technology",
+   "avanzaId": "529720"
+  },
+  {
+   "symbol": "A",
+   "name": "Agilent Technologies",
+   "sector": "Health Care",
+   "avanzaId": "4147"
+  },
+  {
+   "symbol": "APD",
+   "name": "Air Products",
+   "sector": "Materials",
+   "avanzaId": "3888"
+  },
+  {
+   "symbol": "ABNB",
+   "name": "Airbnb",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "1163096"
+  },
+  {
+   "symbol": "AKAM",
+   "name": "Akamai Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "3535"
+  },
+  {
+   "symbol": "ALB",
+   "name": "Albemarle Corporation",
+   "sector": "Materials",
+   "avanzaId": "4125"
+  },
+  {
+   "symbol": "ARE",
+   "name": "Alexandria Real Estate Equities",
+   "sector": "Real Estate",
+   "avanzaId": "194622"
+  },
+  {
+   "symbol": "ALGN",
+   "name": "Align Technology",
+   "sector": "Health Care",
+   "avanzaId": "254070"
+  },
+  {
+   "symbol": "GOOGL",
+   "name": "Alphabet Inc. (Class A)",
+   "sector": "Communication Services",
+   "avanzaId": "4457"
+  },
+  {
+   "symbol": "GOOG",
+   "name": "Alphabet Inc. (Class C)",
+   "sector": "Communication Services",
+   "avanzaId": "4457"
+  },
+  {
+   "symbol": "MO",
+   "name": "Altria",
+   "sector": "Consumer Staples",
+   "avanzaId": "3328"
+  },
+  {
+   "symbol": "AMZN",
+   "name": "Amazon",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3986"
+  },
+  {
+   "symbol": "AEP",
+   "name": "American Electric Power",
+   "sector": "Utilities",
+   "avanzaId": "3326"
+  },
+  {
+   "symbol": "AXP",
+   "name": "American Express",
+   "sector": "Financials",
+   "avanzaId": "3866"
+  },
+  {
+   "symbol": "AIG",
+   "name": "American International Group",
+   "sector": "Financials",
+   "avanzaId": "3783"
+  },
+  {
+   "symbol": "AMT",
+   "name": "American Tower",
+   "sector": "Real Estate",
+   "avanzaId": "115869"
+  },
+  {
+   "symbol": "AWK",
+   "name": "American Water Works",
+   "sector": "Utilities",
+   "avanzaId": "124490"
+  },
+  {
+   "symbol": "AMGN",
+   "name": "Amgen",
+   "sector": "Health Care",
+   "avanzaId": "3810"
+  },
+  {
+   "symbol": "APH",
+   "name": "Amphenol",
+   "sector": "Information Technology",
+   "avanzaId": "4508"
+  },
+  {
+   "symbol": "ADI",
+   "name": "Analog Devices",
+   "sector": "Information Technology",
+   "avanzaId": "343907"
+  },
+  {
+   "symbol": "AON",
+   "name": "Aon plc",
+   "sector": "Financials",
+   "avanzaId": "508320"
+  },
+  {
+   "symbol": "APO",
+   "name": "Apollo Global Management",
+   "sector": "Financials",
+   "avanzaId": "301399"
+  },
+  {
+   "symbol": "AAPL",
+   "name": "Apple Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "3323"
+  },
+  {
+   "symbol": "AMAT",
+   "name": "Applied Materials",
+   "sector": "Information Technology",
+   "avanzaId": "3575"
+  },
+  {
+   "symbol": "APP",
+   "name": "AppLovin",
+   "sector": "Communication Services",
+   "avanzaId": "1215973"
+  },
+  {
+   "symbol": "ADM",
+   "name": "Archer Daniels Midland",
+   "sector": "Consumer Staples",
+   "avanzaId": "4091"
+  },
+  {
+   "symbol": "ANET",
+   "name": "Arista Networks",
+   "sector": "Information Technology",
+   "avanzaId": "482615"
+  },
+  {
+   "symbol": "AJG",
+   "name": "Arthur J. Gallagher &amp; Co.",
+   "sector": "Financials",
+   "avanzaId": "3362"
+  },
+  {
+   "symbol": "T",
+   "name": "AT&amp;T",
+   "sector": "Communication Services",
+   "avanzaId": "3507"
+  },
+  {
+   "symbol": "ADSK",
+   "name": "Autodesk",
+   "sector": "Information Technology",
+   "avanzaId": "3584"
+  },
+  {
+   "symbol": "ADP",
+   "name": "Automatic Data Processing",
+   "sector": "Industrials",
+   "avanzaId": "167073"
+  },
+  {
+   "symbol": "AZO",
+   "name": "AutoZone",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "4306"
+  },
+  {
+   "symbol": "AXON",
+   "name": "Axon Enterprise",
+   "sector": "Industrials",
+   "avanzaId": "742355"
+  },
+  {
+   "symbol": "BKR",
+   "name": "Baker Hughes",
+   "sector": "Energy",
+   "avanzaId": "811353"
+  },
+  {
+   "symbol": "BAC",
+   "name": "Bank of America",
+   "sector": "Financials",
+   "avanzaId": "4089"
+  },
+  {
+   "symbol": "BRK-B",
+   "name": "Berkshire Hathaway",
+   "sector": "Financials",
+   "avanzaId": "4109"
+  },
+  {
+   "symbol": "BBY",
+   "name": "Best Buy",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3471"
+  },
+  {
+   "symbol": "BIIB",
+   "name": "Biogen",
+   "sector": "Health Care",
+   "avanzaId": "3461"
+  },
+  {
+   "symbol": "BLK",
+   "name": "BlackRock",
+   "sector": "Financials",
+   "avanzaId": "181312"
+  },
+  {
+   "symbol": "BX",
+   "name": "Blackstone Inc.",
+   "sector": "Financials",
+   "avanzaId": "974394"
+  },
+  {
+   "symbol": "BE",
+   "name": "Bloom Energy",
+   "sector": "Industrials",
+   "avanzaId": "869554"
+  },
+  {
+   "symbol": "BA",
+   "name": "Boeing",
+   "sector": "Industrials",
+   "avanzaId": "4167"
+  },
+  {
+   "symbol": "BKNG",
+   "name": "Booking Holdings",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "829713"
+  },
+  {
+   "symbol": "BSX",
+   "name": "Boston Scientific",
+   "sector": "Health Care",
+   "avanzaId": "3807"
+  },
+  {
+   "symbol": "BMY",
+   "name": "Bristol Myers Squibb",
+   "sector": "Health Care",
+   "avanzaId": "3720"
+  },
+  {
+   "symbol": "AVGO",
+   "name": "Broadcom",
+   "sector": "Information Technology",
+   "avanzaId": "369636"
+  },
+  {
+   "symbol": "BRO",
+   "name": "Brown &amp; Brown",
+   "sector": "Financials",
+   "avanzaId": "3822"
+  },
+  {
+   "symbol": "CDNS",
+   "name": "Cadence Design Systems",
+   "sector": "Information Technology",
+   "avanzaId": "194785"
+  },
+  {
+   "symbol": "COF",
+   "name": "Capital One",
+   "sector": "Financials",
+   "avanzaId": "4098"
+  },
+  {
+   "symbol": "CARR",
+   "name": "Carrier Global",
+   "sector": "Industrials",
+   "avanzaId": "1077608"
+  },
+  {
+   "symbol": "CVNA",
+   "name": "Carvana",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "747926"
+  },
+  {
+   "symbol": "CAT",
+   "name": "Caterpillar Inc.",
+   "sector": "Industrials",
+   "avanzaId": "4124"
+  },
+  {
+   "symbol": "CNC",
+   "name": "Centene Corporation",
+   "sector": "Health Care",
+   "avanzaId": "529759"
+  },
+  {
+   "symbol": "SCHW",
+   "name": "Charles Schwab Corporation",
+   "sector": "Financials",
+   "avanzaId": "33167"
+  },
+  {
+   "symbol": "CHTR",
+   "name": "Charter Communications",
+   "sector": "Communication Services",
+   "avanzaId": "444858"
+  },
+  {
+   "symbol": "CVX",
+   "name": "Chevron Corporation",
+   "sector": "Energy",
+   "avanzaId": "3432"
+  },
+  {
+   "symbol": "CMG",
+   "name": "Chipotle Mexican Grill",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "194700"
+  },
+  {
+   "symbol": "CB",
+   "name": "Chubb Limited",
+   "sector": "Financials",
+   "avanzaId": "4296"
+  },
+  {
+   "symbol": "CIEN",
+   "name": "Ciena",
+   "sector": "Information Technology",
+   "avanzaId": "451419"
+  },
+  {
+   "symbol": "CI",
+   "name": "Cigna",
+   "sector": "Health Care",
+   "avanzaId": "3459"
+  },
+  {
+   "symbol": "CTAS",
+   "name": "Cintas",
+   "sector": "Industrials",
+   "avanzaId": "4045"
+  },
+  {
+   "symbol": "C",
+   "name": "Citigroup",
+   "sector": "Financials",
+   "avanzaId": "3655"
+  },
+  {
+   "symbol": "KO",
+   "name": "Coca-Cola Company (The)",
+   "sector": "Consumer Staples",
+   "avanzaId": "3803"
+  },
+  {
+   "symbol": "CTSH",
+   "name": "Cognizant",
+   "sector": "Information Technology",
+   "avanzaId": "4515"
+  },
+  {
+   "symbol": "COIN",
+   "name": "Coinbase",
+   "sector": "Financials",
+   "avanzaId": "1211627"
+  },
+  {
+   "symbol": "CL",
+   "name": "Colgate-Palmolive",
+   "sector": "Consumer Staples",
+   "avanzaId": "4370"
+  },
+  {
+   "symbol": "CMCSA",
+   "name": "Comcast",
+   "sector": "Communication Services",
+   "avanzaId": "3812"
+  },
+  {
+   "symbol": "FIX",
+   "name": "Comfort Systems USA",
+   "sector": "Industrials",
+   "avanzaId": "552445"
+  },
+  {
+   "symbol": "COP",
+   "name": "ConocoPhillips",
+   "sector": "Energy",
+   "avanzaId": "3372"
+  },
+  {
+   "symbol": "ED",
+   "name": "Consolidated Edison",
+   "sector": "Utilities",
+   "avanzaId": "3551"
+  },
+  {
+   "symbol": "STZ",
+   "name": "Constellation Brands",
+   "sector": "Consumer Staples",
+   "avanzaId": "3868"
+  },
+  {
+   "symbol": "CEG",
+   "name": "Constellation Energy",
+   "sector": "Utilities",
+   "avanzaId": "1342940"
+  },
+  {
+   "symbol": "COO",
+   "name": "Cooper Companies (The)",
+   "sector": "Health Care",
+   "avanzaId": "164811"
+  },
+  {
+   "symbol": "CPRT",
+   "name": "Copart",
+   "sector": "Industrials",
+   "avanzaId": "3495"
+  },
+  {
+   "symbol": "GLW",
+   "name": "Corning Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "3857"
+  },
+  {
+   "symbol": "CSGP",
+   "name": "CoStar Group",
+   "sector": "Real Estate",
+   "avanzaId": "549512"
+  },
+  {
+   "symbol": "COST",
+   "name": "Costco",
+   "sector": "Consumer Staples",
+   "avanzaId": "3378"
+  },
+  {
+   "symbol": "CRWD",
+   "name": "CrowdStrike",
+   "sector": "Information Technology",
+   "avanzaId": "964496"
+  },
+  {
+   "symbol": "CVS",
+   "name": "CVS Health",
+   "sector": "Health Care",
+   "avanzaId": "3731"
+  },
+  {
+   "symbol": "DHR",
+   "name": "Danaher Corporation",
+   "sector": "Health Care",
+   "avanzaId": "4430"
+  },
+  {
+   "symbol": "DRI",
+   "name": "Darden Restaurants",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3993"
+  },
+  {
+   "symbol": "DDOG",
+   "name": "Datadog",
+   "sector": "Information Technology",
+   "avanzaId": "1000974"
+  },
+  {
+   "symbol": "DVA",
+   "name": "DaVita",
+   "sector": "Health Care",
+   "avanzaId": "3770"
+  },
+  {
+   "symbol": "DE",
+   "name": "Deere &amp; Company",
+   "sector": "Industrials",
+   "avanzaId": "4160"
+  },
+  {
+   "symbol": "DELL",
+   "name": "Dell Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "918953"
+  },
+  {
+   "symbol": "DAL",
+   "name": "Delta Air Lines",
+   "sector": "Industrials",
+   "avanzaId": "4230"
+  },
+  {
+   "symbol": "DXCM",
+   "name": "Dexcom",
+   "sector": "Health Care",
+   "avanzaId": "376540"
+  },
+  {
+   "symbol": "FANG",
+   "name": "Diamondback Energy",
+   "sector": "Energy",
+   "avanzaId": "378103"
+  },
+  {
+   "symbol": "DG",
+   "name": "Dollar General",
+   "sector": "Consumer Staples",
+   "avanzaId": "310175"
+  },
+  {
+   "symbol": "DLTR",
+   "name": "Dollar Tree",
+   "sector": "Consumer Staples",
+   "avanzaId": "3403"
+  },
+  {
+   "symbol": "DPZ",
+   "name": "Domino's",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "457638"
+  },
+  {
+   "symbol": "DASH",
+   "name": "DoorDash",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "1165286"
+  },
+  {
+   "symbol": "DHI",
+   "name": "D. R. Horton",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3501"
+  },
+  {
+   "symbol": "DUK",
+   "name": "Duke Energy",
+   "sector": "Utilities",
+   "avanzaId": "4133"
+  },
+  {
+   "symbol": "EBAY",
+   "name": "eBay Inc.",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3780"
+  },
+  {
+   "symbol": "ECHO",
+   "name": "EchoStar",
+   "sector": "Communication Services",
+   "avanzaId": "549491"
+  },
+  {
+   "symbol": "EW",
+   "name": "Edwards Lifesciences",
+   "sector": "Health Care",
+   "avanzaId": "3701"
+  },
+  {
+   "symbol": "ELV",
+   "name": "Elevance Health",
+   "sector": "Health Care",
+   "avanzaId": "522918"
+  },
+  {
+   "symbol": "EMR",
+   "name": "Emerson Electric",
+   "sector": "Industrials",
+   "avanzaId": "3991"
+  },
+  {
+   "symbol": "EQT",
+   "name": "EQT Corporation",
+   "sector": "Energy",
+   "avanzaId": "1001617"
+  },
+  {
+   "symbol": "EQIX",
+   "name": "Equinix",
+   "sector": "Real Estate",
+   "avanzaId": "462856"
+  },
+  {
+   "symbol": "EL",
+   "name": "Estée Lauder Companies (The)",
+   "sector": "Consumer Staples",
+   "avanzaId": "33447"
+  },
+  {
+   "symbol": "EXC",
+   "name": "Exelon",
+   "sector": "Utilities",
+   "avanzaId": "3489"
+  },
+  {
+   "symbol": "EXPE",
+   "name": "Expedia Group",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "106837"
+  },
+  {
+   "symbol": "FICO",
+   "name": "Fair Isaac",
+   "sector": "Information Technology",
+   "avanzaId": "4269"
+  },
+  {
+   "symbol": "FAST",
+   "name": "Fastenal",
+   "sector": "Industrials",
+   "avanzaId": "4466"
+  },
+  {
+   "symbol": "FDX",
+   "name": "FedEx",
+   "sector": "Industrials",
+   "avanzaId": "4079"
+  },
+  {
+   "symbol": "FIS",
+   "name": "Fidelity National Information Services",
+   "sector": "Financials",
+   "avanzaId": "63994"
+  },
+  {
+   "symbol": "FSLR",
+   "name": "First Solar",
+   "sector": "Information Technology",
+   "avanzaId": "100867"
+  },
+  {
+   "symbol": "FISV",
+   "name": "Fiserv",
+   "sector": "Financials",
+   "avanzaId": "3497"
+  },
+  {
+   "symbol": "F",
+   "name": "Ford Motor Company",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "4428"
+  },
+  {
+   "symbol": "FTNT",
+   "name": "Fortinet",
+   "sector": "Information Technology",
+   "avanzaId": "242850"
+  },
+  {
+   "symbol": "FCX",
+   "name": "Freeport-McMoRan",
+   "sector": "Materials",
+   "avanzaId": "4190"
+  },
+  {
+   "symbol": "GE",
+   "name": "GE Aerospace",
+   "sector": "Industrials",
+   "avanzaId": "4438"
+  },
+  {
+   "symbol": "GEV",
+   "name": "GE Vernova",
+   "sector": "Industrials",
+   "avanzaId": "1744076"
+  },
+  {
+   "symbol": "GEN",
+   "name": "Gen Digital",
+   "sector": "Information Technology",
+   "avanzaId": "263293"
+  },
+  {
+   "symbol": "GD",
+   "name": "General Dynamics",
+   "sector": "Industrials",
+   "avanzaId": "4262"
+  },
+  {
+   "symbol": "GIS",
+   "name": "General Mills",
+   "sector": "Consumer Staples",
+   "avanzaId": "3657"
+  },
+  {
+   "symbol": "GM",
+   "name": "General Motors",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3758"
+  },
+  {
+   "symbol": "GILD",
+   "name": "Gilead Sciences",
+   "sector": "Health Care",
+   "avanzaId": "4014"
+  },
+  {
+   "symbol": "GPN",
+   "name": "Global Payments",
+   "sector": "Financials",
+   "avanzaId": "194746"
+  },
+  {
+   "symbol": "GS",
+   "name": "Goldman Sachs",
+   "sector": "Financials",
+   "avanzaId": "4484"
+  },
+  {
+   "symbol": "HAL",
+   "name": "Halliburton",
+   "sector": "Energy",
+   "avanzaId": "3904"
+  },
+  {
+   "symbol": "HSIC",
+   "name": "Henry Schein",
+   "sector": "Health Care",
+   "avanzaId": "4480"
+  },
+  {
+   "symbol": "HSY",
+   "name": "Hershey Company (The)",
+   "sector": "Consumer Staples",
+   "avanzaId": "4138"
+  },
+  {
+   "symbol": "HPE",
+   "name": "Hewlett Packard Enterprise",
+   "sector": "Information Technology",
+   "avanzaId": "605658"
+  },
+  {
+   "symbol": "HD",
+   "name": "Home Depot (The)",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3964"
+  },
+  {
+   "symbol": "HRL",
+   "name": "Hormel Foods",
+   "sector": "Consumer Staples",
+   "avanzaId": "3568"
+  },
+  {
+   "symbol": "HWM",
+   "name": "Howmet Aerospace",
+   "sector": "Industrials",
+   "avanzaId": "1077609"
+  },
+  {
+   "symbol": "HPQ",
+   "name": "HP Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "3484"
+  },
+  {
+   "symbol": "HUM",
+   "name": "Humana",
+   "sector": "Health Care",
+   "avanzaId": "3691"
+  },
+  {
+   "symbol": "HII",
+   "name": "Huntington Ingalls Industries",
+   "sector": "Industrials",
+   "avanzaId": "459595"
+  },
+  {
+   "symbol": "IBM",
+   "name": "IBM",
+   "sector": "Information Technology",
+   "avanzaId": "4175"
+  },
+  {
+   "symbol": "IDXX",
+   "name": "Idexx Laboratories",
+   "sector": "Health Care",
+   "avanzaId": "3992"
+  },
+  {
+   "symbol": "INTC",
+   "name": "Intel",
+   "sector": "Information Technology",
+   "avanzaId": "3658"
+  },
+  {
+   "symbol": "IBKR",
+   "name": "Interactive Brokers",
+   "sector": "Financials",
+   "avanzaId": "168220"
+  },
+  {
+   "symbol": "ICE",
+   "name": "Intercontinental Exchange",
+   "sector": "Financials",
+   "avanzaId": "194779"
+  },
+  {
+   "symbol": "IP",
+   "name": "International Paper",
+   "sector": "Materials",
+   "avanzaId": "3842"
+  },
+  {
+   "symbol": "INTU",
+   "name": "Intuit",
+   "sector": "Information Technology",
+   "avanzaId": "3401"
+  },
+  {
+   "symbol": "ISRG",
+   "name": "Intuitive Surgical",
+   "sector": "Health Care",
+   "avanzaId": "39973"
+  },
+  {
+   "symbol": "JNJ",
+   "name": "Johnson &amp; Johnson",
+   "sector": "Health Care",
+   "avanzaId": "3666"
+  },
+  {
+   "symbol": "KDP",
+   "name": "Keurig Dr Pepper",
+   "sector": "Consumer Staples",
+   "avanzaId": "866134"
+  },
+  {
+   "symbol": "KEYS",
+   "name": "Keysight Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "522376"
+  },
+  {
+   "symbol": "KMB",
+   "name": "Kimberly-Clark",
+   "sector": "Consumer Staples",
+   "avanzaId": "3994"
+  },
+  {
+   "symbol": "KKR",
+   "name": "KKR &amp; Co.",
+   "sector": "Financials",
+   "avanzaId": "757934"
+  },
+  {
+   "symbol": "KLAC",
+   "name": "KLA Corporation",
+   "sector": "Information Technology",
+   "avanzaId": "3844"
+  },
+  {
+   "symbol": "KHC",
+   "name": "Kraft Heinz",
+   "sector": "Consumer Staples",
+   "avanzaId": "576297"
+  },
+  {
+   "symbol": "KR",
+   "name": "Kroger",
+   "sector": "Consumer Staples",
+   "avanzaId": "3477"
+  },
+  {
+   "symbol": "LHX",
+   "name": "L3Harris",
+   "sector": "Industrials",
+   "avanzaId": "973542"
+  },
+  {
+   "symbol": "LRCX",
+   "name": "Lam Research",
+   "sector": "Information Technology",
+   "avanzaId": "3914"
+  },
+  {
+   "symbol": "LVS",
+   "name": "Las Vegas Sands",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "83748"
+  },
+  {
+   "symbol": "LIN",
+   "name": "Linde plc",
+   "sector": "Materials",
+   "avanzaId": "909013"
+  },
+  {
+   "symbol": "LYV",
+   "name": "Live Nation Entertainment",
+   "sector": "Communication Services",
+   "avanzaId": "65268"
+  },
+  {
+   "symbol": "LMT",
+   "name": "Lockheed Martin",
+   "sector": "Industrials",
+   "avanzaId": "3937"
+  },
+  {
+   "symbol": "LOW",
+   "name": "Lowe's",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3355"
+  },
+  {
+   "symbol": "LULU",
+   "name": "Lululemon Athletica",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "131290"
+  },
+  {
+   "symbol": "LITE",
+   "name": "Lumentum",
+   "sector": "Information Technology",
+   "avanzaId": "582359"
+  },
+  {
+   "symbol": "LYB",
+   "name": "LyondellBasell",
+   "sector": "Materials",
+   "avanzaId": "400882"
+  },
+  {
+   "symbol": "MPC",
+   "name": "Marathon Petroleum",
+   "sector": "Energy",
+   "avanzaId": "312600"
+  },
+  {
+   "symbol": "MAR",
+   "name": "Marriott International",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "440598"
+  },
+  {
+   "symbol": "MRVL",
+   "name": "Marvell Technology",
+   "sector": "Information Technology",
+   "avanzaId": "3340"
+  },
+  {
+   "symbol": "MA",
+   "name": "Mastercard",
+   "sector": "Financials",
+   "avanzaId": "51149"
+  },
+  {
+   "symbol": "MCD",
+   "name": "McDonald's",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "4375"
+  },
+  {
+   "symbol": "MRK",
+   "name": "Merck &amp; Co.",
+   "sector": "Health Care",
+   "avanzaId": "3820"
+  },
+  {
+   "symbol": "META",
+   "name": "Meta Platforms",
+   "sector": "Communication Services",
+   "avanzaId": "350795"
+  },
+  {
+   "symbol": "MET",
+   "name": "MetLife",
+   "sector": "Financials",
+   "avanzaId": "3746"
+  },
+  {
+   "symbol": "MGM",
+   "name": "MGM Resorts",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "69247"
+  },
+  {
+   "symbol": "MCHP",
+   "name": "Microchip Technology",
+   "sector": "Information Technology",
+   "avanzaId": "4110"
+  },
+  {
+   "symbol": "MU",
+   "name": "Micron Technology",
+   "sector": "Information Technology",
+   "avanzaId": "214533"
+  },
+  {
+   "symbol": "MSFT",
+   "name": "Microsoft",
+   "sector": "Information Technology",
+   "avanzaId": "3873"
+  },
+  {
+   "symbol": "MRNA",
+   "name": "Moderna",
+   "sector": "Health Care",
+   "avanzaId": "910173"
+  },
+  {
+   "symbol": "MDLZ",
+   "name": "Mondelez International",
+   "sector": "Consumer Staples",
+   "avanzaId": "375828"
+  },
+  {
+   "symbol": "MPWR",
+   "name": "Monolithic Power Systems",
+   "sector": "Information Technology",
+   "avanzaId": "509831"
+  },
+  {
+   "symbol": "MNST",
+   "name": "Monster Beverage",
+   "sector": "Consumer Staples",
+   "avanzaId": "330935"
+  },
+  {
+   "symbol": "MCO",
+   "name": "Moody's Corporation",
+   "sector": "Financials",
+   "avanzaId": "4350"
+  },
+  {
+   "symbol": "MS",
+   "name": "Morgan Stanley",
+   "sector": "Financials",
+   "avanzaId": "3468"
+  },
+  {
+   "symbol": "MOS",
+   "name": "Mosaic Company (The)",
+   "sector": "Materials",
+   "avanzaId": "299666"
+  },
+  {
+   "symbol": "MSI",
+   "name": "Motorola Solutions",
+   "sector": "Information Technology",
+   "avanzaId": "267012"
+  },
+  {
+   "symbol": "MSCI",
+   "name": "MSCI",
+   "sector": "Financials",
+   "avanzaId": "376137"
+  },
+  {
+   "symbol": "NDAQ",
+   "name": "Nasdaq, Inc.",
+   "sector": "Financials",
+   "avanzaId": "155541"
+  },
+  {
+   "symbol": "NFLX",
+   "name": "Netflix",
+   "sector": "Communication Services",
+   "avanzaId": "185896"
+  },
+  {
+   "symbol": "NEM",
+   "name": "Newmont",
+   "sector": "Materials",
+   "avanzaId": "3968"
+  },
+  {
+   "symbol": "NEE",
+   "name": "NextEra Energy",
+   "sector": "Utilities",
+   "avanzaId": "257734"
+  },
+  {
+   "symbol": "NKE",
+   "name": "Nike, Inc.",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "4127"
+  },
+  {
+   "symbol": "NSC",
+   "name": "Norfolk Southern",
+   "sector": "Industrials",
+   "avanzaId": "3514"
+  },
+  {
+   "symbol": "NOC",
+   "name": "Northrop Grumman",
+   "sector": "Industrials",
+   "avanzaId": "4093"
+  },
+  {
+   "symbol": "NCLH",
+   "name": "Norwegian Cruise Line Holdings",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "394888"
+  },
+  {
+   "symbol": "NUE",
+   "name": "Nucor",
+   "sector": "Materials",
+   "avanzaId": "3659"
+  },
+  {
+   "symbol": "NVDA",
+   "name": "Nvidia",
+   "sector": "Information Technology",
+   "avanzaId": "4478"
+  },
+  {
+   "symbol": "NXPI",
+   "name": "NXP Semiconductors",
+   "sector": "Information Technology",
+   "avanzaId": "248858"
+  },
+  {
+   "symbol": "ORLY",
+   "name": "O'Reilly Automotive",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "299507"
+  },
+  {
+   "symbol": "OXY",
+   "name": "Occidental Petroleum",
+   "sector": "Energy",
+   "avanzaId": "3673"
+  },
+  {
+   "symbol": "ODFL",
+   "name": "Old Dominion",
+   "sector": "Industrials",
+   "avanzaId": "444857"
+  },
+  {
+   "symbol": "ON",
+   "name": "ON Semiconductor",
+   "sector": "Information Technology",
+   "avanzaId": "200128"
+  },
+  {
+   "symbol": "OKE",
+   "name": "Oneok",
+   "sector": "Energy",
+   "avanzaId": "4036"
+  },
+  {
+   "symbol": "ORCL",
+   "name": "Oracle Corporation",
+   "sector": "Information Technology",
+   "avanzaId": "425036"
+  },
+  {
+   "symbol": "OTIS",
+   "name": "Otis Worldwide",
+   "sector": "Industrials",
+   "avanzaId": "1077610"
+  },
+  {
+   "symbol": "PCAR",
+   "name": "Paccar",
+   "sector": "Industrials",
+   "avanzaId": "3511"
+  },
+  {
+   "symbol": "PLTR",
+   "name": "Palantir Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "1138439"
+  },
+  {
+   "symbol": "PANW",
+   "name": "Palo Alto Networks",
+   "sector": "Information Technology",
+   "avanzaId": "365155"
+  },
+  {
+   "symbol": "PAYX",
+   "name": "Paychex",
+   "sector": "Industrials",
+   "avanzaId": "3805"
+  },
+  {
+   "symbol": "PYPL",
+   "name": "PayPal",
+   "sector": "Financials",
+   "avanzaId": "579699"
+  },
+  {
+   "symbol": "PEP",
+   "name": "PepsiCo",
+   "sector": "Consumer Staples",
+   "avanzaId": "3670"
+  },
+  {
+   "symbol": "PFE",
+   "name": "Pfizer",
+   "sector": "Health Care",
+   "avanzaId": "4145"
+  },
+  {
+   "symbol": "PM",
+   "name": "Philip Morris International",
+   "sector": "Consumer Staples",
+   "avanzaId": "120967"
+  },
+  {
+   "symbol": "PSX",
+   "name": "Phillips 66",
+   "sector": "Energy",
+   "avanzaId": "348717"
+  },
+  {
+   "symbol": "PG",
+   "name": "Procter &amp; Gamble",
+   "sector": "Consumer Staples",
+   "avanzaId": "3644"
+  },
+  {
+   "symbol": "PGR",
+   "name": "Progressive Corporation",
+   "sector": "Financials",
+   "avanzaId": "3858"
+  },
+  {
+   "symbol": "PRU",
+   "name": "Prudential Financial",
+   "sector": "Financials",
+   "avanzaId": "3513"
+  },
+  {
+   "symbol": "QCOM",
+   "name": "Qualcomm",
+   "sector": "Information Technology",
+   "avanzaId": "3552"
+  },
+  {
+   "symbol": "PWR",
+   "name": "Quanta Services",
+   "sector": "Industrials",
+   "avanzaId": "4439"
+  },
+  {
+   "symbol": "RL",
+   "name": "Ralph Lauren Corporation",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3639"
+  },
+  {
+   "symbol": "RDDT",
+   "name": "Reddit",
+   "sector": "Communication Services",
+   "avanzaId": "1739445"
+  },
+  {
+   "symbol": "O",
+   "name": "Realty Income",
+   "sector": "Real Estate",
+   "avanzaId": "147048"
+  },
+  {
+   "symbol": "REGN",
+   "name": "Regeneron Pharmaceuticals",
+   "sector": "Health Care",
+   "avanzaId": "352175"
+  },
+  {
+   "symbol": "RMD",
+   "name": "ResMed",
+   "sector": "Health Care",
+   "avanzaId": "194568"
+  },
+  {
+   "symbol": "HOOD",
+   "name": "Robinhood Markets",
+   "sector": "Financials",
+   "avanzaId": "1254701"
+  },
+  {
+   "symbol": "ROK",
+   "name": "Rockwell Automation",
+   "sector": "Industrials",
+   "avanzaId": "4276"
+  },
+  {
+   "symbol": "ROP",
+   "name": "Roper Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "194644"
+  },
+  {
+   "symbol": "ROST",
+   "name": "Ross Stores",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3611"
+  },
+  {
+   "symbol": "RCL",
+   "name": "Royal Caribbean Group",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3630"
+  },
+  {
+   "symbol": "RTX",
+   "name": "RTX Corporation",
+   "sector": "Industrials",
+   "avanzaId": "1077330"
+  },
+  {
+   "symbol": "CRM",
+   "name": "Salesforce",
+   "sector": "Information Technology",
+   "avanzaId": "194763"
+  },
+  {
+   "symbol": "SNDK",
+   "name": "Sandisk",
+   "sector": "Information Technology",
+   "avanzaId": "1968764"
+  },
+  {
+   "symbol": "STX",
+   "name": "Seagate Technology",
+   "sector": "Information Technology",
+   "avanzaId": "150628"
+  },
+  {
+   "symbol": "NOW",
+   "name": "ServiceNow",
+   "sector": "Information Technology",
+   "avanzaId": "361180"
+  },
+  {
+   "symbol": "SHW",
+   "name": "Sherwin-Williams",
+   "sector": "Materials",
+   "avanzaId": "3467"
+  },
+  {
+   "symbol": "SWKS",
+   "name": "Skyworks Solutions",
+   "sector": "Information Technology",
+   "avanzaId": "154280"
+  },
+  {
+   "symbol": "SW",
+   "name": "Smurfit Westrock",
+   "sector": "Materials",
+   "avanzaId": "1807489"
+  },
+  {
+   "symbol": "SOLV",
+   "name": "Solventum",
+   "sector": "Health Care",
+   "avanzaId": "1742381"
+  },
+  {
+   "symbol": "SO",
+   "name": "Southern Company",
+   "sector": "Utilities",
+   "avanzaId": "95048"
+  },
+  {
+   "symbol": "SBUX",
+   "name": "Starbucks",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "4456"
+  },
+  {
+   "symbol": "STT",
+   "name": "State Street Corporation",
+   "sector": "Financials",
+   "avanzaId": "4471"
+  },
+  {
+   "symbol": "STLD",
+   "name": "Steel Dynamics",
+   "sector": "Materials",
+   "avanzaId": "3797"
+  },
+  {
+   "symbol": "SYK",
+   "name": "Stryker Corporation",
+   "sector": "Health Care",
+   "avanzaId": "3735"
+  },
+  {
+   "symbol": "SNPS",
+   "name": "Synopsys",
+   "sector": "Information Technology",
+   "avanzaId": "3456"
+  },
+  {
+   "symbol": "SYY",
+   "name": "Sysco",
+   "sector": "Consumer Staples",
+   "avanzaId": "3989"
+  },
+  {
+   "symbol": "TMUS",
+   "name": "T-Mobile US",
+   "sector": "Communication Services",
+   "avanzaId": "604875"
+  },
+  {
+   "symbol": "TROW",
+   "name": "T. Rowe Price",
+   "sector": "Financials",
+   "avanzaId": "4390"
+  },
+  {
+   "symbol": "TTWO",
+   "name": "Take-Two Interactive",
+   "sector": "Communication Services",
+   "avanzaId": "107013"
+  },
+  {
+   "symbol": "TRGP",
+   "name": "Targa Resources",
+   "sector": "Energy",
+   "avanzaId": "263919"
+  },
+  {
+   "symbol": "TGT",
+   "name": "Target Corporation",
+   "sector": "Consumer Staples",
+   "avanzaId": "4134"
+  },
+  {
+   "symbol": "TER",
+   "name": "Teradyne",
+   "sector": "Information Technology",
+   "avanzaId": "3674"
+  },
+  {
+   "symbol": "TSLA",
+   "name": "Tesla, Inc.",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "238449"
+  },
+  {
+   "symbol": "TXN",
+   "name": "Texas Instruments",
+   "sector": "Information Technology",
+   "avanzaId": "330696"
+  },
+  {
+   "symbol": "TMO",
+   "name": "Thermo Fisher Scientific",
+   "sector": "Health Care",
+   "avanzaId": "3553"
+  },
+  {
+   "symbol": "TJX",
+   "name": "TJX Companies",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3480"
+  },
+  {
+   "symbol": "TT",
+   "name": "Trane Technologies",
+   "sector": "Industrials",
+   "avanzaId": "1053060"
+  },
+  {
+   "symbol": "TDG",
+   "name": "TransDigm Group",
+   "sector": "Industrials",
+   "avanzaId": "148148"
+  },
+  {
+   "symbol": "TRMB",
+   "name": "Trimble Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "112088"
+  },
+  {
+   "symbol": "TFC",
+   "name": "Truist Financial",
+   "sector": "Financials",
+   "avanzaId": "1024740"
+  },
+  {
+   "symbol": "TWLO",
+   "name": "Twilio",
+   "sector": "Information Technology",
+   "avanzaId": "671018"
+  },
+  {
+   "symbol": "TSN",
+   "name": "Tyson Foods",
+   "sector": "Consumer Staples",
+   "avanzaId": "3845"
+  },
+  {
+   "symbol": "ULTA",
+   "name": "Ulta Beauty",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "455317"
+  },
+  {
+   "symbol": "UNP",
+   "name": "Union Pacific Corporation",
+   "sector": "Industrials",
+   "avanzaId": "3486"
+  },
+  {
+   "symbol": "UAL",
+   "name": "United Airlines Holdings",
+   "sector": "Industrials",
+   "avanzaId": "299556"
+  },
+  {
+   "symbol": "UPS",
+   "name": "United Parcel Service",
+   "sector": "Industrials",
+   "avanzaId": "4112"
+  },
+  {
+   "symbol": "URI",
+   "name": "United Rentals",
+   "sector": "Industrials",
+   "avanzaId": "3920"
+  },
+  {
+   "symbol": "UNH",
+   "name": "UnitedHealth Group",
+   "sector": "Health Care",
+   "avanzaId": "4323"
+  },
+  {
+   "symbol": "VLO",
+   "name": "Valero Energy",
+   "sector": "Energy",
+   "avanzaId": "4469"
+  },
+  {
+   "symbol": "VEEV",
+   "name": "Veeva Systems",
+   "sector": "Health Care",
+   "avanzaId": "437841"
+  },
+  {
+   "symbol": "VRSK",
+   "name": "Verisk Analytics",
+   "sector": "Industrials",
+   "avanzaId": "315553"
+  },
+  {
+   "symbol": "VZ",
+   "name": "Verizon",
+   "sector": "Communication Services",
+   "avanzaId": "3469"
+  },
+  {
+   "symbol": "VRTX",
+   "name": "Vertex Pharmaceuticals",
+   "sector": "Health Care",
+   "avanzaId": "3579"
+  },
+  {
+   "symbol": "VRT",
+   "name": "Vertiv",
+   "sector": "Industrials",
+   "avanzaId": "1042976"
+  },
+  {
+   "symbol": "V",
+   "name": "Visa Inc.",
+   "sector": "Financials",
+   "avanzaId": "29747"
+  },
+  {
+   "symbol": "VST",
+   "name": "Vistra Corp.",
+   "sector": "Utilities",
+   "avanzaId": "779093"
+  },
+  {
+   "symbol": "GWW",
+   "name": "W. W. Grainger",
+   "sector": "Industrials",
+   "avanzaId": "3893"
+  },
+  {
+   "symbol": "WMT",
+   "name": "Walmart",
+   "sector": "Consumer Staples",
+   "avanzaId": "4008"
+  },
+  {
+   "symbol": "DIS",
+   "name": "Walt Disney Company (The)",
+   "sector": "Communication Services",
+   "avanzaId": "3997"
+  },
+  {
+   "symbol": "WM",
+   "name": "Waste Management",
+   "sector": "Industrials",
+   "avanzaId": "3813"
+  },
+  {
+   "symbol": "WAT",
+   "name": "Waters Corporation",
+   "sector": "Health Care",
+   "avanzaId": "4358"
+  },
+  {
+   "symbol": "WFC",
+   "name": "Wells Fargo",
+   "sector": "Financials",
+   "avanzaId": "3368"
+  },
+  {
+   "symbol": "WDC",
+   "name": "Western Digital",
+   "sector": "Information Technology",
+   "avanzaId": "353285"
+  },
+  {
+   "symbol": "WDAY",
+   "name": "Workday, Inc.",
+   "sector": "Information Technology",
+   "avanzaId": "378104"
+  },
+  {
+   "symbol": "XEL",
+   "name": "Xcel Energy",
+   "sector": "Utilities",
+   "avanzaId": "3722"
+  },
+  {
+   "symbol": "YUM",
+   "name": "Yum! Brands",
+   "sector": "Consumer Discretionary",
+   "avanzaId": "3494"
+  },
+  {
+   "symbol": "ZBRA",
+   "name": "Zebra Technologies",
+   "sector": "Information Technology",
+   "avanzaId": "4502"
+  },
+  {
+   "symbol": "ZTS",
+   "name": "Zoetis",
+   "sector": "Health Care",
+   "avanzaId": "395797"
+  }
+ ]
+}

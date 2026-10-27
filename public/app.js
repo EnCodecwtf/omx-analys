@@ -54,8 +54,22 @@ for (const b of document.querySelectorAll('[data-filter]')) {
   b.addEventListener('click', () => {
     document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
     filter = b.dataset.filter;
-    renderScan();
+    if (filter === 'us' && !usData) loadUS(); else renderScan();
   });
+}
+
+// USA-listan (S&P 500-bolag med hävstångspapper på Avanza) hämtas först när
+// fliken öppnas, eftersom den är mycket större än OMX-listan.
+let usData = null;
+async function loadUS(refresh) {
+  if (!usData) $('#scan-list').innerHTML = '<div class="loading">Hämtar och analyserar cirka 280 amerikanska bolag…</div>';
+  try {
+    usData = await (await fetch('/api/us/scan' + (refresh ? '?refresh=1' : ''))).json();
+  } catch (e) {
+    $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta USA-listan: ${esc(e.message)}</div>`;
+    return;
+  }
+  if (filter === 'us') renderScan();
 }
 $('#refresh').addEventListener('click', () => loadScan(true));
 $('#back').addEventListener('click', () => { document.body.classList.remove('show-detail'); history.replaceState(null, '', '#'); });
@@ -87,14 +101,19 @@ async function loadScan(refresh, auto = false) {
 }
 
 function renderScan() {
-  const rows = scanData.rows.slice().sort((a, b) =>
+  const src = filter === 'us' ? (usData?.rows || []) : scanData.rows;
+  const rows = src.slice().sort((a, b) =>
     (b.isIndex - a.isIndex) || ((STATUS[a.status]?.order ?? 9) - (STATUS[b.status]?.order ?? 9)) || ((b.score ?? 0) - (a.score ?? 0)));
   // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
-  const visible = rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
+  const visible = filter === 'us' ? rows : rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
     || (filter === 'signals' && (r.status === 'strong' || r.status === 'buy'))
     || (filter === 'watch' && r.status === 'watch')));
   const list = $('#scan-list');
-  list.innerHTML = visible.map(r => {
+  const um = filter === 'us' && usData?.macro;
+  const usHead = um ? `<div class="us-head">USA-läge: <b class="${um.score >= um.need ? 'pos' : 'neg'}">${esc(um.label)}</b> <span class="muted">(poäng ${um.score}, köpsignaler kräver ${um.need})</span>
+    <div class="macro-comment">${esc(um.comment || '')}</div>
+    <div class="muted" style="font-size:12px;margin-top:4px">USA-signaler kommer bara vid full rädsla i den amerikanska marknaden, det enda läge där de gav en fördel i backtestet, och bara om minst tre säkra hävstångspapper finns på Avanza.</div></div>` : '';
+  list.innerHTML = usHead + visible.map(r => {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
     const up = r.changePct >= 0;
     return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
@@ -102,9 +121,9 @@ function renderScan() {
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && r.status !== 'strong' && r.status !== 'buy' ? `<span title="Krav för köpsignal som är uppfyllda">${r.checks - r.missing.length} av ${r.checks} krav uppfyllda</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
-  }).join('') + (visible.length <= (filter === 'crypto' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
+  }).join('') + (visible.length <= (filter === 'crypto' || filter === 'us' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
 }
 
@@ -213,7 +232,7 @@ function renderSignalCards(d) {
   $('#c-signal').innerHTML = `<h3>Signal</h3>
     <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
     <p>${explain}</p>
-    ${d.preliminary ? '<p class="warn" style="font-size:12px">Preliminärt: räknat på kursen just nu (cirka 15 minuter fördröjd). Signalen gäller först när dagen stänger 17:30, och köpet sker på öppningen nästa dag.</p>' : ''}
+    ${d.preliminary ? `<p class="warn" style="font-size:12px">Preliminärt: räknat på kursen just nu (cirka 15 minuter fördröjd). Signalen gäller först när dagen stänger ${d.isUS ? '22:00 (USA-börsen)' : '17:30'}, och köpet sker på öppningen nästa dag${d.isUS ? ' (15:30 svensk tid)' : ''}.</p>` : ''}
     ${checklist(A)}
     <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
     ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}

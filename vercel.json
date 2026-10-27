@@ -4,6 +4,7 @@
     "api/index.js": { "includeFiles": "{public/**,symbols.json,data/**}", "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/cron/scan", "schedule": "0 17 * * *" }
+    { "path": "/api/cron/scan", "schedule": "0 17 * * *" },
+    { "path": "/api/cron/us", "schedule": "30 21 * * *" }
   ]
 }

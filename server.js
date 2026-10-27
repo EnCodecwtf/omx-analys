@@ -24,7 +24,9 @@ const CACHE_MS = 15 * 60 * 1000;
 const symbols = JSON.parse(await fs.readFile(path.join(__dirname, 'symbols.json'), 'utf8'));
 const universe = [{ ...symbols.index, isIndex: true }, ...symbols.stocks];
 const cryptos = (symbols.crypto || []).map(s => ({ ...s, isCrypto: true }));
-const bySymbol = new Map([...universe, ...cryptos].map(s => [s.symbol, s]));
+// USA: S&P 500-bolag med minst tre långa hävstångspapper på Avanza (data/sp500.json).
+const usStocks = JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'sp500.json'), 'utf8')).stocks.map(s => ({ ...s, isUS: true }));
+const bySymbol = new Map([...universe, ...cryptos, ...usStocks].map(s => [s.symbol, s]));
 
 const r4 = x => Math.round(x * 1e4) / 1e4;
 const cache = new Map();
@@ -60,11 +62,39 @@ async function macro() {
   });
 }
 
+// USA: S&P 500, VIX och bredden bland bolagen i USA-listan. Köpsignaler kräver
+// poäng 3 (full rädsla), det enda läge där signalerna gav en fördel i backtestet.
+async function usMacro() {
+  return cached('usmacro', async () => {
+    const [idx, vixBars] = await Promise.all([fetchBars('^GSPC'), fetchBars('^VIX')]);
+    const stockBars = await mapLimit(usStocks, 8, s => fetchBars(s.symbol).catch(() => []));
+    return buildMacro({ omxBars: idx, vixBars, stockBars, index: 'S&P 500', need: 3 });
+  });
+}
+
+// En amerikansk signal gäller bara om minst tre hävstångspapper på Avanza
+// klarar säkerhetsreglerna (knock-out långt under stoppet, låg spread, rimlig hävstång).
+const US_MIN_PRODUCTS = 3;
+async function usProducts(ev, meta) {
+  // Rapportspärren gäller inte USA-listan (rapportdatum saknas och testet gjordes utan den).
+  ev.checklist = ev.checklist.filter(c => c.key !== 'report');
+  if (ev.status !== 'strong') return ev;
+  let n = 0;
+  try { const r = recommend(await fetchProducts(meta.avanzaId), { plan: ev.plan, atr: ev.atr, isIndex: false }); n = r.minis.length + r.bulls.length; } catch { n = 0; }
+  ev.checklist.push({ key: 'products', ok: n >= US_MIN_PRODUCTS, text: `Minst ${US_MIN_PRODUCTS} säkra hävstångspapper på Avanza`, now: `${n} papper klarar kraven` });
+  if (ev.status === 'strong' && n < US_MIN_PRODUCTS) {
+    ev.warnings.unshift(`Bara ${n} hävstångspapper på Avanza klarar säkerhetskraven – ingen signal.`);
+    ev.blocked = 'strong'; ev.status = 'watch';
+  }
+  return ev;
+}
+
 async function stress() {
   return cached('stress', stressNow);
 }
 
 async function guards(s) {
+  if (s.isUS) return { report: null, reportDays: null, macro: (await usMacro())(today()), stress: await stress() };
   const macroAt = await macro();
   const st = await stress();
   const report = s.isIndex ? null : await nextReport(s.symbol);
@@ -73,11 +103,11 @@ async function guards(s) {
 
 // Samma regler i backtestet som i appen: rapportspärr och makrofilter.
 async function backtestFor(s, bars) {
-  const macroAt = await macro();
+  const macroAt = s.isUS ? await usMacro() : await macro();
   const bt = backtest(bars, {
-    reports: s.isIndex ? [] : reportDates(s.symbol),
-    reportBlock: s.isIndex ? 0 : REPORT_BLOCK_DAYS,
-    allow: t => macroAt(dayOf(t)).score >= 1,
+    reports: s.isIndex || s.isUS ? [] : reportDates(s.symbol),
+    reportBlock: s.isIndex || s.isUS ? 0 : REPORT_BLOCK_DAYS,
+    allow: t => { const m = macroAt(dayOf(t)); return m.score >= m.need; },
   });
   for (const t of bt.trades) t.status = 'strong';
   return bt;
@@ -94,6 +124,47 @@ function sthlm(now = new Date()) {
 function isFinal(t) {
   const s = sthlm();
   return dayOf(t) < s.date || s.min >= 18 * 60;
+}
+
+// USA-börsen stänger 16.00 i New York. Dagens stapel är slutgiltig efter 16.30 där.
+function isFinalUS(t) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+    .formatToParts(new Date()).map(x => [x.type, x.value]));
+  return dayOf(t) < `${p.year}-${p.month}-${p.day}` || +p.hour * 60 + +p.minute >= 16 * 60 + 30;
+}
+
+// USA-listan. Hämtas separat (fliken USA och den egna kvällskörningen) eftersom
+// den har många fler bolag än OMX-listan.
+async function usScan() {
+  return cached('usscan', async () => {
+    const macroAt = await usMacro();
+    const m = macroAt(today());
+    const rows = await mapLimit(usStocks, 8, async s => {
+      try {
+        const bars = await fetchBars(s.symbol);
+        const ev = await usProducts(applyGuards(evaluate(bars.slice(-CHART_BARS)), { macro: m, stress: await stress() }), s);
+        const prevClose = bars[bars.length - 2]?.c;
+        return {
+          symbol: s.symbol, name: s.name, isUS: true,
+          price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
+          t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
+          elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
+          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinalUS(ev.t),
+          missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, size: ev.guards.size,
+          spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
+        };
+      } catch (err) {
+        return { symbol: s.symbol, name: s.name, isUS: true, error: err.message };
+      }
+    });
+    const signals = rows.filter(r => r.status === 'strong' && !r.preliminary);
+    if (signals.length) {
+      const added = await signalLog.record(signals.map(r => ({ date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+        tps: r.plan.tps.map(x => x.price), size: r.size, market: 'USA', avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() })));
+      for (const e of added) await notifySignal(e);
+    }
+    return { updated: Date.now(), macro: m, rows };
+  });
 }
 
 async function scan() {
@@ -150,6 +221,8 @@ async function scan() {
 async function liveCheck({ force = false } = {}) {
   const s = sthlm();
   const open = force || (!s.weekend && s.min >= 9 * 60 && s.min <= 17 * 60 + 40);
+  // USA-börsen är öppen cirka 15.30–22.00 svensk tid.
+  const usOpen = force || (!s.weekend && s.min >= 15 * 60 + 30 && s.min <= 22 * 60 + 10);
   const sent = [];
   for (const e of await signalLog.entries()) {
     const id = `${e.date}|${e.symbol}`;
@@ -158,7 +231,7 @@ async function liveCheck({ force = false } = {}) {
         if (today() >= e.exitDate) for (const k of await signalLog.markAlerts(id, ['exit'])) if (await notifyEvent(e, k)) sent.push(`${e.symbol} ${k}`);
         continue;
       }
-      if (!open) continue;
+      if (!(e.market === 'USA' ? usOpen : open)) continue;
       const o = signalLog.outcome(e, await fetchBars(e.symbol));
       if (o.state !== 'öppen' && o.state !== 'stängd') continue;
       const kinds = ['tp1', 'tp2', 'tp3'].slice(0, o.hit || 0);
@@ -240,13 +313,14 @@ async function analysis(symbol) {
     if (meta.isCrypto) return cryptoAnalysis(meta);
     const all = await fetchBars(symbol);
     const bars = all.slice(-CHART_BARS);
-    const ev = applyGuards(evaluate(bars), await guards(meta));
+    let ev = applyGuards(evaluate(bars), await guards(meta));
+    if (meta.isUS) ev = await usProducts(ev, meta);
     const ind = computeIndicators(all);
     const off = all.length - bars.length;
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
     const bt = await backtestFor(meta, all);
     return {
-      symbol, name: meta.name, isIndex: !!meta.isIndex, avanzaUrl: avanzaUrl(meta), preliminary: !isFinal(bars[bars.length - 1].t),
+      symbol, name: meta.name, isIndex: !!meta.isIndex, isUS: !!meta.isUS, avanzaUrl: avanzaUrl(meta), preliminary: !(meta.isUS ? isFinalUS : isFinal)(bars[bars.length - 1].t),
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
       analysis: ev,
@@ -319,6 +393,17 @@ export default async function handler(req, res) {
       if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
       return send(res, 200, await liveCheck());
     }
+    if (url.pathname === '/api/us/scan') {
+      if (url.searchParams.has('refresh')) { cache.delete('usscan'); cache.delete('usmacro'); }
+      return send(res, 200, await usScan());
+    }
+    // Kvällskörning efter USA-börsens stängning: sparar nya USA-signaler och kontrollerar mål och stopp.
+    if (url.pathname === '/api/cron/us') {
+      cache.delete('usscan'); cache.delete('usmacro');
+      const s = await usScan();
+      const live = await liveCheck({ force: true });
+      return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), alerts: live.sent });
+    }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {
       const meta = bySymbol.get(url.searchParams.get('symbol'));
@@ -335,6 +420,7 @@ export default async function handler(req, res) {
       if (!meta?.avanzaId) return send(res, 404, { error: 'Okänd symbol' });
       const bars = await fetchBars(meta.symbol);
       const ev = applyGuards(evaluate(bars.slice(-CHART_BARS)), await guards(meta));
+      if (meta.isUS) await usProducts(ev, meta);
       const products = await fetchProducts(meta.avanzaId);
       return send(res, 200, { status: ev.status, stop: ev.plan.stop, size: ev.guards.size, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
     }

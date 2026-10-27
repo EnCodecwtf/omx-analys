@@ -625,6 +625,20 @@ poäng per vecka gav sämre resultat än att ta alla. För OMX-signalerna gav ma
 **Slutsats:** fler aktier ger fler signaler i samma oroliga perioder, inte jämnare över året. Large Cap utanför OMXS30
 höll inte 2022–26. S&P 500 vid full rädsla (poäng 3) fungerar bra men kommer klumpvis.
 
+### USA-fliken
+S&P 500-bolag med minst tre långa hävstångspapper på Avanza (284 bolag i `data/sp500.json`, kopplade till Avanzas id via
+namnet i Avanzas produktfilter). Samma regler som för OMX, med två skillnader från testet ovan:
+
+1. **Makropoäng 3 krävs** (amerikanskt läge: S&P 500 under EMA 200, under 40 % av bolagen i listan över EMA 50, VIX minst 20
+   och inget räntebesked inom 7 dagar). Bara då gav signalerna en fördel: +0,63 / +0,34 R för bolag med Avanza-papper.
+2. **Minst tre säkra hävstångspapper:** när alla andra krav är uppfyllda hämtas Avanzas produkter och samma säkerhetsregler
+   som för OMX används (knock-out minst 1 ATR under stoppet, spread högst 1,5 %, högst 6x hävstång, högst 35 % förlust vid
+   stopp). Klarar färre än tre papper kraven blir det ingen signal.
+
+Ingen rapportspärr (testet gjordes utan). Listan hämtas när fliken öppnas. Vercel Cron kör `/api/cron/us` kl. 21.30 UTC,
+efter USA-börsens stängning, och sparar nya signaler i signalloggen (märkta USA) och skickar notis. Live-bevakningen av
+mål och stopp för USA-affärer gäller 15.30–22.00 svensk tid.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
@@ -876,7 +890,8 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
    (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) fungerar också. Utan Redis kan signalloggen inte sparas på Vercel.
 3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne. Lägg samma ämne i
    `NTFY_TOPIC` och appens adress i `APP_URL`. Gör en ny deploy efter att variablerna är satta.
-4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` varje dag kl. 17 UTC (18–19 svensk tid). Det fungerar på
+4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` varje dag kl. 17 UTC (18–19 svensk tid) och `/api/cron/us`
+   kl. 21.30 UTC (efter USA-börsens stängning). Det fungerar på
    gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas
    som notis, och dagens mål och stopp för öppna affärer kontrolleras.
 5. **Live under dagen:** Vercels gratisplan tillåter bara en schemalagd körning per dag. Skapa därför ett gratis jobb på

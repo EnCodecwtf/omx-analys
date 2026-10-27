@@ -339,3 +339,15 @@ test('Makrokalender och förklaring i klartext', async () => {
   const m = buildMacro({ omxBars: up, vixBars: up.map(b => ({ ...b, c: 18 })), stockBars: [up] })(new Date(up[up.length - 1].t * 1000).toISOString().slice(0, 10));
   assert.match(m.comment, /lugn och stigande/);
 });
+
+test('USA: köpsignal kräver makropoäng 3', async () => {
+  const { applyGuards } = await import('../lib/analyze.js');
+  const base = () => ({ status: 'buy', warnings: [], checklist: [] });
+  const two = applyGuards(base(), { macro: { score: 2, need: 3, size: 0, label: 'Neutralt', summary: 'Poäng 2' } });
+  assert.equal(two.status, 'watch');
+  assert.equal(two.checklist.find(c => c.key === 'macro').ok, false);
+  assert.match(two.warnings[0], /makropoäng 3/);
+  assert.equal(applyGuards(base(), { macro: { score: 3, need: 3, size: 1 } }).status, 'strong');
+  // OMX oförändrat: poäng 1 räcker
+  assert.equal(applyGuards(base(), { macro: { score: 1, size: 1 } }).status, 'strong');
+});
