@@ -757,6 +757,35 @@ N-dagarsbotten under EMA 200 och köp tillbaka efter exakt 2 dagar, positivt fö
 (till exempel Brent N = 50: +0,56 / +0,48 %, t 1,9 / 0,7). Men 1 dag gav −0,1 till −0,8 % och 3–5 dagar var negativt efter
 2018, så effekten hänger på exakt 2 dagars innehav och är troligen slump.
 
+### AI-analytiker för blankning (experimentell, mäts framåt)
+
+De tekniska blankningsreglerna förlorade i alla test ovan. Analytiker som tjänar
+pengar på blankning använder information som inte syns i kursen. Fliken
+**Blankning (AI)** väger därför ihop samma sak för varje OMXS30-aktie:
+
+| Del | Källa | Poäng |
+|---|---|---|
+| Analytikerna: vinstprognoser nu mot för 90 dagar sedan, sänkningar och höjningar senaste 30 dagarna, rapporter under förväntan, riktkurs och snittråd | Yahoo Finance | upp till cirka 48 |
+| Nyckeltal: fallande försäljning och vinst, hög skuld med negativt kassaflöde | Yahoo Finance | upp till 15 |
+| Blankningsregistret: total blankning och ökning på 4 veckor | Finansinspektionen | upp till 15 |
+| Nyheter: negativa minus positiva rubriker om bolaget senaste 14 dagarna | Google Nyheter | −10 till +10 |
+| Teknik: nedtrend, studs upp mot EMA 20/50 som vänt ned, RSI som faller | Kurserna | upp till 20 |
+
+En blankning kräver att **alla** krav är uppfyllda: nedtrend, studs som vänt ned,
+inte översåld (RSI över 40), analytikerna negativa (minst 20 poäng), ingen rapport
+inom 10 handelsdagar, total poäng minst 55 och minst tre säkra korta hävstångspapper
+på Avanza (samma säkerhetsregler som för köp, spegelvända: knock-out minst 1 ATR
+över stoppet). Stoppet ligger över de senaste 5 dagarnas topp eller EMA 20 (1–4 ATR),
+målen 1, 2 och 3 R under. En tredjedel stängs vid varje mål, stoppet flyttas till
+ingången efter TP2, högst 30 dagar. Halv position.
+
+**Det här går inte att backtesta.** Historiska analytikerprognoser och nyckeltal
+finns inte gratis, så det går inte att veta i förväg hur träffsäker analytikern är.
+Därför sparas varje kandidat i signalloggen med frysta nivåer vid stängningen
+(egen körning 18.15 på vardagar vintertid, 19.15 sommartid, `/api/cron/shorts`), notis skickas, och utfallet
+räknas i R under Släppta signaler. Efter 20–30 stängda blankningar går det att se
+om metoden har en fördel. Förlorar den, ska den stängas av.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
@@ -1047,7 +1076,9 @@ Lokalt körs appen som vanlig server med `npm start`.
 - `lib/news.js`: nyhetsrubriker från Google Nyheter
 - `lib/cycle.js`: bitcoins halveringscykel
 - `lib/notify.js`: aviseringar via ntfy
+- `lib/shortlab.js`: AI-analytiker för blankning (prognoser, nyckeltal, blankningsregistret, nyheter, teknik)
+- `lib/ods.js`: läser ODS-filer (Finansinspektionens blankningsregister) utan externa paket
 - `data/`: historiska rapportdatum och FOMC-kalender
 - `api/index.js`, `vercel.json`: körning på Vercel
-- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`) och statiska filer
+- `server.js`: API (`/api/scan`, `/api/analysis?symbol=`, `/api/products?symbol=`, `/api/summary`, `/api/macro`, `/api/log`, `/api/news`, `/api/shorts`) och statiska filer
 - `public/`: gränssnittet med en egen canvas-graf (dra för att panorera, scrolla eller nyp för att zooma, dubbelklicka för att återställa)

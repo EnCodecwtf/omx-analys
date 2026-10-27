@@ -17,6 +17,7 @@ import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
+import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -231,6 +232,58 @@ async function scan() {
   });
 }
 
+// AI-analytiker för blankning: väger analytikernas prognoser, nyckeltal,
+// blankningsregistret, nyheter och teknik för varje OMXS30-aktie. En kandidat
+// kräver dessutom minst 3 säkra korta hävstångspapper på Avanza. Kandidater
+// sparas vid stängningen med frysta nivåer så att träffsäkerheten mäts framåt.
+const SHORT_MIN_PRODUCTS = 3;
+async function shortScan() {
+  return cached('shorts', async () => {
+    let reg = null;
+    try { reg = await shortRegister(); } catch (err) { console.error('Blankningsregistret kunde inte hämtas:', err.message); }
+    const rows = await mapLimit(symbols.stocks, 4, async s => {
+      try {
+        const bars = await fetchBars(s.symbol);
+        const tech = technical(bars);
+        const [f, nw, rep] = await Promise.all([
+          fundamentals(s.symbol).catch(() => null), newsFor(s.name, s.newsQuery).catch(() => null), nextReport(s.symbol).catch(() => null)]);
+        const report = rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date), estimated: rep.estimated } : null;
+        const si = shortFor(reg, s.symbol);
+        const sc = scoreShort({ f, si, nw, tech, report });
+        let products = null, blocked = null;
+        if (sc.status === 'short') {
+          try { products = recommend(await fetchProducts(s.avanzaId, 'short'), { plan: tech.plan, atr: tech.atr, isIndex: false, side: 'short' }); } catch { products = { minis: [], bulls: [] }; }
+          const n = products.minis.length + products.bulls.length;
+          sc.checklist.push({ key: 'products', ok: n >= SHORT_MIN_PRODUCTS, text: `Minst ${SHORT_MIN_PRODUCTS} säkra korta hävstångspapper på Avanza`, now: `${n} papper klarar kraven` });
+          if (n < SHORT_MIN_PRODUCTS) { sc.status = 'watch'; blocked = `Bara ${n} korta hävstångspapper på Avanza klarar säkerhetskraven.`; }
+        }
+        const last = bars[bars.length - 1], prev = bars[bars.length - 2];
+        const head = n => ({ title: n.title, link: n.link, source: n.source, date: n.date });
+        return {
+          symbol: s.symbol, name: s.name, price: tech.price, changePct: prev ? Math.round((last.c / prev.c - 1) * 10000) / 100 : null, t: last.t,
+          status: sc.status, score: sc.score, analyst: sc.analyst, parts: sc.parts, checklist: sc.checklist, missing: sc.checklist.filter(c => !c.ok).map(c => c.key),
+          plan: tech.plan, rsi: tech.rsi, report, blocked, preliminary: !isFinal(last.t), size: SHORT_SIZE,
+          analysts: f ? { target: f.target, recMean: f.recMean, n: f.analysts, epsChange90: f.epsChange90 } : null, short: si,
+          news: nw ? { neg: nw.neg.slice(0, 4).map(head), pos: nw.pos.slice(0, 2).map(head), total: nw.total } : null,
+          products: products && { minis: products.minis, bulls: products.bulls },
+          avanzaUrl: avanzaUrl(s), spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
+        };
+      } catch (err) {
+        return { symbol: s.symbol, name: s.name, error: err.message };
+      }
+    });
+    const order = { short: 0, watch: 1, none: 2 };
+    rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.score ?? -1) - (a.score ?? -1));
+    const signals = rows.filter(r => r.status === 'short' && !r.preliminary);
+    if (signals.length) {
+      const added = await signalLog.record(signals.map(r => ({ kind: 'short', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+        tps: r.plan.tps.map(x => x.price), size: r.size, score: r.score, avanzaUrl: r.avanzaUrl, loggedAt: new Date().toISOString() })));
+      for (const e of added) await notifySignal(e);
+    }
+    return { updated: Date.now(), register: !!reg, rows };
+  });
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -255,7 +308,7 @@ async function liveCheck({ force = false } = {}) {
         continue;
       }
       if (!(e.market === 'USA' ? usOpen : open)) continue;
-      const o = signalLog.outcome(e, await fetchBars(e.symbol));
+      const o = e.kind === 'short' ? shortOutcome(e, await fetchBars(e.symbol)) : signalLog.outcome(e, await fetchBars(e.symbol));
       if (o.state !== 'öppen' && o.state !== 'stängd') continue;
       const kinds = ['tp1', 'tp2', 'tp3'].slice(0, o.hit || 0);
       if (o.state === 'stängd' && o.hit < 3) kinds.push('stop');
@@ -312,7 +365,7 @@ async function logView() {
     let o;
     try {
       const bars = await fetchBars(e.symbol);
-      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : signalLog.outcome(e, bars);
+      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
     } catch { o = { state: 'okänd' }; }
     out.push({ ...e, ...o });
   }
@@ -321,6 +374,7 @@ async function logView() {
   const closed = out.filter(x => x.state === 'stängd' && !x.kind);
   const cClosed = out.filter(x => x.state === 'stängd' && x.kind === 'crypto');
   const pClosed = out.filter(x => x.state === 'stängd' && x.kind === 'panic');
+  const sClosed = out.filter(x => x.state === 'stängd' && x.kind === 'short');
   const current = equityStats(closed.slice().sort((a, b) => a.date.localeCompare(b.date)).map(x => x.r));
   const pct = k => closed.length ? Math.round(1000 * closed.filter(x => x.hit >= k).length / closed.length) / 10 : null;
   return {
@@ -328,6 +382,8 @@ async function logView() {
     stats: { n: out.length, closed: closed.length, current, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
       avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null,
       crypto: { closed: cClosed.length, avgPct: cClosed.length ? Math.round(100 * cClosed.reduce((s, x) => s + x.pct, 0) / cClosed.length) / 100 : null },
+      short: { closed: sClosed.length, wins: sClosed.filter(x => x.r > 0).length, tp1Rate: sClosed.length ? Math.round(1000 * sClosed.filter(x => x.hit >= 1).length / sClosed.length) / 10 : null,
+        avgR: sClosed.length ? Math.round(100 * sClosed.reduce((s, x) => s + x.r, 0) / sClosed.length) / 100 : null },
       panic: { closed: pClosed.length, avgPct: pClosed.length ? Math.round(100 * pClosed.reduce((s, x) => s + x.pct, 0) / pClosed.length) / 100 : null } },
   };
 }
@@ -446,6 +502,16 @@ export default async function handler(req, res) {
       const s = await usScan();
       const live = await liveCheck({ force: true });
       return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), alerts: live.sent });
+    }
+    // Egen kvällskörning för blankningsanalytikern (hämtar mycket data per bolag).
+    if (url.pathname === '/api/cron/shorts') {
+      cache.delete('shorts');
+      const s = await shortScan();
+      return send(res, 200, { ok: true, candidates: s.rows.filter(r => r.status === 'short').map(r => r.symbol) });
+    }
+    if (url.pathname === '/api/shorts') {
+      if (url.searchParams.has('refresh')) cache.delete('shorts');
+      return send(res, 200, await shortScan());
     }
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {

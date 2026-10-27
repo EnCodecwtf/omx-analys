@@ -401,3 +401,71 @@ test('Webbnotiser: kryptering enligt RFC 8291 och VAPID-signatur', async () => {
   const pubKey = crypto.createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y }, format: 'jwk' });
   assert.ok(crypto.verify('sha256', Buffer.from(`${hh}.${cc}`), { key: pubKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(ss, 'base64url')));
 });
+
+test('blankning: teknik hittar nedtrend med studs som vänder ned', async () => {
+  const { technical } = await import('../lib/shortlab.js');
+  // Lång uppgång, sedan nedtrend, en studs upp mot EMA 20 och ett fall igen.
+  const bars = path([120, 130, 80, 88, 85], 60);
+  const t = technical(bars);
+  assert.equal(t.down, true);
+  assert.ok(t.plan.stop > t.price);
+  const R = t.plan.stop - t.price;
+  assert.ok(R >= t.atr * 0.99 && R <= t.atr * 4.01, 'stoppet ligger 1–4 ATR över kursen');
+  assert.ok(Math.abs(t.plan.tps[0].price - (t.price - R)) < 0.02);
+});
+
+test('blankning: poäng och kravlista', async () => {
+  const { scoreShort, SHORT_MIN_SCORE } = await import('../lib/shortlab.js');
+  const tech = { down: true, rejection: true, notOversold: true, fading: true, rsi: 52, price: 90, ema20: 92, ema200: 110 };
+  const weak = { epsChange90: -0.12, revUp: 0, revDown: 5, surprises: [-0.05, -0.04, 0.01, -0.06], price: 90, target: 85, recMean: 3, analysts: 12,
+    revenueGrowth: -0.04, earningsGrowth: -0.2, debtToEquity: 200, fcf: -1 };
+  const s = scoreShort({ f: weak, si: { pct: 6, change4w: 1 }, nw: { neg: [1, 2], pos: [] }, tech, report: { date: '2099-01-01', days: 30 } });
+  assert.ok(s.score >= SHORT_MIN_SCORE);
+  assert.equal(s.status, 'short');
+  // Rapport snart stoppar blankningen även om allt annat stämmer.
+  assert.equal(scoreShort({ f: weak, si: null, nw: null, tech, report: { date: '2099-01-01', days: 3 } }).status, 'watch');
+  // Starka prognoser ger ingen kandidat.
+  const strong = { ...weak, epsChange90: 0.1, revUp: 6, revDown: 0, surprises: [0.05], target: 120, recMean: 1.8, revenueGrowth: 0.1, earningsGrowth: 0.2 };
+  assert.equal(scoreShort({ f: strong, si: null, nw: null, tech, report: null }).status, 'none');
+});
+
+test('blankning: utfall med mål, stopp till ingången och avgift', async () => {
+  const { shortOutcome } = await import('../lib/shortlab.js');
+  const d = i => 1_700_000_000 + i * 86400;
+  const day = i => new Date(d(i) * 1000).toISOString().slice(0, 10);
+  const e = { date: day(0), stop: 110, tps: [90, 80, 70] };
+  // In på 100. TP1 och TP2 nås, sedan tillbaka till ingången: +1/3 + 2/3 = +1 R före avgift.
+  const bars = [{ t: d(0), o: 100, h: 101, l: 99, c: 100 }, { t: d(1), o: 100, h: 101, l: 89, c: 90 }, { t: d(2), o: 90, h: 91, l: 79, c: 80 }, { t: d(3), o: 80, h: 101, l: 79, c: 100 }];
+  const o = shortOutcome(e, bars);
+  assert.equal(o.state, 'stängd');
+  assert.equal(o.hit, 2);
+  assert.ok(Math.abs(o.r - (1 - 0.003 * 100 / 10)) < 0.01);
+  // Stoppet direkt: −1 R.
+  const s = shortOutcome(e, [bars[0], { t: d(1), o: 100, h: 111, l: 99, c: 108 }]);
+  assert.ok(Math.abs(s.r - (-1 - 0.03)) < 0.01);
+});
+
+test('ODS-läsaren läser rader och upprepade celler', async () => {
+  const zlib = await import('node:zlib');
+  const { readOds } = await import('../lib/ods.js');
+  const xml = '<office:document-content><office:body><office:spreadsheet><table:table table:name="A"><table:table-row><table:table-cell office:value-type="string"><text:p>Bolag &amp; Co</text:p></table:table-cell><table:table-cell table:number-columns-repeated="2" office:value-type="float" office:value="1.5"><text:p>1,5</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>';
+  const name = Buffer.from('content.xml'), data = zlib.deflateRawSync(Buffer.from(xml));
+  const local = Buffer.alloc(30); local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(8, 8); local.writeUInt32LE(data.length, 18); local.writeUInt16LE(name.length, 26);
+  const cd = Buffer.alloc(46); cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(8, 10); cd.writeUInt32LE(data.length, 20); cd.writeUInt16LE(name.length, 28); cd.writeUInt32LE(0, 42);
+  const cdOff = local.length + name.length + data.length;
+  const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(1, 10); end.writeUInt32LE(cd.length + name.length, 12); end.writeUInt32LE(cdOff, 16);
+  const rows = readOds(Buffer.concat([local, name, data, cd, name, end]));
+  assert.deepEqual(rows, [['Bolag & Co', '1.5', '1.5']]);
+});
+
+test('Avanza: korta papper räknas spegelvänt', async () => {
+  const { recommend } = await import('../lib/avanza.js');
+  const plan = { entry: 100, stop: 104, tps: [{ price: 96 }, { price: 92 }, { price: 88 }] };
+  const mini = (id, fin, ko) => ({ orderbookId: id, name: `MINI S X AVA ${id}`, subType: 'MINI_FUTURE', financingLevel: fin, stopLoss: ko, buyPrice: 10, sellPrice: 10.05, totalValueTraded: 1e5 });
+  const r = recommend({ minis: [mini(1, 125, 120), mini(2, 105, 103)], bulls: [{ orderbookId: 3, name: 'BEAR X X2 AVA', leverage: 2, buyPrice: 5, sellPrice: 5.02 }] }, { plan, atr: 2, isIndex: false, side: 'short' });
+  assert.equal(r.minis.length, 1, 'knock-out under stoppet + 1 ATR sorteras bort');
+  assert.equal(r.minis[0].id, 1);
+  assert.equal(r.minis[0].leverage, 4);
+  assert.equal(r.minis[0].lossAtStopPct, 16);
+  assert.equal(r.bulls[0].kind, 'Bear (daglig hävstång)');
+});

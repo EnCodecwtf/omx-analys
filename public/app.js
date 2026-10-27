@@ -54,7 +54,7 @@ for (const b of document.querySelectorAll('[data-filter]')) {
   b.addEventListener('click', () => {
     document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
     filter = b.dataset.filter;
-    if (filter === 'us' && !usData) loadUS(); else renderScan();
+    if (filter === 'us' && !usData) loadUS(); else if (filter === 'shorts' && !shortData) loadShorts(); else renderScan();
   });
 }
 
@@ -71,7 +71,60 @@ async function loadUS(refresh) {
   }
   if (filter === 'us') renderScan();
 }
-$('#refresh').addEventListener('click', () => loadScan(true));
+// AI-analytiker för blankning. Hämtas först när fliken öppnas (cirka 10 sekunder).
+let shortData = null;
+async function loadShorts(refresh) {
+  if (!shortData) $('#scan-list').innerHTML = '<div class="loading">Analytikern läser prognoser, blankningsregistret, nyheter och kurser för 30 bolag…</div>';
+  try {
+    shortData = await (await fetch('/api/shorts' + (refresh ? '?refresh=1' : ''))).json();
+  } catch (e) {
+    $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta blankningsanalysen: ${esc(e.message)}</div>`;
+    return;
+  }
+  if (filter === 'shorts') renderScan();
+}
+const SHORT_BADGE = { short: '<span class="badge avoid">BLANKA</span>', watch: '<span class="badge watch">BEVAKA</span>', none: '<span class="badge neutral">INGEN</span>' };
+const SHORT_KEY = { trend: 'nedtrend', rejection: 'vändning', rsi: 'RSI', analyst: 'analytiker', report: 'rapport', score: 'poäng', products: 'papper' };
+function renderShorts() {
+  const list = $('#scan-list');
+  if (!shortData) { list.innerHTML = '<div class="loading">Hämtar…</div>'; return; }
+  const n = v => v == null ? '–' : String(v).replace(/(\d)\.(\d)/g, '$1,$2');
+  const head = `<div class="us-head"><b>AI-analytiker: blankning</b> <span class="tag">experimentell</span>
+    <div class="muted" style="font-size:12px;margin-top:4px">Väger ihop det en analytiker tittar på: sänkta vinstprognoser och riktkurser, rapporter under förväntan, svaga nyckeltal,
+    blankningsregistret hos FI, negativa nyheter och en teknisk nedtrend där kursen studsat upp och vänt ned. Blanka bara när alla krav är gröna och det finns minst tre säkra korta papper på Avanza.</div>
+    <div class="muted" style="font-size:12px;margin-top:4px"><b>Går inte att backtesta</b> (historiska prognoser finns inte gratis). Därför halv position, och varje kandidat sparas med frysta nivåer så att träffsäkerheten mäts framåt under Släppta signaler.
+    ${logData?.stats?.short?.closed ? `Hittills: ${logData.stats.short.closed} stängda, ${logData.stats.short.wins} vinnare, snitt ${n(logData.stats.short.avgR)} R.` : 'Inga stängda blankningar än.'}</div>
+    ${shortData.register ? '' : '<div class="neg" style="font-size:12px">Blankningsregistret kunde inte hämtas just nu.</div>'}</div>`;
+  const rows = shortData.rows.map(r => {
+    if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
+    const up = r.changePct >= 0;
+    const groups = {};
+    for (const p of r.parts) (groups[p.group] ||= []).push(p);
+    const parts = Object.entries(groups).map(([g, ps]) => `<div class="s-group"><b>${esc(g)}</b> <span class="muted">(${ps.reduce((a, p) => a + p.pts, 0) > 0 ? '+' : ''}${ps.reduce((a, p) => a + p.pts, 0)})</span>
+      <ul>${ps.map(p => `<li class="${p.pts > 0 ? 'bad' : 'ok'}">${esc(p.text)} (${p.pts > 0 ? '+' : ''}${p.pts})</li>`).join('')}</ul></div>`).join('') || '<p class="muted">Inga tecken på svaghet.</p>';
+    const checks = `<ul class="checklist">${r.checklist.map(c => `<li class="${c.ok ? 'ok' : 'bad'}">${c.ok ? '✓' : '✗'} ${esc(c.text)} <span class="muted">(${esc(n(c.now))})</span></li>`).join('')}</ul>`;
+    const p = r.plan;
+    const plan = `<div class="s-plan">Blanka runt <b>${fmt(p.entry)}</b> · stopp <b class="neg">${fmt(p.stop)}</b> (${n(p.riskPct)} %) · TP ${p.tps.map(t => fmt(t.price)).join(' / ')}
+      <div class="muted" style="font-size:12px">En tredjedel stängs vid varje mål, stoppet flyttas till ingången efter TP2, högst 30 dagar. Halv position.</div></div>`;
+    const prods = r.products ? [...r.products.minis, ...r.products.bulls] : [];
+    const prodHtml = prods.length ? `<div class="s-sub">Korta papper på Avanza</div><ul>${prods.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a> <span class="muted">${esc(x.kind)} · ${n(x.leverage)}x · spread ${n(x.spreadPct)} % · förlust vid stopp ${x.lossAtStopPct} %</span></li>`).join('')}</ul>` : '';
+    const nw = r.news?.neg?.length ? `<div class="s-sub">Negativa rubriker</div><ul>${r.news.neg.map(h => `<li><a href="${esc(h.link)}" target="_blank" rel="noopener">${esc(h.title)}</a> <span class="muted">${esc(h.source)}</span></li>`).join('')}</ul>` : '';
+    const an = r.analysts ? `<div class="muted" style="font-size:12px">Analytiker: ${n(r.analysts.n)} st · riktkurs ${fmt(r.analysts.target)} · snittråd ${n(r.analysts.recMean?.toFixed(1))} (1 köp – 5 sälj)${r.short ? ` · blankat ${n(r.short.pct)} %` : ''}</div>` : '';
+    return `<details class="row s-row"><summary>
+      <div class="name">${esc(r.name)} ${SHORT_BADGE[r.status]}${r.preliminary && r.status === 'short' ? ' <span class="tag">preliminär</span>' : ''}</div>
+      <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
+        <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${n(r.changePct)} %</div></div></div>
+      <div class="meta"><span>Poäng ${r.score}</span><span>Analytiker ${r.analyst}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing.length ? `<span class="${r.missing.length === 1 ? 'near' : ''}">${r.missing.length} krav kvar: ${r.missing.map(k => SHORT_KEY[k] || k).join(', ')}</span>` : ''}</div>
+      </summary><div class="s-body">
+      ${r.blocked ? `<p class="neg">${esc(r.blocked)}</p>` : ''}
+      ${an}<div class="s-sub">Varför</div>${parts}<div class="s-sub">Krav för blankning</div>${checks}${plan}${prodHtml}${nw}
+      <p><a href="#${encodeURIComponent(r.symbol)}" data-open="${esc(r.symbol)}">Visa graf</a>${r.avanzaUrl ? ` · <a href="${esc(r.avanzaUrl)}" target="_blank" rel="noopener">Aktien på Avanza</a>` : ''}</p>
+      </div></details>`;
+  }).join('');
+  list.innerHTML = head + rows;
+  for (const a of list.querySelectorAll('[data-open]')) a.addEventListener('click', ev => { ev.preventDefault(); openSymbol(a.dataset.open); });
+}
+$('#refresh').addEventListener('click', () => { loadScan(true); if (filter === 'shorts') loadShorts(true); });
 $('#back').addEventListener('click', () => { document.body.classList.remove('show-detail'); history.replaceState(null, '', '#'); });
 
 function spark(values, up) {
@@ -113,6 +166,7 @@ function byCloseness(a, b) {
 
 function renderScan() {
   if (filter === 'log') { renderReleased(); return; }
+  if (filter === 'shorts') { renderShorts(); return; }
   const src = filter === 'us' ? (usData?.rows || []) : scanData.rows;
   const rows = src.slice().sort(byCloseness);
   // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
@@ -466,7 +520,7 @@ function renderNormal() {
 // Alla släppta signaler på ett ställe: OMX, USA, krypto och panikvecka.
 // Öppna affärer överst, sedan avslutade, nyast först.
 let logData = null;
-const KIND = e => e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
+const KIND = e => e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
 function renderReleased() {
   const list = $('#scan-list');
   if (!logData) { list.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
@@ -477,7 +531,7 @@ function renderReleased() {
     : e.r != null ? `<span>${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>` : '–';
   const plan = e => e.kind === 'panic' || e.kind === 'crypto'
     ? `Köp ${e.entry ? fmt(e.entry) : 'på öppningen'} · säljdag ${esc(e.exitDate || '–')}`
-    : `Köp ${e.entry ? fmt(e.entry) : fmt(e.close)} · stopp ${fmt(e.stop)} · TP ${e.tps.map(fmt).join(' / ')}`;
+    : `${e.kind === 'short' ? 'Blanka' : 'Köp'} ${e.entry ? fmt(e.entry) : fmt(e.close)} · stopp ${fmt(e.stop)} · TP ${e.tps.map(fmt).join(' / ')}`;
   const head = `<div class="us-head"><b>Släppta signaler</b> <span class="muted">(${logData.stats.n} st, ${logData.stats.open} öppna)</span>
     <div class="muted" style="font-size:12px;margin-top:4px">Alla köpsignaler som har gått ut, med frysta nivåer och utfall räknat med samma regler som backtestet.</div></div>`;
   list.innerHTML = head + (es.length ? es.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
@@ -505,9 +559,10 @@ async function loadLog() {
       ? `<p>${s.n} signaler sparade sedan start, ${s.closed} stängda och ${s.open} öppna.
           Stängda OMX: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.
           ${s.crypto?.closed ? `Stängda krypto: ${s.crypto.closed}, snitt ${String(s.crypto.avgPct).replace('.', ',')} %.` : ''}
+          ${s.short?.closed ? `Stängda blankningar (AI): ${s.short.closed}, snitt ${String(s.short.avgR).replace('.', ',')} R.` : ''}
           ${s.panic?.closed ? `Stängda panikveckor: ${s.panic.closed} affärer, snitt ${String(s.panic.avgPct).replace('.', ',')} %.` : ''}</p>
         <table><tr><th>Datum</th><th>Aktie</th><th class="r">Köp</th><th class="r">Utfall</th></tr>
-        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}${e.kind === 'panic' ? ' <span class="tag">panik</span>' : e.market === 'USA' ? ' <span class="tag">USA</span>' : ''}</td>
+        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}${e.kind === 'panic' ? ' <span class="tag">panik</span>' : e.kind === 'short' ? ' <span class="tag">blankning</span>' : e.market === 'USA' ? ' <span class="tag">USA</span>' : ''}</td>
           <td class="r num">${e.entry ? fmt(e.entry) : '–'}</td><td class="r">${state(e)}</td></tr>`).join('')}</table>`
       : '<p>Inga signaler sparade än. Varje stark köpsignal sparas när dagens stängningskurs är klar, och utfallet följs med samma regler som backtestet. Det är det riktiga beviset på om strategin fungerar.</p>';
     for (const el of $('#log-body').querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));

@@ -190,3 +190,17 @@ tr:last-child td { border-bottom: 0; }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(92vw, 460px); background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-size: 13px; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 #push.on { border-color: var(--green); color: var(--green); }
 .meta .near { color: var(--amber); font-weight: 600; }
+
+/* Blankning (AI) */
+.s-row { display: block; }
+.s-row > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+.s-row > summary::-webkit-details-marker { display: none; }
+.s-body { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 13px; }
+.s-body ul { list-style: none; margin: 2px 0 6px; }
+.s-body li { margin: 2px 0; }
+.s-body li.ok { color: var(--green); }
+.s-body li.bad { color: var(--red); }
+.s-body a { color: var(--blue); }
+.s-sub { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 8px; }
+.s-group { margin-top: 4px; }
+.s-plan { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); }
