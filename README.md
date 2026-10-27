@@ -735,6 +735,22 @@ Av cirka 60 kombinationer av regel och innehavstid var 5 positiva i båda period
 gårdagens VIX är minst 25: +0,37 % (t 1,8) / +0,31 % (t 1,2) per vecka efter avgift för båda benen. Sämsta veckan −8,5 % mot
 −20,5 % utan skydd, spridning 3,2 % mot 5,5 %. I alla andra VIX-lägen var kombinationen negativ.
 
+### Blankning på guld, silver, olja, naturgas och bitcoin (2010–2026)
+11 händelseregler (nya bottnar i nedtrend, studs mot EMA 20 och EMA 50 i nedtrend, överköpt, långt över EMA 20, blanka
+utbrott, fortsättning efter fall) med 5, 10 och 20 dagars innehav, samt trendföljning kort (under SMA 200, 12 månader ned,
+EMA 50 under EMA 200). Två lika långa perioder per marknad. Exempel, 10 dagar:
+
+| Regel | Guld | Silver | Brent | WTI | Bitcoin |
+|---|---|---|---|---|---|
+| Blanka alltid (jämförelse) | negativ | −0,31 / −0,85 % | −0,28 / −0,75 % | −0,18 / −0,31 % | −2,84 / −1,66 % |
+| Ny 50-dagarsbotten under EMA 200 | – | +0,83 / −0,60 % | +2,22 / −1,29 % | +0,32 / +0,21 % | +2,32 / −2,61 % |
+| Studs till EMA 50 i nedtrend | −0,11 / −1,00 % | −0,03 / −1,20 % | −1,13 / +0,42 % | −2,56 / +0,14 % | −3,89 / +1,94 % |
+| RSI(2) över 90 under EMA 200 | −1,16 / −0,98 % | −2,15 / −1,81 % | −1,49 / +0,03 % | −1,69 / −0,32 % | −2,09 / −0,66 % |
+
+Trendföljning kort per år i marknaden: guld −3,9 / −14,3 %, silver −5,5 / −21,4 %, Brent −4,7 / −12,1 %, bitcoin −50,5 /
+−13,1 %. Av cirka 100 kombinationer var 3 positiva i båda perioderna, alla med t under 0,6. **Slutsats:** ingen
+blankningsregel håller på råvarorna eller bitcoin heller.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
