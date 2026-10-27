@@ -6,6 +6,11 @@
   <meta name="theme-color" content="#0d1117">
   <title>OMX Analys</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="OMX Analys">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,6 +21,7 @@
     </div>
     <div class="top-right">
       <span id="updated" class="muted"></span>
+      <button id="push" class="btn" title="Få notiser om signaler direkt i webbläsaren eller mobilen">Notiser</button>
       <button id="refresh" class="btn" title="Hämta ny data">Uppdatera</button>
     </div>
   </header>
@@ -34,6 +40,7 @@
       </div>
       <div class="scanner-head">
         <div id="macro" class="macro"></div>
+        <div id="panic" class="panic"></div>
         <div id="summary" class="summary muted">Räknar backtest för alla signaler…</div>
         <details id="normal" class="log">
           <summary>Vad är normalt? Förluster och nedgångar</summary>
@@ -103,6 +110,7 @@
     </section>
   </main>
 
+  <div id="toast" class="toast" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

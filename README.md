@@ -683,8 +683,16 @@ cirka 7 veckor om året, 60 % vinstveckor, sämsta vecka −20 %. År för år: 
 2021 +3,93, 2022 +0,57, 2023 −5,36, 2024 +1,18, 2025 +3,34, 2026 +0,51 % per vecka. Med VIX minst 20 berodde resultatet
 2022–26 på veckodagen (−0,22 till +0,70 %). Med VIX minst 28 var alla år positiva men bara cirka 4 veckor om året.
 
+Med gårdagens VIX (som är känt när signalen ges, VIX stänger efter Stockholm) och VIX minst 25: +0,95 till +1,78 % per vecka
+2017–21 och +0,36 till +2,28 % 2022–26 beroende på veckodag, 63 % vinstveckor.
+
 **Slutsats:** det första korta upplägget (en vecka) som håller i båda perioderna, men bara vid hög rädsla och med stora
 svängningar. Samma grundidé som appens rekylstrategi.
+
+**I appen (Panikvecka):** rutan under makroläget visar läget varje dag. När gårdagens VIX är minst 25 och ingen panikvecka
+redan är öppen sparas de tre mest fallna OMXS30-aktierna (de 5 senaste handelsdagarna) i signalloggen och aviseras: köp på
+öppningen, sälj på stängningen 5 handelsdagar efter signaldagen, 10 % av kontot per aktie, utan hävstång och utan stopp.
+Påminnelse om säljdagen kommer kvällen före. `lib/panic.js`.
 
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
@@ -935,8 +943,11 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
 2. **Upstash Redis (gratis):** Storage → Upstash for Redis, eller ett eget konto på console.upstash.com. Lägg in
    `UPSTASH_REDIS_REST_URL` och `UPSTASH_REDIS_REST_TOKEN` under Settings → Environment Variables. Vercels egna namn
    (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) fungerar också. Utan Redis kan signalloggen inte sparas på Vercel.
-3. **Aviseringar:** installera appen *ntfy* på mobilen och prenumerera på ett eget, svårgissat ämne. Lägg samma ämne i
-   `NTFY_TOPIC` och appens adress i `APP_URL`. Gör en ny deploy efter att variablerna är satta.
+3. **Aviseringar:** tryck på **Notiser** i appen. Webbläsaren frågar om lov och skickar en testnotis. Det fungerar i Chrome,
+   Edge och Firefox på dator och Android. På iPhone (iOS 16.4 eller senare): öppna appen i Safari, Dela → *Lägg till på
+   hemskärmen*, öppna den från hemskärmen och tryck på Notiser där. Kräver Upstash Redis (punkt 2), där prenumerationerna och
+   VAPID-nycklarna sparas (eller sätt `VAPID_PUBLIC_KEY` och `VAPID_PRIVATE_KEY`). Vill du ha notiser via appen *ntfy* i
+   stället eller också: lägg ett eget ämne i `NTFY_TOPIC` och appens adress i `APP_URL`.
 4. **Daglig skanning:** Vercel Cron anropar `/api/cron/scan` varje dag kl. 17 UTC (18–19 svensk tid) och `/api/cron/us`
    kl. 21.30 UTC (efter USA-börsens stängning). Det fungerar på
    gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas
@@ -957,6 +968,7 @@ Lokalt körs appen som vanlig server med `npm start`.
 | `NTFY_URL` | Egen ntfy-server, standard https://ntfy.sh |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Sparar signalloggen i Upstash Redis |
 | `LOG_FILE` | Fil för signalloggen utan Redis, standard `data/signal-log.json` (lokalt) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Egna nycklar för webbnotiser (annars skapas de och sparas i Redis) |
 | `CRON_SECRET` | Nyckel som krävs för `/api/cron/live` (rekommenderas när den anropas utifrån) |
 
 ## Struktur

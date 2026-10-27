@@ -89,6 +89,7 @@ async function loadScan(refresh, auto = false) {
     $('#updated').textContent = (marketOpen() ? 'Live · ' : 'Analys ') + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) + (marketOpen() ? ' · kurser cirka 15 min fördröjda' : '');
     renderScan();
     renderMacro(scanData.macro, scanData.stress, scanData.cycle, scanData.calendar);
+    renderPanic(scanData.panic);
     const fromHash = decodeURIComponent(location.hash.slice(1));
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
     // Vid automatisk uppdatering stannar vyn där den är (listan eller aktien).
@@ -360,6 +361,22 @@ async function loadProducts(symbol, status) {
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
 }
 
+// Panikvecka: tre mest fallna OMXS30-aktier när VIX är minst 25, säljs efter 5 handelsdagar.
+function renderPanic(p) {
+  const el = $('#panic');
+  if (!p) { el.innerHTML = ''; return; }
+  const list = p.picks.map(x => `<a href="#${encodeURIComponent(x.symbol)}" data-open="${esc(x.symbol)}">${esc(x.name)}</a> <span class="neg">${String(x.ret5).replace('.', ',')} %</span>`).join(', ');
+  const v = p.vix == null ? '–' : String(p.vix).replace('.', ',');
+  el.className = 'panic' + (p.active ? ' on' : '');
+  el.innerHTML = p.active
+    ? `<b>Panikvecka: ${p.holding ? 'pågår' : 'köp'}</b> <span class="muted">(VIX ${v}, minst ${p.need})</span>
+      <div>${p.holding ? 'En panikvecka är redan öppen, se signalloggen.' : `Köp på öppningen: ${list}. Sälj efter ${p.days} handelsdagar (cirka ${esc(p.exitDate)}).`}</div>
+      <div class="muted" style="font-size:12px">${Math.round(p.size * 100)} % av kontot per aktie, utan hävstång och utan stopp. Sämsta veckan i testet var −20 %.</div>`
+    : `<b>Panikvecka:</b> inaktiv <span class="muted">(VIX ${v}, krävs ${p.need})</span>
+      <div class="muted" style="font-size:12px">När VIX är minst ${p.need} köps de tre OMXS30-aktier som fallit mest på 5 dagar, i en vecka. Mest fallna just nu: ${list}.</div>`;
+  for (const a of el.querySelectorAll('[data-open]')) a.addEventListener('click', ev => { ev.preventDefault(); openSymbol(a.dataset.open); });
+}
+
 function renderMacro(m, st, cy, cal) {
   if (!m) return;
   const when = e => e.days === 0 ? 'idag' : e.days === 1 ? 'imorgon' : `om ${e.days} dagar`;
@@ -442,7 +459,7 @@ async function loadLog() {
     const s = d.stats;
     normalLive = s.current; renderNormal();
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    const state = e => e.kind === 'crypto' && e.pct != null
+    const state = e => (e.kind === 'crypto' || e.kind === 'panic') && e.pct != null
       ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.state === 'öppen' ? 'öppen ' : ''}${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
       : e.state === 'stängd'
       ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
@@ -450,9 +467,10 @@ async function loadLog() {
     $('#log-body').innerHTML = d.entries.length
       ? `<p>${s.n} signaler sparade sedan start, ${s.closed} stängda och ${s.open} öppna.
           Stängda OMX: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.
-          ${s.crypto?.closed ? `Stängda krypto: ${s.crypto.closed}, snitt ${String(s.crypto.avgPct).replace('.', ',')} %.` : ''}</p>
+          ${s.crypto?.closed ? `Stängda krypto: ${s.crypto.closed}, snitt ${String(s.crypto.avgPct).replace('.', ',')} %.` : ''}
+          ${s.panic?.closed ? `Stängda panikveckor: ${s.panic.closed} affärer, snitt ${String(s.panic.avgPct).replace('.', ',')} %.` : ''}</p>
         <table><tr><th>Datum</th><th>Aktie</th><th class="r">Köp</th><th class="r">Utfall</th></tr>
-        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}</td>
+        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}${e.kind === 'panic' ? ' <span class="tag">panik</span>' : e.market === 'USA' ? ' <span class="tag">USA</span>' : ''}</td>
           <td class="r num">${e.entry ? fmt(e.entry) : '–'}</td><td class="r">${state(e)}</td></tr>`).join('')}</table>`
       : '<p>Inga signaler sparade än. Varje stark köpsignal sparas när dagens stängningskurs är klar, och utfallet följs med samma regler som backtestet. Det är det riktiga beviset på om strategin fungerar.</p>';
     for (const el of $('#log-body').querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -490,3 +508,46 @@ function marketOpen(now = new Date()) {
 }
 setInterval(() => { if (marketOpen() && !document.hidden) { loadScan(true, true); loadLog(); } }, 5 * 60 * 1000);
 loadMarketNews();
+
+// Webbnotiser: ingen extra app behövs. På iPhone måste appen först läggas till
+// på hemskärmen (Dela → Lägg till på hemskärmen), sedan fungerar det där.
+function toast(text, ms = 6000) {
+  const t = $('#toast'); t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, ms);
+}
+const b64ToBytes = s => { const b = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+let swReg = null;
+async function pushInit() {
+  if (!pushSupported()) return;
+  try {
+    swReg = await navigator.serviceWorker.register('/sw.js');
+    const sub = await swReg.pushManager.getSubscription();
+    $('#push').classList.toggle('on', !!sub);
+    $('#push').textContent = sub ? 'Notiser på' : 'Notiser';
+  } catch { /* service worker kunde inte registreras */ }
+}
+$('#push').addEventListener('click', async () => {
+  if (!pushSupported()) {
+    toast(isIOS ? 'På iPhone: tryck på Dela och välj "Lägg till på hemskärmen". Öppna appen från hemskärmen och tryck på Notiser igen.' : 'Webbläsaren stöder inte notiser. Prova Chrome, Edge eller Firefox.', 10000);
+    return;
+  }
+  try {
+    swReg ??= await navigator.serviceWorker.register('/sw.js');
+    let sub = await swReg.pushManager.getSubscription();
+    if (!sub) {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('Notiser är blockerade. Tillåt notiser för sidan i webbläsarens inställningar.'); return; }
+      const { key } = await (await fetch('/api/push/key')).json();
+      sub = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+      await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+    }
+    const r = await (await fetch('/api/push/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })).json();
+    $('#push').classList.add('on'); $('#push').textContent = 'Notiser på';
+    toast(r.ok ? 'Notiser är på. En testnotis är skickad.' : 'Notiser är på, men testnotisen kom inte fram. Kontrollera att Upstash Redis är inlagt i Vercel.');
+  } catch (e) {
+    toast('Kunde inte slå på notiser: ' + e.message);
+  }
+});
+pushInit();

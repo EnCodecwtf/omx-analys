@@ -8,6 +8,7 @@ import { reportDates, nextReport, tradingDaysBetween, upcomingMacro } from './li
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent } from './lib/notify.js';
+import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
@@ -15,6 +16,7 @@ import { computeIndicators } from './lib/indicators.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
+import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -202,6 +204,21 @@ async function scan() {
         rows.push({ symbol: s.symbol, name: s.name, isCrypto: true, error: err.message });
       }
     }
+    // Panikvecka: tre mest fallna OMXS30-aktier när gårdagens VIX är minst 25.
+    let panic = null;
+    try {
+      const date = dayOf(rows.find(r => r.isIndex)?.t ?? Date.now() / 1000);
+      panic = panicPicks({ stocks: await mapLimit(symbols.stocks, 6, async s => ({ ...s, bars: await fetchBars(s.symbol) })), vixBars: await fetchBars('^VIX'), date });
+      const open = (await signalLog.entries()).some(e => e.kind === 'panic' && e.exitDate >= today());
+      panic.holding = open;
+      if (panic.active && !open && isFinal(rows.find(r => r.isIndex).t)) {
+        const added = await signalLog.record(panic.picks.map(p => ({ kind: 'panic', date, symbol: p.symbol, name: p.name, close: p.price, ret5: p.ret5, vix: panic.vix,
+          days: panic.days, exitDate: panic.exitDate, size: panic.size, avanzaUrl: avanzaUrl(bySymbol.get(p.symbol)), loggedAt: new Date().toISOString() })));
+        for (const e of added) await notifySignal(e);
+      }
+    } catch (err) {
+      console.error('Panikveckan kunde inte räknas:', err.message);
+    }
     const signals = rows.filter(r => r.status === 'strong' && (r.isCrypto || isFinal(r.t)));
     if (signals.length) {
       const added = await signalLog.record(signals.map(r => r.isCrypto
@@ -210,7 +227,7 @@ async function scan() {
           tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() }));
       for (const e of added) await notifySignal(e);
     }
-    return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), rows };
+    return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), panic, rows };
   });
 }
 
@@ -225,8 +242,14 @@ async function liveCheck({ force = false } = {}) {
   const usOpen = force || (!s.weekend && s.min >= 15 * 60 + 30 && s.min <= 22 * 60 + 10);
   const sent = [];
   for (const e of await signalLog.entries()) {
-    const id = `${e.date}|${e.symbol}`;
+    const id = signalLog.idOf(e);
     try {
+      if (e.kind === 'panic') {
+        // Påminnelse kvällen före säljdagen (efter 17.00) eller på säljdagen.
+        const now = sthlm();
+        if (now.date >= e.exitDate || (addTradingDays(now.date, 1) === e.exitDate && now.min >= 17 * 60)) for (const k of await signalLog.markAlerts(id, ['exit'])) if (await notifyEvent(e, k)) sent.push(`${e.symbol} ${k}`);
+        continue;
+      }
       if (e.kind === 'crypto') {
         if (today() >= e.exitDate) for (const k of await signalLog.markAlerts(id, ['exit'])) if (await notifyEvent(e, k)) sent.push(`${e.symbol} ${k}`);
         continue;
@@ -289,21 +312,23 @@ async function logView() {
     let o;
     try {
       const bars = await fetchBars(e.symbol);
-      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : signalLog.outcome(e, bars);
+      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : signalLog.outcome(e, bars);
     } catch { o = { state: 'okänd' }; }
     out.push({ ...e, ...o });
   }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
-  const closed = out.filter(x => x.state === 'stängd' && x.kind !== 'crypto');
+  const closed = out.filter(x => x.state === 'stängd' && !x.kind);
   const cClosed = out.filter(x => x.state === 'stängd' && x.kind === 'crypto');
+  const pClosed = out.filter(x => x.state === 'stängd' && x.kind === 'panic');
   const current = equityStats(closed.slice().sort((a, b) => a.date.localeCompare(b.date)).map(x => x.r));
   const pct = k => closed.length ? Math.round(1000 * closed.filter(x => x.hit >= k).length / closed.length) / 10 : null;
   return {
     entries: out,
     stats: { n: out.length, closed: closed.length, current, open: out.filter(x => x.state === 'öppen').length, tp1Rate: pct(1), tp2Rate: pct(2),
       avgR: closed.length ? Math.round(100 * closed.reduce((s, x) => s + x.r, 0) / closed.length) / 100 : null,
-      crypto: { closed: cClosed.length, avgPct: cClosed.length ? Math.round(100 * cClosed.reduce((s, x) => s + x.pct, 0) / cClosed.length) / 100 : null } },
+      crypto: { closed: cClosed.length, avgPct: cClosed.length ? Math.round(100 * cClosed.reduce((s, x) => s + x.pct, 0) / cClosed.length) / 100 : null },
+      panic: { closed: pClosed.length, avgPct: pClosed.length ? Math.round(100 * pClosed.reduce((s, x) => s + x.pct, 0) / pClosed.length) / 100 : null } },
   };
 }
 
@@ -360,6 +385,15 @@ async function cryptoAnalysis(meta) {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 
+// JSON-kroppen i en POST. På Vercel kan den redan vara inläst (req.body).
+async function readJson(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') return JSON.parse(req.body);
+  let raw = '';
+  for await (const chunk of req) { raw += chunk; if (raw.length > 1e5) throw new Error('För stor'); }
+  return raw ? JSON.parse(raw) : {};
+}
+
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
@@ -392,6 +426,15 @@ export default async function handler(req, res) {
       const secret = process.env.CRON_SECRET;
       if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
       return send(res, 200, await liveCheck());
+    }
+    // Webbnotiser: publik nyckel, prenumeration och testnotis till den egna enheten.
+    if (url.pathname === '/api/push/key') return send(res, 200, { key: (await vapidKeys()).publicKey });
+    if (url.pathname === '/api/push/subscribe' && req.method === 'POST') return send(res, 200, { ok: true, count: await subscribe(await readJson(req)) });
+    if (url.pathname === '/api/push/unsubscribe' && req.method === 'POST') { await unsubscribe((await readJson(req)).endpoint); return send(res, 200, { ok: true }); }
+    if (url.pathname === '/api/push/test' && req.method === 'POST') {
+      const { endpoint } = await readJson(req);
+      const n = await pushAll({ title: 'OMX Analys', body: 'Notiserna fungerar. Du får besked om köpsignaler, mål, stopp och säljdagar.', url: '/' }, { only: endpoint });
+      return send(res, 200, { ok: n > 0 });
     }
     if (url.pathname === '/api/us/scan') {
       if (url.searchParams.has('refresh')) { cache.delete('usscan'); cache.delete('usmacro'); }

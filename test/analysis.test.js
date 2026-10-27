@@ -351,3 +351,53 @@ test('USA: köpsignal kräver makropoäng 3', async () => {
   // OMX oförändrat: poäng 1 räcker
   assert.equal(applyGuards(base(), { macro: { score: 1, size: 1 } }).status, 'strong');
 });
+
+test('Panikvecka: tre mest fallna när gårdagens VIX är minst 25', async () => {
+  const { panicPicks, panicOutcome, addTradingDays } = await import('../lib/panic.js');
+  const mk = (pts) => path(pts, 10);
+  const stocks = [[100, 110, 120], [100, 110, 90], [100, 110, 80], [100, 110, 100], [100, 110, 70]].map((p, k) => ({ symbol: 'S' + k, name: 'Aktie ' + k, bars: mk(p) }));
+  const date = new Date(stocks[0].bars[12].t * 1000).toISOString().slice(0, 10);
+  const vix = v => stocks[0].bars.map(b => ({ ...b, c: v }));
+  const on = panicPicks({ stocks, vixBars: vix(30), date });
+  assert.equal(on.active, true);
+  assert.deepEqual(on.picks.map(p => p.symbol), ['S4', 'S2', 'S1']);
+  assert.equal(panicPicks({ stocks, vixBars: vix(20), date }).active, false);
+  assert.equal(addTradingDays('2026-10-30', 5), '2026-11-06'); // fredag + 5 vardagar
+  const o = panicOutcome({ date }, stocks[4].bars);
+  assert.equal(o.state, 'stängd');
+  assert.ok(Math.abs(o.pct - ((stocks[4].bars[17].c / stocks[4].bars[13].o - 1 - 0.002) * 100)) < 0.01);
+  const { idOf } = await import('../lib/log.js');
+  assert.notEqual(idOf({ date, symbol: 'S1' }), idOf({ date, symbol: 'S1', kind: 'panic' }));
+});
+
+test('Webbnotiser: kryptering enligt RFC 8291 och VAPID-signatur', async () => {
+  const crypto = await import('node:crypto');
+  const { encrypt, vapidAuth } = await import('../lib/push.js');
+  // Webbläsarens nycklar (mottagaren)
+  const ua = crypto.createECDH('prime256v1'); ua.generateKeys();
+  const auth = crypto.randomBytes(16);
+  const sub = { endpoint: 'https://push.example.com/abc', keys: { p256dh: ua.getPublicKey().toString('base64url'), auth: auth.toString('base64url') } };
+  const body = encrypt(sub, JSON.stringify({ title: 'Test', body: 'Hej' }));
+  // Dekryptera som webbläsaren gör
+  const salt = body.subarray(0, 16), idlen = body[20], asPublic = body.subarray(21, 21 + idlen), ct = body.subarray(21 + idlen);
+  assert.equal(body.readUInt32BE(16), 4096);
+  const shared = ua.computeSecret(asPublic);
+  const ikm = Buffer.from(crypto.hkdfSync('sha256', shared, auth, Buffer.concat([Buffer.from('WebPush: info\0'), ua.getPublicKey(), asPublic]), 32));
+  const cek = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16));
+  const nonce = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+  const d = crypto.createDecipheriv('aes-128-gcm', cek, nonce); d.setAuthTag(ct.subarray(ct.length - 16));
+  const plain = Buffer.concat([d.update(ct.subarray(0, ct.length - 16)), d.final()]);
+  assert.equal(plain[plain.length - 1], 2);
+  assert.deepEqual(JSON.parse(plain.subarray(0, -1).toString()), { title: 'Test', body: 'Hej' });
+  // VAPID: signaturen ska gå att verifiera med den publika nyckeln
+  const { privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = privateKey.export({ format: 'jwk' });
+  const pub = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x, 'base64url'), Buffer.from(jwk.y, 'base64url')]).toString('base64url');
+  const h = vapidAuth(sub.endpoint, { publicKey: pub, jwk: { kty: 'EC', crv: 'P-256', d: jwk.d, x: jwk.x, y: jwk.y } });
+  const [, t, k] = h.match(/^vapid t=([^,]+), k=(.+)$/);
+  assert.equal(k, pub);
+  const [hh, cc, ss] = t.split('.');
+  assert.equal(JSON.parse(Buffer.from(cc, 'base64url')).aud, 'https://push.example.com');
+  const pubKey = crypto.createPublicKey({ key: { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y }, format: 'jwk' });
+  assert.ok(crypto.verify('sha256', Buffer.from(`${hh}.${cc}`), { key: pubKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(ss, 'base64url')));
+});

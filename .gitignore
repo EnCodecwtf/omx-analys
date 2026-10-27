@@ -1,3 +1,4 @@
-node_modules/
 .DS_Store
+data/signal-log*.json
 data/signal-log.json
+node_modules/
