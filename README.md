@@ -666,6 +666,26 @@ För minifutures är spreaden räknad på underliggande ofta 0,05–0,1 %, så 0
 
 Även med låg avgift blir det ingen fördel som håller i båda halvorna.
 
+### Veckovis återgång vid panik (OMXS30, 2017–2026)
+Varje vecka köps de aktier i OMXS30 (bolag som var med i indexet just då) som fallit mest de senaste 5 handelsdagarna och
+säljs 5 handelsdagar senare. Avkastning per vecka efter 0,2 % avgift, 2017–21 / 2022–26.
+
+| VIX vid köpet | 1 aktie | 3 aktier | 5 aktier |
+|---|---|---|---|
+| Alla lägen | +0,44 / −0,69 % | +0,27 / −0,07 % | +0,23 / −0,02 % |
+| VIX minst 18 | +0,66 / −0,36 % | +0,85 / +0,31 % | +0,74 / +0,23 % |
+| VIX minst 20 | +1,13 / −0,40 % | +1,23 / +0,44 % | +0,97 / +0,29 % |
+| VIX minst 25 | +0,62 / +1,18 % | +1,36 / +0,89 % | +1,12 / +1,10 % |
+| VIX minst 30 | +1,24 / +2,37 % | +1,41 / +2,22 % | +1,28 / +2,45 % |
+
+Med VIX minst 25 och 3 aktier var resultatet positivt i båda perioderna oavsett veckodag för köpet (+0,16 till +1,54 %),
+cirka 7 veckor om året, 60 % vinstveckor, sämsta vecka −20 %. År för år: 2018 −0,10, 2019 +9,03 (1 vecka), 2020 +0,93,
+2021 +3,93, 2022 +0,57, 2023 −5,36, 2024 +1,18, 2025 +3,34, 2026 +0,51 % per vecka. Med VIX minst 20 berodde resultatet
+2022–26 på veckodagen (−0,22 till +0,70 %). Med VIX minst 28 var alla år positiva men bara cirka 4 veckor om året.
+
+**Slutsats:** det första korta upplägget (en vecka) som håller i båda perioderna, men bara vid hög rädsla och med stora
+svängningar. Samma grundidé som appens rekylstrategi.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
