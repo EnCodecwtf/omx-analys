@@ -709,6 +709,32 @@ Bolag som var med i OMXS30 på signaldagen, 6 842 signaler. Stoppet låg i snitt
 redan före avgifter i båda perioderna, även i nedtrend. FVG ensam ger ingen signal åt något håll. I appen används FVG bara
 som en av flera faktorer i poängen (+2) för köpsignalerna.
 
+### Blankning: brett test (2017–2026)
+Blanka på nästa öppning och köp tillbaka på stängningen efter 1, 5 eller 20 dagar, efter 0,2 % avgift. Bolag som var med i
+OMXS30 på signaldagen och OMXS30-indexet. 2017–21 | 2022–26, 5 dagar:
+
+| Regel (aktier) | Utfall |
+|---|---|
+| Jämförelse: blanka varje dag | −0,47 % (t −8,5) / −0,30 % (t −5,1) |
+| Nedtrend (under EMA 200, EMA 50 under EMA 200) | −0,77 % / −0,53 % |
+| Studs till EMA 50 underifrån i nedtrend | −0,76 % / −0,48 % |
+| RSI(2) över 95 i nedtrend | −0,67 % / −0,14 % |
+| Ny 52-veckorsbotten | −0,15 % / −0,60 % |
+| Ny 52-veckorstopp | −0,23 % / +0,05 % |
+| Gap upp över 3 % | −1,43 % / −1,78 % |
+| Ned över 5 % på dagen | −0,38 % / −1,31 % |
+| Rapportdag och fall över 4 % | −0,56 % / −1,10 % |
+| 5 uppdagar i rad | −0,38 % / −0,09 % |
+| RSI(14) över 70 i nedtrend | +0,72 % / +2,46 % (30 + 31 affärer) |
+
+Veckans 3 största vinnare blankade i en vecka: −0,34 % (t −4,1) / −0,25 % (t −2,1) per vecka, negativt i alla VIX-lägen.
+Av cirka 60 kombinationer av regel och innehavstid var 5 positiva i båda perioderna, alla med 9–31 affärer per period, vilket
+är vad slumpen ger. **Slutsats:** ingen blankningsregel håller.
+
+**Blankning som skydd:** köp de 3 mest fallna OMXS30-aktierna och blanka lika mycket av snittet (index) i en vecka när
+gårdagens VIX är minst 25: +0,37 % (t 1,8) / +0,31 % (t 1,2) per vecka efter avgift för båda benen. Sämsta veckan −8,5 % mot
+−20,5 % utan skydd, spridning 3,2 % mot 5,5 %. I alla andra VIX-lägen var kombinationen negativ.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
