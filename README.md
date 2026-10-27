@@ -641,6 +641,18 @@ makropoäng 3: rapport inom 14 dagar +0,07 R (31 st) mot +0,69 R utan (2017–21
 efter USA-börsens stängning, och sparar nya signaler i signalloggen (märkta USA) och skickar notis. Live-bevakningen av
 mål och stopp för USA-affärer gäller 15.30–22.00 svensk tid.
 
+### Appens regler på kortare tidsramar
+Samma signal, stopp och mål räknat på timstaplar (2 år) och 15-minutersstaplar (60 dagar), OMXS30-bolagen:
+
+| Tidsram | Affärer/år | Stoppavstånd | Före avgifter | Efter 0,3 % avgift | Vinst |
+|---|---|---|---|---|---|
+| Dag (som appen) | cirka 40 | cirka 4–6 % | – | +0,25 R | 56 % |
+| 60 min | cirka 960 | 1,3 % | +0,05 R | −0,32 R | 46 % |
+| 15 min | cirka 2 800 | 0,6 % | −0,01 R | −0,65 R | 36 % |
+
+På kortare tidsramar försvinner fördelen redan före avgifter, och eftersom stoppet ligger mycket närmare blir avgiften
+en stor del av risken (0,3 % av 1,3 % är nästan en fjärdedel av R).
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
