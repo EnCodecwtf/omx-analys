@@ -751,6 +751,12 @@ Trendföljning kort per år i marknaden: guld −3,9 / −14,3 %, silver −5,5 
 −13,1 %. Av cirka 100 kombinationer var 3 positiva i båda perioderna, alla med t under 0,6. **Slutsats:** ingen
 blankningsregel håller på råvarorna eller bitcoin heller.
 
+**Kortare innehav (1–3 dagar):** blanka alltid gav −0,12 till −0,38 % per dag (t −3 till −6) på alla marknader. 11 av cirka
+180 kombinationer var positiva i båda perioderna, färre än slumpen ger. Närmast ett mönster: blanka olja efter en ny
+N-dagarsbotten under EMA 200 och köp tillbaka efter exakt 2 dagar, positivt för Brent, BNO och USO med N 10–100
+(till exempel Brent N = 50: +0,56 / +0,48 %, t 1,9 / 0,7). Men 1 dag gav −0,1 till −0,8 % och 3–5 dagar var negativt efter
+2018, så effekten hänger på exakt 2 dagars innehav och är troligen slump.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
