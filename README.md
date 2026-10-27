@@ -653,6 +653,19 @@ Samma signal, stopp och mål räknat på timstaplar (2 år) och 15-minutersstapl
 På kortare tidsramar försvinner fördelen redan före avgifter, och eftersom stoppet ligger mycket närmare blir avgiften
 en stor del av risken (0,3 % av 1,3 % är nästan en fjärdedel av R).
 
+**Omräkning med lägre avgift och strängare urval** (timgraf, 1 913 affärer, delat vid juni 2025, första / andra halvan).
+För minifutures är spreaden räknad på underliggande ofta 0,05–0,1 %, så 0,3 % var för högt för kort handel.
+
+| Urval | Utan avgift | 0,05 % | 0,1 % |
+|---|---|---|---|
+| Alla signaler | +0,07 / +0,04 R | −0,00 / −0,01 R | −0,07 / −0,07 R |
+| Poäng minst 55 | −0,07 / +0,12 R | −0,19 / +0,06 R | −0,32 / −0,00 R |
+| Makro minst 1 | +0,04 / +0,02 R | −0,01 / −0,03 R | −0,06 / −0,07 R |
+| Stoppavstånd minst 2 % | +0,18 / +0,02 R | +0,16 / +0,00 R | +0,14 / −0,01 R |
+| Makro minst 1 och poäng minst 55 | −0,12 / +0,26 R | −0,18 / +0,21 R | −0,23 / +0,16 R |
+
+Även med låg avgift blir det ingen fördel som håller i båda halvorna.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att
