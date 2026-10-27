@@ -635,7 +635,9 @@ namnet i Avanzas produktfilter). Samma regler som för OMX, med två skillnader 
    som för OMX används (knock-out minst 1 ATR under stoppet, spread högst 1,5 %, högst 6x hävstång, högst 35 % förlust vid
    stopp). Klarar färre än tre papper kraven blir det ingen signal.
 
-Ingen rapportspärr (testet gjordes utan). Listan hämtas när fliken öppnas. Vercel Cron kör `/api/cron/us` kl. 21.30 UTC,
+Ingen rapportspärr. Test med historiska rapportdatum från Yahoo (273 bolag, kompletta till februari 2025), signaler vid
+makropoäng 3: rapport inom 14 dagar +0,07 R (31 st) mot +0,69 R utan (2017–21), och +0,30 R (63 st) mot +0,31 R
+(2022–feb 2025). Skillnaden syns bara i den första perioden och gäller cirka 10 % av signalerna. Listan hämtas när fliken öppnas. Vercel Cron kör `/api/cron/us` kl. 21.30 UTC,
 efter USA-börsens stängning, och sparar nya signaler i signalloggen (märkta USA) och skickar notis. Live-bevakningen av
 mål och stopp för USA-affärer gäller 15.30–22.00 svensk tid.
 
