@@ -666,6 +666,21 @@ För minifutures är spreaden räknad på underliggande ofta 0,05–0,1 %, så 0
 
 Även med låg avgift blir det ingen fördel som håller i båda halvorna.
 
+### Makrokrav 1 eller 0? (2017–2026, överlevnadsfritt)
+
+Fler signaler genom att sänka makrokravet från 1 till 0, testat på de bolag som
+faktiskt var med i OMXS30 på signaldagen:
+
+| Makrokrav | Affärer | Per vecka | Snitt | Summa | Största nedgång | Månader utan signal |
+|---|---|---|---|---|---|---|
+| 1 (appen) | 364 | 0,79 | +0,26 R | +94 R | −26,6 R | 46 av 106 |
+| 0 | 485 | 1,04 | +0,22 R | +105 R | −30,1 R | 23 av 108 |
+
+De 131 extra affärerna (makropoäng exakt 0) gav bara +0,07 R i snitt före avgifter
+(+0,03 R 2022–26) och 49 % vinnare, alltså ungefär noll efter courtage och spread,
+men större nedgångar. Kravet ligger kvar på 1. Signalerna kommer i klumpar när
+marknaden är orolig. Lugna perioder ger få eller inga signaler.
+
 ### Veckovis återgång vid panik (OMXS30, 2017–2026)
 Varje vecka köps de aktier i OMXS30 (bolag som var med i indexet just då) som fallit mest de senaste 5 handelsdagarna och
 säljs 5 handelsdagar senare. Avkastning per vecka efter 0,2 % avgift, 2017–21 / 2022–26.
