@@ -862,6 +862,8 @@ marknaden är rädd. Om marknaden fortsätter ned förlorar många positioner sa
 | Olika risk för olika signalnivåer | Liten förbättring. Ersattes av regeln att bara starka signaler handlas |
 
 ### Signallogg (framåttest)
+En affär i taget per aktie och strategi, precis som i backtestet: medan en loggad affär är öppen (eller väntar på köp) sparas ingen ny signal i samma aktie, och listan visar *I AFFÄR* i stället för en ny köpsignal. Signaler som ändå loggats medan en affär var öppen tas bort automatiskt.
+
 Varje stark köpsignal sparas när dagens stängningskurs är klar, efter 18.00 svensk tid. Servern kör skannern varje timme.
 Utfallet räknas sedan med samma regler som backtestet. Loggen visas under "Signallogg" i appen och är det enda riktiga beviset
 på hur strategin fungerar framåt.

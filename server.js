@@ -162,10 +162,11 @@ async function usScan() {
     });
     const signals = rows.filter(r => r.status === 'strong' && !r.preliminary);
     if (signals.length) {
-      const added = await signalLog.record(signals.map(r => ({ date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+      const added = await recordFree(signals.map(r => ({ date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
         tps: r.plan.tps.map(x => x.price), size: r.size, market: 'USA', avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() })));
       for (const e of added) await notifySignal(e);
     }
+    await markInTrade(rows);
     return { updated: Date.now(), macro: m, rows };
   });
 }
@@ -222,12 +223,13 @@ async function scan() {
     }
     const signals = rows.filter(r => r.status === 'strong' && (r.isCrypto || isFinal(r.t)));
     if (signals.length) {
-      const added = await signalLog.record(signals.map(r => r.isCrypto
+      const added = await recordFree(signals.map(r => r.isCrypto
         ? { kind: 'crypto', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, exitDate: r.crypto.exitDate, days: r.crypto.days, size: r.size, loggedAt: new Date().toISOString() }
         : { date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
           tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() }));
       for (const e of added) await notifySignal(e);
     }
+    await markInTrade(rows, r => r.isCrypto ? 'crypto' : undefined);
     return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), panic, rows };
   });
 }
@@ -276,12 +278,56 @@ async function shortScan() {
     rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.score ?? -1) - (a.score ?? -1));
     const signals = rows.filter(r => r.status === 'short' && !r.preliminary);
     if (signals.length) {
-      const added = await signalLog.record(signals.map(r => ({ kind: 'short', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
+      const added = await recordFree(signals.map(r => ({ kind: 'short', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
         tps: r.plan.tps.map(x => x.price), size: r.size, score: r.score, avanzaUrl: r.avanzaUrl, loggedAt: new Date().toISOString() })));
       for (const e of added) await notifySignal(e);
     }
+    await markInTrade(rows, () => 'short');
     return { updated: Date.now(), register: !!reg, rows };
   });
+}
+
+async function outcomeOf(e) {
+  try {
+    const bars = await fetchBars(e.symbol);
+    return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
+  } catch { return { state: 'okänd' }; }
+}
+
+// Alla loggade signaler med utfall. Signaler som kom medan en tidigare affär i
+// samma instrument och strategi var öppen tas bort, eftersom det bara får finnas
+// en affär i taget per instrument (som i backtestet).
+async function withOutcomes() {
+  let out = [];
+  for (const e of await signalLog.entries()) out.push({ ...e, ...(await outcomeOf(e)) });
+  const { dupes } = signalLog.busy(out);
+  if (dupes.length) {
+    await signalLog.remove(dupes);
+    out = out.filter(e => !dupes.includes(signalLog.idOf(e)));
+  }
+  return out;
+}
+
+// Sparar nya signaler, men bara för instrument utan öppen affär i samma strategi.
+async function recordFree(list) {
+  const { until } = signalLog.busy(await withOutcomes());
+  return signalLog.record(list.filter(e => !(e.date <= (until.get(signalLog.slotOf(e.symbol, e.kind)) ?? ''))));
+}
+
+// Öppna affärer (eller som väntar på köp) per instrument och strategi, med signaldagen.
+async function openSlots() {
+  const m = new Map();
+  for (const e of await withOutcomes()) if (e.state === 'öppen' || e.state === 'väntar på köp') m.set(signalLog.slotOf(e.symbol, e.kind), e);
+  return m;
+}
+// Markerar rader där en tidigare signal redan är en öppen affär: ingen ny signal då.
+async function markInTrade(rows, kindOf = () => undefined) {
+  const slots = await openSlots();
+  for (const r of rows) {
+    const e = slots.get(signalLog.slotOf(r.symbol, kindOf(r)));
+    if (e && r.t && e.date < dayOf(r.t)) r.inTrade = { date: e.date, entry: e.entry ?? null, state: e.state };
+  }
+  return rows;
 }
 
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
@@ -322,7 +368,7 @@ async function liveCheck({ force = false } = {}) {
   // Förvarning 16.30–17.30: köpsignal med kursen just nu, bekräftas vid stängningen.
   if (!s.weekend && s.min >= 16 * 60 + 30 && s.min <= 17 * 60 + 30) {
     cache.delete('scan');
-    for (const r of (await scan()).rows.filter(r => r.status === 'strong' && r.preliminary)) {
+    for (const r of (await scan()).rows.filter(r => r.status === 'strong' && r.preliminary && !r.inTrade)) {
       if (await signalLog.markWarning(`${s.date}|${r.symbol}`) && await notifyEvent({ name: r.name, symbol: r.symbol, close: r.price }, 'warn')) sent.push(`${r.symbol} warn`);
     }
   }
@@ -359,16 +405,7 @@ async function summary() {
 
 // Signalloggen med utfall räknat från kurserna efter signaldagen.
 async function logView() {
-  const list = await signalLog.entries();
-  const out = [];
-  for (const e of list) {
-    let o;
-    try {
-      const bars = await fetchBars(e.symbol);
-      o = e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
-    } catch { o = { state: 'okänd' }; }
-    out.push({ ...e, ...o });
-  }
+  const out = await withOutcomes();
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
   const closed = out.filter(x => x.state === 'stängd' && !x.kind);
@@ -400,7 +437,10 @@ async function analysis(symbol) {
     const off = all.length - bars.length;
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
     const bt = await backtestFor(meta, all);
+    const [it] = await markInTrade([{ symbol, t: bars[bars.length - 1].t }], () => (meta.isCrypto ? 'crypto' : undefined));
+    if (it.inTrade && (ev.status === 'strong' || ev.status === 'buy')) ev.warnings.unshift(`Du har redan en öppen affär från signalen ${it.inTrade.date}. Ingen ny signal: en affär i taget per aktie. Följ den öppna affärens stopp och mål.`);
     return {
+      inTrade: it.inTrade || null,
       symbol, name: meta.name, isIndex: !!meta.isIndex, isUS: !!meta.isUS, avanzaUrl: avanzaUrl(meta), preliminary: !(meta.isUS ? isFinalUS : isFinal)(bars[bars.length - 1].t),
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),

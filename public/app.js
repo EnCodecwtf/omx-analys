@@ -111,7 +111,7 @@ function renderShorts() {
     const nw = r.news?.neg?.length ? `<div class="s-sub">Negativa rubriker</div><ul>${r.news.neg.map(h => `<li><a href="${esc(h.link)}" target="_blank" rel="noopener">${esc(h.title)}</a> <span class="muted">${esc(h.source)}</span></li>`).join('')}</ul>` : '';
     const an = r.analysts ? `<div class="muted" style="font-size:12px">Analytiker: ${n(r.analysts.n)} st · riktkurs ${fmt(r.analysts.target)} · snittråd ${n(r.analysts.recMean?.toFixed(1))} (1 köp – 5 sälj)${r.short ? ` · blankat ${n(r.short.pct)} %` : ''}</div>` : '';
     return `<details class="row s-row"><summary>
-      <div class="name">${esc(r.name)} ${SHORT_BADGE[r.status]}${r.preliminary && r.status === 'short' ? ' <span class="tag">preliminär</span>' : ''}</div>
+      <div class="name">${esc(r.name)} ${r.inTrade ? '<span class="badge avoid">I AFFÄR</span>' : SHORT_BADGE[r.status]}${r.preliminary && r.status === 'short' ? ' <span class="tag">preliminär</span>' : ''}</div>
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${n(r.changePct)} %</div></div></div>
       <div class="meta"><span>Poäng ${r.score}</span><span>Analytiker ${r.analyst}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing.length ? `<span class="${r.missing.length === 1 ? 'near' : ''}">${r.missing.length} krav kvar: ${r.missing.map(k => SHORT_KEY[k] || k).join(', ')}</span>` : ''}</div>
@@ -158,7 +158,7 @@ async function loadScan(refresh, auto = false) {
 const KEY_LABEL = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro', products: 'papper', breakout: 'utbrott' };
 // Sortering: köpsignaler först, sedan de med minst antal krav kvar, sedan poäng.
 // Indexet ligger alltid överst som referens.
-const isSignal = r => r.status === 'strong' || r.status === 'buy';
+const isSignal = r => !r.inTrade && (r.status === 'strong' || r.status === 'buy');
 const left = r => r.missing?.length ?? 99;
 function byCloseness(a, b) {
   return (b.isIndex - a.isIndex) || (isSignal(b) - isSignal(a)) || (left(a) - left(b)) || ((b.score ?? 0) - (a.score ?? 0));
@@ -171,7 +171,7 @@ function renderScan() {
   const rows = src.slice().sort(byCloseness);
   // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
   const visible = filter === 'us' ? rows : rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
-    || (filter === 'signals' && (r.status === 'strong' || r.status === 'buy'))
+    || (filter === 'signals' && isSignal(r))
     || (filter === 'watch' && r.status === 'watch')));
   const list = $('#scan-list');
   const um = filter === 'us' && usData?.macro;
@@ -182,7 +182,7 @@ function renderScan() {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
     const up = r.changePct >= 0;
     return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
-      <div class="name">${esc(r.name)} ${badge(r.status)}${r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
+      <div class="name">${esc(r.name)} ${r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>` : badge(r.status)}${!r.inTrade && r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
@@ -272,7 +272,7 @@ function renderDetail(d) {
   const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
   $('#d-name').textContent = d.name;
   $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
-  $('#d-badge').innerHTML = badge(A.status, true);
+  $('#d-badge').innerHTML = d.inTrade ? '<span class="badge strong big">I AFFÄR</span>' : badge(A.status, true);
   chart.setData(d);
 
   if (d.isCrypto) renderCryptoCards(d);

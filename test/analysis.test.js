@@ -469,3 +469,19 @@ test('Avanza: korta papper räknas spegelvänt', async () => {
   assert.equal(r.minis[0].lossAtStopPct, 16);
   assert.equal(r.bulls[0].kind, 'Bear (daglig hävstång)');
 });
+
+test('en affär i taget per aktie och strategi', async () => {
+  const { busy, idOf } = await import('../lib/log.js');
+  const list = [
+    { date: '2026-11-02', symbol: 'ATCO-A.ST', state: 'öppen' },
+    { date: '2026-11-03', symbol: 'ATCO-A.ST', state: 'väntar på köp' },
+    { date: '2026-11-03', symbol: 'ATCO-A.ST', kind: 'short', state: 'väntar på köp' },
+    { date: '2026-10-01', symbol: 'LIFCO-B.ST', state: 'stängd', exitDate: '2026-10-10' },
+    { date: '2026-10-10', symbol: 'LIFCO-B.ST', state: 'stängd', exitDate: '2026-10-20' },
+    { date: '2026-10-11', symbol: 'LIFCO-B.ST', state: 'öppen' },
+  ];
+  const { until, dupes } = busy(list);
+  assert.deepEqual(dupes, [idOf(list[4]), idOf(list[1])]);
+  assert.equal(until.get('ATCO-A.ST|'), '9999-12-31');
+  assert.equal(until.get('LIFCO-B.ST|'), '9999-12-31');
+});
