@@ -69,6 +69,8 @@ function setView(v) {
   document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('active', x.dataset.view === v));
   for (const id of ['today', 'trades', 'stocks', 'more']) $('#v-' + id).hidden = id !== v;
   document.body.classList.remove('show-detail');
+  if (v !== 'more') closeTool();
+  else if (!tool && window.innerWidth > 900) openTool('calendar');
   if (v === 'stocks') renderScan();
   if (v === 'trades') renderTrades();
   if (v === 'today') renderToday();
@@ -82,7 +84,27 @@ for (const b of document.querySelectorAll('[data-market]')) {
     if (market === 'us' && !usData) loadUS(); else renderScan();
   });
 }
-$('#shorts-box').addEventListener('toggle', e => { if (e.target.open && !shortData) loadShorts(); });
+// Verktygen under Mer öppnas på en egen sida (på datorn i den stora ytan till höger).
+let tool = null;
+function openTool(name) {
+  tool = name;
+  for (const t of document.querySelectorAll('.tool')) t.hidden = t.dataset.tool !== name;
+  document.querySelectorAll('.menu-item').forEach(x => x.classList.toggle('active', x.dataset.tool === name));
+  $('#tool-title').textContent = document.querySelector(`.tool[data-tool="${name}"]`).dataset.title;
+  document.body.classList.remove('show-detail');
+  document.body.classList.add('show-tool');
+  window.scrollTo(0, 0);
+  if (name === 'shorts' && !shortData) loadShorts();
+  if (name === 'strategy') loadStrategyCalc();
+  if (name === 'compound') runCompound();
+}
+function closeTool() {
+  tool = null;
+  document.body.classList.remove('show-tool');
+  document.querySelectorAll('.menu-item').forEach(x => x.classList.remove('active'));
+}
+for (const b of document.querySelectorAll('[data-tool].menu-item')) b.addEventListener('click', () => openTool(b.dataset.tool));
+$('#tool-back').addEventListener('click', closeTool);
 
 // USA-listan (S&P 500-bolag med hävstångspapper på Avanza) hämtas först när
 // fliken öppnas, eftersom den är mycket större än OMX-listan.
@@ -229,6 +251,7 @@ function renderScan() {
 
 async function openSymbol(symbol, { keepView, refresh } = {}) {
   current = symbol;
+  if (!keepView) closeTool();
   document.querySelectorAll('.row').forEach(r => r.classList.toggle('active', r.dataset.symbol === symbol));
   if (!keepView) { document.body.classList.add('show-detail'); history.replaceState(null, '', '#' + encodeURIComponent(symbol)); }
   $('#d-name').textContent = scanData?.rows.find(r => r.symbol === symbol)?.name || symbol;
@@ -679,10 +702,10 @@ function renderCalendar() {
   const outs = calData.outcomes || [];
   el.innerHTML = (list.length ? `<ul class="cal">${list.map(calRow).join('')}</ul>` : '<p class="muted small">Inget inplanerat.</p>')
     + (hidden ? `<button class="btn small-btn" id="cal-all">${calAll ? 'Visa bara viktiga' : `Visa alla rapporter (${hidden} till)`}</button>` : '')
-    + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>'
-    + (outs.length ? `<h3 style="margin-top:16px">Senaste makroutfall</h3><table class="outcomes">${outs.map(o => `<tr><td>${esc(o.label)}${o.period ? `<div class="muted small">${esc(o.period)}</div>` : ''}</td>
+    + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>';
+  $('#outcomes').innerHTML = (outs.length ? `<table class="outcomes">${outs.map(o => `<tr><td>${esc(o.label)}${o.period ? `<div class="muted small">${esc(o.period)}</div>` : ''}</td>
         <td class="r num"><b>${esc(o.text)}</b> ${o.dir > 0 ? '<span class="arrow">▲</span>' : o.dir < 0 ? '<span class="arrow">▼</span>' : ''}<div class="muted small">${esc(o.detail)}</div></td></tr>`).join('')}</table>
-      <p class="muted small" style="margin-top:6px">▲ ▼ visar jämfört med förra utfallet. Analytikernas förväntningar finns inte gratis, så utfallen jämförs med förra. Källor: FRED, Riksbanken och SCB.</p>` : '');
+      <p class="muted small" style="margin-top:6px">▲ ▼ visar jämfört med förra utfallet. Analytikernas förväntningar finns inte gratis, så utfallen jämförs med förra. Källor: FRED, Riksbanken och SCB.</p>` : '<p class="muted small">Utfallen kunde inte hämtas just nu.</p>');
   $('#cal-all')?.addEventListener('click', () => { calAll = !calAll; renderCalendar(); });
   bindRows(el);
   // På Idag: rapporter för öppna affärer inom 10 handelsdagar och makrobesked inom 3 dagar.
@@ -695,6 +718,69 @@ async function loadCalendar() {
   catch { $('#calendar').innerHTML = '<p class="muted small">Kunde inte hämta kalendern.</p>'; }
 }
 
+// Vanlig ränta på ränta: fast avkastning per år, sparande varje månad och avgift.
+for (const id of ['cc-start', 'cc-month', 'cc-rate', 'cc-years', 'cc-fee']) {
+  const el = $('#' + id); el.value = store.get(id, el.value);
+  el.addEventListener('input', () => { store.set(id, el.value); runCompound(); });
+}
+function runCompound() {
+  const start = Math.max(0, +$('#cc-start').value || 0), monthly = Math.max(0, +$('#cc-month').value || 0);
+  const rate = (+$('#cc-rate').value || 0) / 100, fee = Math.max(0, +$('#cc-fee').value || 0) / 100;
+  const years = Math.min(60, Math.max(1, Math.round(+$('#cc-years').value || 1)));
+  const r = (1 + rate) ** (1 / 12) * (1 - fee) ** (1 / 12) - 1;
+  const rows = [{ y: 0, value: start, paid: start, fees: 0 }];
+  let v = start, paid = start, fees = 0;
+  for (let m = 1; m <= years * 12; m++) {
+    v += monthly; paid += monthly;
+    const gross = v * ((1 + rate) ** (1 / 12) - 1), net = v * r;
+    fees += gross - net; v += net;
+    if (m % 12 === 0) rows.push({ y: m / 12, value: v, paid, fees });
+  }
+  const last = rows.at(-1), gain = last.value - last.paid;
+  const doubleIn = rate > 0 ? Math.log(2) / Math.log(1 + rate) : null;
+  $('#cc-out').innerHTML = `
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${kr(last.value)}</b><span>slutvärde efter ${years} år</span></div>
+      <div class="stat"><b class="num">${kr(last.paid)}</b><span>insatt totalt</span></div>
+      <div class="stat"><b class="num ${gain >= 0 ? 'pos' : 'neg'}">${gain >= 0 ? '+' : ''}${kr(gain)}</b><span>avkastning (ränta på ränta)</span></div>
+      <div class="stat"><b class="num">${fee > 0 ? kr(last.fees) : doubleIn ? `${doubleIn.toFixed(1).replace('.', ',')} år` : '–'}</b><span>${fee > 0 ? 'betalt i avgifter' : 'tills startbeloppet fördubblats'}</span></div>
+    </div>
+    <div class="calc-chart" id="cc-chart"></div>
+    <div class="calc-legend"><span><i class="lg-paid-box"></i>Insatt</span><span><i class="lg-band"></i>Avkastning</span></div>
+    <details class="fold-in"><summary>Visa år för år</summary>
+      <table class="cc-table"><tr><th>År</th><th class="r">Insatt</th><th class="r">Avkastning</th><th class="r">Värde</th></tr>
+      ${rows.slice(1).map(x => `<tr><td>${x.y}</td><td class="r num">${kr(x.paid)}</td><td class="r num">${kr(x.value - x.paid)}</td><td class="r num"><b>${kr(x.value)}</b></td></tr>`).join('')}</table>
+    </details>
+    <p class="muted small">Räknat med samma avkastning varje år och sparande i början av varje månad. Verkligheten svänger: börsen har gått upp ungefär 7–9 % om året i snitt över lång tid, men med år på −30 % emellan. Skatt (till exempel ISK) ingår inte.</p>`;
+  drawCompound(rows);
+}
+function drawCompound(rows) {
+  const el = $('#cc-chart'), W = Math.max(300, Math.round(el.clientWidth || 640)), H = W < 500 ? 220 : 280, L = 60, Rm = 12, T = 12, B = 26;
+  const n = rows.length - 1, top = Math.max(...rows.map(r => r.value), 1) * 1.05;
+  const x = i => L + (W - L - Rm) * i / n, y = v => T + (H - T - B) * (1 - Math.max(0, v) / top);
+  const path = fn => rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(fn(r)).toFixed(1)}`).join('');
+  const area = (hi, lo) => path(hi) + rows.slice().reverse().map((r, k) => `L${x(n - k).toFixed(1)},${y(lo(r)).toFixed(1)}`).join('') + 'Z';
+  const ticks = [0, .25, .5, .75, 1].map(f => top / 1.05 * f), step = n > 30 ? 10 : n > 12 ? 5 : n > 6 ? 2 : 1;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Värdet år för år">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${krShort(v)}</text>`).join('')}
+    ${rows.filter(r => r.y % step === 0).map(r => `<text x="${x(r.y)}" y="${H - 8}" class="ax" text-anchor="middle">${r.y ? r.y + ' år' : 'nu'}</text>`).join('')}
+    <path d="${area(r => r.paid, () => 0)}" class="paid-area"/>
+    <path d="${area(r => r.value, r => Math.min(r.paid, r.value))}" class="band2"/>
+    <path d="${path(r => r.value)}" class="med"/>
+    <line id="cc-hair" y1="${T}" y2="${H - B}" class="hair" visibility="hidden"/>
+  </svg><div class="calc-tip" id="cc-tip" hidden></div>`;
+  const svg = el.querySelector('svg'), tip = $('#cc-tip'), hair = $('#cc-hair');
+  svg.addEventListener('pointermove', ev => {
+    const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) / rc.width * W;
+    const i = Math.max(0, Math.min(n, Math.round((px - L) / (W - L - Rm) * n))), r = rows[i];
+    hair.setAttribute('x1', x(i)); hair.setAttribute('x2', x(i)); hair.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<div class="muted">${i ? i + ' år' : 'nu'}</div><div><i class="lg-line"></i><b>${kr(r.value)}</b> värde</div>
+      <div><i class="lg-band"></i><b>${kr(r.value - r.paid)}</b> avkastning</div><div><i class="lg-paid-box"></i><b>${kr(r.paid)}</b> insatt</div>`;
+    tip.hidden = false; tip.style.left = Math.min(x(i) / W * rc.width + 12, rc.width - tip.offsetWidth - 4) + 'px';
+  });
+  svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
+}
+
 // Ränta på ränta med strategin: tusentals möjliga framtider dragna ur de
 // verkliga affärerna i tioårstestet, i stället för en jämn kurva.
 let trades10y = null;
@@ -702,11 +788,11 @@ const CALC_COST_R = 0.05; // courtage och spread per affär, uppskattat
 $('#cx-start').value = store.get('acct', '10000');
 $('#cx-risk').value = store.get('risk', '6');
 for (const id of ['cx-start', 'cx-month', 'cx-risk', 'cx-years', 'cx-rate']) $('#' + id).addEventListener('input', () => runCalc());
-$('#calc-box').addEventListener('toggle', async e => {
-  if (!e.target.open || trades10y) return;
+async function loadStrategyCalc() {
+  if (trades10y) { runCalc(); return; }
   $('#calc-out').innerHTML = '<div class="loading">Hämtar affärerna…</div>';
   try { trades10y = await (await fetch('/api/trades10y')).json(); runCalc(); } catch { $('#calc-out').innerHTML = '<p class="muted">Kunde inte hämta affärerna.</p>'; }
-});
+}
 const kr = v => Math.round(v).toLocaleString('sv-SE') + ' kr';
 const krShort = v => v >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mn' : v >= 1e4 ? Math.round(v / 1000) + ' tkr' : Math.round(v).toLocaleString('sv-SE');
 function runCalc() {

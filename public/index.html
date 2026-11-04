@@ -56,49 +56,18 @@
       </section>
 
       <section class="view" id="v-more" hidden>
-        <div class="panel-box">
-          <h3>Mitt konto</h3>
-          <div class="sizing">
-            <label>Kontots värde <span><input id="acct" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
-            <label>Risk per affär <span><input id="risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
-            <label>Kontots högsta värde <span><input id="peak" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
-          </div>
-          <div id="dd-rule" class="dd-rule"></div>
-          <p class="muted small">Används för att räkna ut hur mycket du ska köpa för. En förlust vid stopp blir risken × kontot × riskfaktorerna × nedgångsregeln. Backtestet 2017–2026 använde 6–8 % grundrisk.</p>
-        </div>
-        <div class="panel-box">
-          <h3>Kalender, 60 dagar</h3>
-          <div id="calendar"><div class="loading">Hämtar rapportdatum och makrobesked…</div></div>
-        </div>
-        <details class="panel-box fold" id="calc-box">
-          <summary>Ränta på ränta med strategin</summary>
-          <div class="calc-in">
-            <label>Startkapital <span><input id="cx-start" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
-            <label>Sparande per månad <span><input id="cx-month" type="number" min="0" step="500" inputmode="numeric" value="0"> kr</span></label>
-            <label>Risk per affär <span><input id="cx-risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
-            <label>Antal år <span><input id="cx-years" type="number" min="1" max="20" step="1" inputmode="numeric" value="5"> år</span></label>
-            <label>Jämför med fast ränta <span><input id="cx-rate" type="number" min="0" max="30" step="0.5" inputmode="decimal" value="7"> %</span></label>
-          </div>
-          <div id="calc-out"></div>
-        </details>
-        <div class="panel-box">
-          <h3>Fungerar systemet?</h3>
-          <div id="summary" class="summary muted">Räknar backtest…</div>
-          <div id="normal-body" class="muted small">Laddar…</div>
-        </div>
-        <details class="panel-box fold" id="shorts-box">
-          <summary>Blankning (AI) <span class="tag">experimentell</span></summary>
-          <div id="shorts"><div class="loading">Hämtar…</div></div>
-        </details>
-        <details class="panel-box fold">
-          <summary>Börsnyheter och geopolitik</summary>
-          <div id="news-body" class="muted">Laddar…</div>
-        </details>
-        <div class="panel-box">
-          <h3>Om appen</h3>
-          <p class="muted small">Automatiska signaler från historiska kurser (Yahoo Finance, cirka 15 minuter fördröjda). Inte investeringsrådgivning.
-            <a href="#" id="show-terms">Läs ansvarsfriskrivningen</a></p>
-        </div>
+        <nav class="menu" aria-label="Verktyg och inställningar">
+          <div class="menu-head">Verktyg</div>
+          <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
+          <button class="menu-item" data-tool="compound"><span class="mi-ico">％</span><span><b>Ränta på ränta</b><small>Vanlig kalkylator med fast avkastning</small></span></button>
+          <button class="menu-item" data-tool="strategy"><span class="mi-ico">📈</span><span><b>Ränta på ränta med strategin</b><small>Möjliga utfall med appens riktiga affärer</small></span></button>
+          <div class="menu-head">Inställningar och statistik</div>
+          <button class="menu-item" data-tool="account"><span class="mi-ico">👤</span><span><b>Mitt konto</b><small>Kontots värde och risk per affär</small></span></button>
+          <button class="menu-item" data-tool="system"><span class="mi-ico">✓</span><span><b>Fungerar systemet?</b><small>Backtest mot verkligt utfall</small></span></button>
+          <button class="menu-item" data-tool="shorts"><span class="mi-ico">↘</span><span><b>Blankning (AI)</b><small>Experimentell, mäts framåt</small></span></button>
+          <button class="menu-item" data-tool="news"><span class="mi-ico">📰</span><span><b>Börsnyheter</b><small>Börsen, krig och geopolitik</small></span></button>
+          <button class="menu-item" data-tool="about"><span class="mi-ico">ⓘ</span><span><b>Om appen</b><small>Datakällor och ansvarsfriskrivning</small></span></button>
+        </nav>
       </section>
     </aside>
 
@@ -152,6 +121,82 @@
         investeringsrådgivning. Historiskt resultat är ingen garanti för framtiden. Använd alltid stoppnivån och anpassa
         positionsstorleken så att en förlust på 1 R är en förlust du har råd med.
       </p>
+    </section>
+
+    <section class="toolpage" id="toolpage">
+      <div class="detail-head">
+        <button class="btn back tool-back" id="tool-back" aria-label="Tillbaka till menyn">‹</button>
+        <h1 id="tool-title">–</h1>
+      </div>
+
+      <div class="tool" data-tool="calendar" data-title="Kalender">
+        <div class="tool-grid">
+          <article class="card"><h3>Kommande 60 dagar</h3><div id="calendar"><div class="loading">Hämtar rapportdatum och makrobesked…</div></div></article>
+          <article class="card"><h3>Senaste makroutfall</h3><div id="outcomes"><div class="loading">Hämtar…</div></div></article>
+        </div>
+      </div>
+
+      <div class="tool" data-tool="compound" data-title="Ränta på ränta" hidden>
+        <article class="card tool-card">
+          <div class="calc-in">
+            <label>Startbelopp <span><input id="cc-start" type="number" min="0" step="1000" inputmode="numeric" value="10000"> kr</span></label>
+            <label>Sparande per månad <span><input id="cc-month" type="number" min="0" step="100" inputmode="numeric" value="1000"> kr</span></label>
+            <label>Avkastning per år <span><input id="cc-rate" type="number" min="-20" max="50" step="0.5" inputmode="decimal" value="7"> %</span></label>
+            <label>Antal år <span><input id="cc-years" type="number" min="1" max="60" step="1" inputmode="numeric" value="10"> år</span></label>
+            <label>Avgift per år <span><input id="cc-fee" type="number" min="0" max="5" step="0.1" inputmode="decimal" value="0"> %</span></label>
+          </div>
+          <div id="cc-out"></div>
+        </article>
+      </div>
+
+      <div class="tool" data-tool="strategy" data-title="Ränta på ränta med strategin" hidden>
+        <article class="card tool-card">
+          <div class="calc-in">
+            <label>Startkapital <span><input id="cx-start" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+            <label>Sparande per månad <span><input id="cx-month" type="number" min="0" step="500" inputmode="numeric" value="0"> kr</span></label>
+            <label>Risk per affär <span><input id="cx-risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
+            <label>Antal år <span><input id="cx-years" type="number" min="1" max="20" step="1" inputmode="numeric" value="5"> år</span></label>
+            <label>Jämför med fast ränta <span><input id="cx-rate" type="number" min="0" max="30" step="0.5" inputmode="decimal" value="7"> %</span></label>
+          </div>
+          <div id="calc-out"></div>
+        </article>
+      </div>
+
+      <div class="tool" data-tool="account" data-title="Mitt konto" hidden>
+        <article class="card tool-card">
+          <div class="sizing">
+            <label>Kontots värde <span><input id="acct" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+            <label>Risk per affär <span><input id="risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
+            <label>Kontots högsta värde <span><input id="peak" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+          </div>
+          <div id="dd-rule" class="dd-rule"></div>
+          <p class="muted small">Används för att räkna ut hur mycket du ska köpa för. En förlust vid stopp blir risken × kontot × riskfaktorerna × nedgångsregeln. Backtestet 2017–2026 använde 6–8 % grundrisk.</p>
+        </article>
+      </div>
+
+      <div class="tool" data-tool="system" data-title="Fungerar systemet?" hidden>
+        <article class="card tool-card">
+          <div id="summary" class="summary muted">Räknar backtest…</div>
+          <div id="normal-body" class="muted small">Laddar…</div>
+        </article>
+      </div>
+
+      <div class="tool" data-tool="shorts" data-title="Blankning (AI)" hidden>
+        <article class="card tool-card"><div id="shorts"><div class="loading">Hämtar…</div></div></article>
+      </div>
+
+      <div class="tool" data-tool="news" data-title="Börsnyheter" hidden>
+        <article class="card tool-card"><div id="news-body" class="muted">Laddar…</div></article>
+      </div>
+
+      <div class="tool" data-tool="about" data-title="Om appen" hidden>
+        <article class="card tool-card">
+          <p>Signalerna tas fram automatiskt från historiska kurser och offentlig data. Kurser från Yahoo Finance (cirka 15 minuter fördröjda),
+            hävstångspapper från Avanza, makrodata från FRED, Riksbanken och SCB, blankningsregistret från Finansinspektionen och nyheter från Google Nyheter.</p>
+          <p class="muted">Inte investeringsrådgivning. Historiska resultat är ingen garanti för framtiden.</p>
+          <button class="btn" id="show-terms">Läs ansvarsfriskrivningen</button>
+        </article>
+      </div>
     </section>
   </main>
 

@@ -802,7 +802,9 @@ räknas i R under Släppta signaler. Efter 20–30 stängda blankningar går det
 om metoden har en fördel. Förlorar den, ska den stängas av.
 
 ### Ränta på ränta och kalender
-Under **Mer** finns en kalkylator för ränta på ränta som räknar med strategins egna affärer i stället för en fast ränta: 2 000
+**Mer** är en meny där varje verktyg har en egen sida (på datorn i ytan till höger): kalender, vanlig ränta på ränta (fast avkastning, månadssparande och avgift), ränta på ränta med strategin, Mitt konto, Fungerar systemet?, Blankning (AI), börsnyheter och Om appen.
+
+Där finns också en kalkylator för ränta på ränta som räknar med strategins egna affärer i stället för en fast ränta: 2 000
 slumpade framtider dragna ur de 365 affärerna i tioårstestet (de bolag som var med i OMXS30 på signaldagen, cirka 41 affärer
 om året, 0,05 R i avgifter per affär). Den visar normalt, dåligt och bra utfall, nedgångar på vägen och jämför med en fast
 ränta. Kalendern visar rapporter, makrobesked (Fed, Riksbanken, ECB, svensk KPIF, amerikansk KPI, PCE, jobb, BNP och detaljhandel) och säljdagar 60 dagar framåt, med förra utfallet vid varje makrobesked och en tabell med de senaste utfallen (FRED, Riksbanken och SCB; analytikernas förväntningar finns inte gratis), med dina öppna affärer markerade, och under
