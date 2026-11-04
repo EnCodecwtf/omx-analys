@@ -118,7 +118,7 @@ function renderShorts() {
     const nw = r.news?.neg?.length ? `<div class="s-sub">Negativa rubriker</div><ul>${r.news.neg.map(h => `<li><a href="${esc(h.link)}" target="_blank" rel="noopener">${esc(h.title)}</a> <span class="muted">${esc(h.source)}</span></li>`).join('')}</ul>` : '';
     const an = r.analysts ? `<div class="muted" style="font-size:12px">Analytiker: ${n(r.analysts.n)} st · riktkurs ${fmt(r.analysts.target)} · snittråd ${n(r.analysts.recMean?.toFixed(1))} (1 köp – 5 sälj)${r.short ? ` · blankat ${n(r.short.pct)} %` : ''}</div>` : '';
     return `<details class="row s-row"><summary>
-      <div class="name">${esc(r.name)} ${r.inTrade ? '<span class="badge avoid">I AFFÄR</span>' : SHORT_BADGE[r.status]}${r.preliminary && r.status === 'short' ? ' <span class="tag">preliminär</span>' : ''}</div>
+      <div class="name">${esc(r.name)} ${r.inTrade ? `<span class="badge avoid">I AFFÄR</span>${r.inTrade.hit ? ` <span class="tp-chip hit">TP${r.inTrade.hit} ✓</span>` : ''}` : SHORT_BADGE[r.status]}${r.preliminary && r.status === 'short' ? ' <span class="tag">preliminär</span>' : ''}</div>
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${n(r.changePct)} %</div></div></div>
       <div class="meta"><span>Poäng ${r.score}</span><span>Analytiker ${r.analyst}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing.length ? `<span class="${r.missing.length === 1 ? 'near' : ''}">${r.missing.length} krav kvar: ${r.missing.map(k => SHORT_KEY[k] || k).join(', ')}</span>` : ''}</div>
@@ -189,11 +189,11 @@ function renderScan() {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
     const up = r.changePct >= 0;
     return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
-      <div class="name">${esc(r.name)} ${r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>` : badge(r.status)}${!r.inTrade && r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
+      <div class="name">${esc(r.name)} ${r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>${r.inTrade.hit ? ` <span class="tp-chip hit">TP${r.inTrade.hit} ✓</span>` : ''}` : badge(r.status)}${!r.inTrade && r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
       <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
         <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
       </div>
-      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && !isSignal(r) ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
+      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && !isSignal(r) && !r.inTrade ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
     </div>`;
   }).join('') + (visible.length <= (filter === 'crypto' || filter === 'us' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
   for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
@@ -322,7 +322,7 @@ function renderSignalCards(d) {
       <tr><th></th><th class="r">Nivå</th><th class="r">Avstånd</th><th class="r">R</th></tr>
       <tr class="plan-row"><td>Köp</td><td class="r num">${fmt(pl.entry)}</td><td class="r num">–</td><td class="r">–</td></tr>
       <tr class="plan-row sl"><td>Stopp${pl.frozen && pl.hit >= 2 ? '<div class="why">Flyttat till köpkursen efter TP2</div>' : ''}</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
-      ${pl.tps.map((t, k) => `<tr class="plan-row tp"><td>TP${k + 1}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
+      ${pl.tps.map((t, k) => `<tr class="plan-row tp${pl.frozen && k < pl.hit ? ' hit' : ''}"><td>TP${k + 1}${pl.frozen && k < pl.hit ? ' ✓' : ''}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
     </table>
     <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP2 är nådd.
     TP1 ligger på närmaste nivå 0,5–1,2 R bort och TP2 på nästa nivå upp till 2 R, för att målen ska nås ofta.
@@ -527,6 +527,8 @@ function renderNormal() {
 // Alla släppta signaler på ett ställe: OMX, USA, krypto och panikvecka.
 // Öppna affärer överst, sedan avslutade, nyast först.
 let logData = null;
+// Målen med bock och grön färg när de är nådda.
+const tpChips = (tps, hit = 0) => tps.map((p, k) => `<span class="tp-chip${k < hit ? ' hit' : ''}" title="${k < hit ? 'Nådd' : 'Inte nådd än'}">TP${k + 1} ${fmt(p)}${k < hit ? ' ✓' : ''}</span>`).join(' ');
 const KIND = e => e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
 function renderReleased() {
   const list = $('#scan-list');
@@ -538,7 +540,7 @@ function renderReleased() {
     : e.r != null ? `<span>${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>` : '–';
   const plan = e => e.kind === 'panic' || e.kind === 'crypto'
     ? `Köp ${e.entry ? fmt(e.entry) : 'på öppningen'} · säljdag ${esc(e.exitDate || '–')}`
-    : `${e.kind === 'short' ? 'Blanka' : 'Köp'} ${e.entry ? fmt(e.entry) : fmt(e.close)} · stopp ${fmt(e.stop)} · TP ${e.tps.map(fmt).join(' / ')}`;
+    : `${e.kind === 'short' ? 'Blanka' : 'Köp'} ${e.entry ? fmt(e.entry) : fmt(e.close)} · ${(e.hit || 0) >= 2 ? `stopp flyttat till ${e.entry ? fmt(e.entry) : 'köpkursen'}` : `stopp ${fmt(e.stop)}`} · ${tpChips(e.tps, e.hit)}`;
   const head = `<div class="us-head"><b>Släppta signaler</b> <span class="muted">(${logData.stats.n} st, ${logData.stats.open} öppna)</span>
     <div class="muted" style="font-size:12px;margin-top:4px">Alla köpsignaler som har gått ut, med frysta nivåer och utfall räknat med samma regler som backtestet.</div></div>`;
   list.innerHTML = head + (es.length ? es.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">

@@ -303,7 +303,7 @@ export class PriceChart {
       const pl = A.plan;
       line(pl.stop, C.down, 'SL', [4, 3]);
       line(pl.entry, C.blue, 'IN');
-      pl.tps.forEach((t, k) => line(t.price, C.up, `TP${k + 1}`, [6, 3]));
+      pl.tps.forEach((t, k) => line(t.price, C.up, `TP${k + 1}${k < (pl.hit || 0) ? ' ✓' : ''}`, k < (pl.hit || 0) ? [] : [6, 3]));
     }
     ctx.restore();
 
