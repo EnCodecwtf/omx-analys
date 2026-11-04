@@ -41,6 +41,9 @@ export class PriceChart {
   }
 
   setLayer(name, on) { this.layers[name] = on; this.draw(); }
+  // Köp-, stopp- och mållinjer ritas bara vid en signal eller en öppen affär,
+  // så att grafen inte ser ut att ha en signal när den inte har det.
+  showPlan(A) { return A.plan && (A.plan.frozen || A.status === 'strong' || A.status === 'buy'); }
 
   resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -125,7 +128,7 @@ export class PriceChart {
     let lo = Infinity, hi = -Infinity;
     for (let i = i0; i <= i1; i++) { lo = Math.min(lo, bars[i][3]); hi = Math.max(hi, bars[i][2]); }
     if (!isFinite(lo)) return;
-    if (this.layers.plan && A.plan && i1 >= this.n - 1) {
+    if (this.layers.plan && this.showPlan(A) && i1 >= this.n - 1) {
       lo = Math.min(lo, A.plan.stop);
       hi = Math.max(hi, A.plan.tps[0].price);
     }
@@ -292,7 +295,7 @@ export class PriceChart {
 
     // Handelsplan
     const axisTags = [];
-    if (this.layers.plan && A.plan) {
+    if (this.layers.plan && this.showPlan(A)) {
       const x1 = this.x(this.n - 1);
       const line = (price, col, label, dash) => {
         const y = this.y(price);

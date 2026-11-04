@@ -308,7 +308,7 @@ function renderDetail(d) {
   const prev = d.bars[d.bars.length - 2]?.[4], ch = prev ? (A.price / prev - 1) * 100 : null;
   $('#d-name').innerHTML = `${esc(d.name)} <span class="d-price num">${fmt(A.price)}</span>${ch == null ? '' : ` <span class="d-ch ${ch >= 0 ? 'pos' : 'neg'}">${ch >= 0 ? '+' : ''}${ch.toFixed(2).replace('.', ',')} %</span>`}`;
   $('#d-sub').innerHTML = `${esc(d.symbol)} · ${lastT} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
-  $('#d-badge').innerHTML = d.inTrade ? '<span class="badge strong big">I AFFÄR</span>' : A.status === 'neutral' ? '' : badge(A.status, true);
+  $('#d-badge').innerHTML = d.inTrade ? '<span class="badge strong big">I AFFÄR</span>' : A.status === 'strong' || A.status === 'buy' ? badge(A.status, true) : '<span class="badge neutral big">INGEN SIGNAL</span>';
   chart.setData(d);
 
   if (d.isCrypto) renderCryptoCards(d);
@@ -335,7 +335,7 @@ function renderSignalCards(d) {
   const verdict = d.inTrade ? '' : active0
     ? `<div class="verdict go"><b>${A.status === 'strong' ? 'Stark köpsignal' : 'Köpsignal'}</b><span>${esc(explain)}</span></div>`
     : `<div class="verdict"><b>Ingen signal${A.checklist?.length ? ` – ${A.checklist.length - missing.length} av ${A.checklist.length} krav uppfyllda` : ''}</b>
-      <span>${missing.length ? `Saknas: ${missing.map(c => esc(c.text.toLowerCase())).join(', ')}.` : esc(explain)}</span></div>`;
+      <span>${missing.length ? `Saknas: ${missing.map(c => esc(c.text[0].toLowerCase() + c.text.slice(1))).join(', ')}.` : esc(explain)}</span></div>`;
   const trade = d.inTrade ? (logData?.entries || []).find(e => isLive(e) && e.symbol === d.symbol && !e.kind) : null;
   $('#c-signal').innerHTML = d.inTrade
     ? `<h3>Din affär</h3>${trade ? tradeCard(trade) : `<p>Öppen affär från signalen ${esc(d.inTrade.date)}.</p>`}
@@ -360,14 +360,17 @@ function renderSignalCards(d) {
 
   // Handelsplan
   const active = A.status === 'strong' || A.status === 'buy';
-  $('#c-plan').innerHTML = `<h3>Handelsplan ${pl.frozen ? `<span class="muted">(öppen affär från ${esc(pl.frozen)}${pl.hit ? `, TP${pl.hit} nådd` : ''})</span>` : active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
-    <table>
+  const planTable = `<table>
       <tr><th></th><th class="r">Nivå</th><th class="r">Avstånd</th><th class="r">R</th></tr>
       <tr class="plan-row"><td>Köp</td><td class="r num">${fmt(pl.entry)}</td><td class="r num">–</td><td class="r">–</td></tr>
       <tr class="plan-row sl"><td>Stopp${pl.frozen && pl.hit >= 2 ? '<div class="why">Flyttat till köpkursen efter TP2</div>' : ''}</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
       ${pl.tps.map((t, k) => `<tr class="plan-row tp${pl.frozen && k < pl.hit ? ' hit' : ''}"><td>TP${k + 1}${pl.frozen && k < pl.hit ? ' ✓' : ''}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
     </table>
     <p class="muted small" style="margin-top:10px">Sälj en tredjedel vid varje mål och flytta stoppet till köpkursen när TP2 är nådd.</p>`;
+  $('#c-plan').innerHTML = pl.frozen || active
+    ? `<h3>Handelsplan ${pl.frozen ? `<span class="muted">(öppen affär från ${esc(pl.frozen)}${pl.hit ? `, TP${pl.hit} nådd` : ''})</span>` : ''}</h3>${planTable}`
+    : `<h3>Handelsplan</h3><p class="muted small">Ingen signal, så ingen plan att följa. Planen och linjerna i grafen visas när en signal kommer.</p>
+      <details class="fold-in"><summary>Visa möjlig plan om en signal skulle komma idag</summary>${planTable}</details>`;
 
   loadProducts(d.symbol, d.inTrade ? 'trade' : A.status);
 }
