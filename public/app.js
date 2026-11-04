@@ -691,7 +691,22 @@ function calRow(e) {
   const tags = [e.open ? '<span class="tp-chip hit">Din affär</span>' : '', e.near ? '<span class="tp-chip">Nära signal</span>' : '',
     e.estimated ? '<span class="muted small">uppskattat</span>' : '', e.scored ? '<span class="muted small">påverkar makropoängen veckan före</span>' : ''].filter(Boolean).join(' ');
   return `<li class="cal-row${e.open ? ' mine' : ''}"${e.symbol ? ` data-symbol="${esc(e.symbol)}"` : ''}><span class="cal-date num">${dayName(e.date)}</span>
-    <span class="cal-what">${what} ${tags}<span class="muted small cal-in">${inDays(e.days)}${e.last ? ` · förra: ${esc(e.last.text)}${e.last.period ? ` (${esc(e.last.period)})` : ''}` : ''}</span></span></li>`;
+    <span class="cal-what">${what} ${tags}${e.fedwatch ? `<span class="small cal-in">Marknaden: ${fwText(e.fedwatch)}</span>` : ''}<span class="muted small cal-in">${inDays(e.days)}${e.last ? ` · förra: ${esc(e.last.text)}${e.last.period ? ` (${esc(e.last.period)})` : ''}` : ''}</span></span></li>`;
+}
+// Sannolikheterna i ord, störst först.
+const fwText = m => [['höjning', m.hike], ['oförändrat', m.hold], ['sänkning', m.cut]].filter(x => x[1] >= 0.5).sort((a, b) => b[1] - a[1])
+  .map(([t, p]) => `${String(Math.round(p)).replace('.', ',')} % ${t}`).join(', ');
+function renderFedWatch(fw) {
+  const el = $('#fedwatch');
+  if (!fw?.meetings?.length) { el.innerHTML = '<p class="muted small">Kunde inte räknas just nu.</p>'; return; }
+  const seg = (p, cls, label) => p >= 0.5 ? `<span class="fw-seg ${cls}" style="width:${p}%" title="${label} ${Math.round(p)} %">${p >= 12 ? `${Math.round(p)} %` : ''}</span>` : '';
+  el.innerHTML = `<p class="small" style="margin-top:0">Styrräntan nu: <b>${esc(fw.now.range)}</b> <span class="muted">(effektiv ${String(fw.now.effr).replace('.', ',')} %)</span></p>
+    ${fw.meetings.map(m => `<div class="fw-row"><div class="fw-head"><span>${dayName(m.date)}</span><span class="muted small">väntad ränta ${m.expected.toFixed(2).replace('.', ',')} %</span></div>
+      <div class="fw-bar">${seg(m.cut, 'cut', 'Sänkning')}${seg(m.hold, 'hold', 'Oförändrat')}${seg(m.hike, 'hike', 'Höjning')}</div>
+      <div class="small">${fwText(m)}</div>
+      <div class="muted small">${m.dist.map(d => `${esc(d.range)}: ${String(d.p).replace('.', ',')} %`).join(' · ')}</div></div>`).join('')}
+    <div class="calc-legend" style="margin-top:8px"><span><i class="fw-key cut"></i>Sänkning</span><span><i class="fw-key hold"></i>Oförändrat</span><span><i class="fw-key hike"></i>Höjning</span></div>
+    <p class="muted small" style="margin-top:6px">Jämfört med räntan idag. Räknat ungefär som CME FedWatch ur terminerna på Feds styrränta (Yahoo Finance). Det är marknadens bedömning, inte en prognos från Fed, och den kan ändras snabbt efter till exempel inflations- eller jobbsiffror.</p>`;
 }
 function renderCalendar() {
   const el = $('#calendar');
@@ -700,6 +715,7 @@ function renderCalendar() {
   const list = calData.events.filter(e => calAll || important(e));
   const hidden = calData.events.length - calData.events.filter(important).length;
   const outs = calData.outcomes || [];
+  renderFedWatch(calData.fedwatch);
   el.innerHTML = (list.length ? `<ul class="cal">${list.map(calRow).join('')}</ul>` : '<p class="muted small">Inget inplanerat.</p>')
     + (hidden ? `<button class="btn small-btn" id="cal-all">${calAll ? 'Visa bara viktiga' : `Visa alla rapporter (${hidden} till)`}</button>` : '')
     + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>';

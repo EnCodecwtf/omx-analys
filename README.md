@@ -807,7 +807,7 @@ om metoden har en fördel. Förlorar den, ska den stängas av.
 Där finns också en kalkylator för ränta på ränta som räknar med strategins egna affärer i stället för en fast ränta: 2 000
 slumpade framtider dragna ur de 365 affärerna i tioårstestet (de bolag som var med i OMXS30 på signaldagen, cirka 41 affärer
 om året, 0,05 R i avgifter per affär). Den visar normalt, dåligt och bra utfall, nedgångar på vägen och jämför med en fast
-ränta. Kalendern visar rapporter, makrobesked (Fed, Riksbanken, ECB, svensk KPIF, amerikansk KPI, PCE, jobb, BNP och detaljhandel) och säljdagar 60 dagar framåt, med förra utfallet vid varje makrobesked och en tabell med de senaste utfallen (FRED, Riksbanken och SCB; analytikernas förväntningar finns inte gratis), med dina öppna affärer markerade, och under
+ränta. Kalendern visar rapporter, makrobesked (Fed, Riksbanken, ECB, svensk KPIF, amerikansk KPI, PCE, jobb, BNP och detaljhandel) och säljdagar 60 dagar framåt, med FedWatch (marknadens sannolikheter för Feds kommande räntebesked, räknade som CME FedWatch ur terminerna på Feds styrränta från Yahoo), förra utfallet vid varje makrobesked och en tabell med de senaste utfallen (FRED, Riksbanken och SCB; analytikernas förväntningar finns inte gratis), med dina öppna affärer markerade, och under
 Idag syns rapporter för öppna affärer inom 10 handelsdagar.
 
 ### Nyheter
