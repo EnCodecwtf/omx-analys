@@ -233,7 +233,7 @@ function renderCryptoCards(d) {
     <p class="muted" style="font-size:12px">En annan strategi än OMX-signalerna: köp styrka i stället för rekyler. Den slog att bara äga
     samma dagar i alla perioder 2017–2026, men svänger mycket: en enskild affär har gått −25 %.</p>`;
   const acct = Math.max(0, +$('#acct').value || 0);
-  $('#c-plan').innerHTML = `<h3>Handelsplan ${active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
+  $('#c-plan').innerHTML = `<h3>Handelsplan ${pl.frozen ? `<span class="muted">(öppen affär från ${esc(pl.frozen)}${pl.hit ? `, TP${pl.hit} nådd` : ''})</span>` : active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
     <dl class="kv">
       <dt>Köp</dt><dd>${active ? `nu, runt <span class="num">${fmt(cs.price)}</span>` : `vid stängning över <span class="num">${fmt(cs.level)}</span>`}</dd>
       <dt>Sälj</dt><dd>${active ? `${esc(cs.exitDate)}, oavsett kurs` : '7 dagar efter köpet, oavsett kurs'}</dd>
@@ -310,11 +310,11 @@ function renderSignalCards(d) {
 
   // Handelsplan
   const active = A.status === 'strong' || A.status === 'buy';
-  $('#c-plan').innerHTML = `<h3>Handelsplan ${active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
+  $('#c-plan').innerHTML = `<h3>Handelsplan ${pl.frozen ? `<span class="muted">(öppen affär från ${esc(pl.frozen)}${pl.hit ? `, TP${pl.hit} nådd` : ''})</span>` : active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
     <table>
       <tr><th></th><th class="r">Nivå</th><th class="r">Avstånd</th><th class="r">R</th></tr>
       <tr class="plan-row"><td>Köp</td><td class="r num">${fmt(pl.entry)}</td><td class="r num">–</td><td class="r">–</td></tr>
-      <tr class="plan-row sl"><td>Stopp</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
+      <tr class="plan-row sl"><td>Stopp${pl.frozen && pl.hit >= 2 ? '<div class="why">Flyttat till köpkursen efter TP2</div>' : ''}</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
       ${pl.tps.map((t, k) => `<tr class="plan-row tp"><td>TP${k + 1}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
     </table>
     <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP2 är nådd.

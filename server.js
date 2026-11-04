@@ -325,7 +325,7 @@ async function markInTrade(rows, kindOf = () => undefined) {
   const slots = await openSlots();
   for (const r of rows) {
     const e = slots.get(signalLog.slotOf(r.symbol, kindOf(r)));
-    if (e && r.t && e.date < dayOf(r.t)) r.inTrade = { date: e.date, entry: e.entry ?? null, state: e.state };
+    if (e && r.t && e.date < dayOf(r.t)) r.inTrade = { date: e.date, entry: e.entry ?? null, state: e.state, stop: e.stop, tps: e.tps, hit: e.hit || 0 };
   }
   return rows;
 }
@@ -438,7 +438,13 @@ async function analysis(symbol) {
     const pick = arr => arr.slice(off).map(v => (v == null ? null : Math.round(v * 100) / 100));
     const bt = await backtestFor(meta, all);
     const [it] = await markInTrade([{ symbol, t: bars[bars.length - 1].t }], () => (meta.isCrypto ? 'crypto' : undefined));
-    if (it.inTrade && (ev.status === 'strong' || ev.status === 'buy')) ev.warnings.unshift(`Du har redan en öppen affär från signalen ${it.inTrade.date}. Ingen ny signal: en affär i taget per aktie. Följ den öppna affärens stopp och mål.`);
+    // Öppen affär: planen visar de frysta nivåerna från signalen, inte dagens beräkning.
+    if (it.inTrade?.tps) {
+      const e = it.inTrade, entry = e.entry ?? e.close, R = entry - e.stop, rd = x => Math.round(x * 100) / 100;
+      ev.warnings.unshift(`Öppen affär från signalen ${e.date}. Stopp och mål är frysta från den signalen. Ingen ny signal: en affär i taget per aktie.`);
+      ev.plan = { ...ev.plan, entry, stop: e.hit >= 2 ? entry : e.stop, riskPct: e.hit >= 2 ? 0 : rd((entry - e.stop) / entry * 100), frozen: e.date, hit: e.hit,
+        tps: e.tps.map((p, k) => ({ price: p, r: rd((p - entry) / R), why: [k < e.hit ? 'Nådd' : `Fryst från signalen ${e.date}`] })) };
+    }
     return {
       inTrade: it.inTrade || null,
       symbol, name: meta.name, isIndex: !!meta.isIndex, isUS: !!meta.isUS, avanzaUrl: avanzaUrl(meta), preliminary: !(meta.isUS ? isFinalUS : isFinal)(bars[bars.length - 1].t),
