@@ -659,6 +659,130 @@ async function loadLog() {
   }
 }
 
+// Kalender: rapporter, makrobesked och säljdagar de kommande 60 dagarna.
+let calData = null, calAll = false;
+const dayName = d => new Date(d + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' });
+const inDays = n => n === 0 ? 'idag' : n === 1 ? 'imorgon' : `om ${n} handelsdagar`;
+function calRow(e) {
+  const what = e.kind === 'report' ? `Rapport: <b>${esc(e.name)}</b>` : e.kind === 'exit' ? `Säljdag: <b>${esc(e.name)}</b>` : `${esc(e.label)}${e.time ? ` <span class="muted">${esc(e.time)}</span>` : ''}`;
+  const tags = [e.open ? '<span class="tp-chip hit">Din affär</span>' : '', e.near ? '<span class="tp-chip">Nära signal</span>' : '',
+    e.estimated ? '<span class="muted small">uppskattat</span>' : '', e.scored ? '<span class="muted small">påverkar makropoängen veckan före</span>' : ''].filter(Boolean).join(' ');
+  return `<li class="cal-row${e.open ? ' mine' : ''}"${e.symbol ? ` data-symbol="${esc(e.symbol)}"` : ''}><span class="cal-date num">${dayName(e.date)}</span>
+    <span class="cal-what">${what} ${tags}<span class="muted small cal-in">${inDays(e.days)}</span></span></li>`;
+}
+function renderCalendar() {
+  const el = $('#calendar');
+  if (!calData) return;
+  const important = e => e.kind !== 'report' || e.open || e.near;
+  const list = calData.events.filter(e => calAll || important(e));
+  const hidden = calData.events.length - calData.events.filter(important).length;
+  el.innerHTML = (list.length ? `<ul class="cal">${list.map(calRow).join('')}</ul>` : '<p class="muted small">Inget inplanerat.</p>')
+    + (hidden ? `<button class="btn small-btn" id="cal-all">${calAll ? 'Visa bara viktiga' : `Visa alla rapporter (${hidden} till)`}</button>` : '')
+    + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>';
+  $('#cal-all')?.addEventListener('click', () => { calAll = !calAll; renderCalendar(); });
+  bindRows(el);
+  // På Idag: rapporter för öppna affärer inom 10 handelsdagar och makrobesked inom 3 dagar.
+  const soon = calData.events.filter(e => (e.open && e.kind === 'report' && e.days <= 10) || (e.kind === 'macro' && e.days <= 3));
+  $('#today-cal').innerHTML = soon.length ? `<h2 class="v-title">Snart</h2><ul class="cal">${soon.map(calRow).join('')}</ul>` : '';
+  bindRows($('#today-cal'));
+}
+async function loadCalendar() {
+  try { calData = await (await fetch('/api/calendar')).json(); renderCalendar(); }
+  catch { $('#calendar').innerHTML = '<p class="muted small">Kunde inte hämta kalendern.</p>'; }
+}
+
+// Ränta på ränta med strategin: tusentals möjliga framtider dragna ur de
+// verkliga affärerna i tioårstestet, i stället för en jämn kurva.
+let trades10y = null;
+const CALC_COST_R = 0.05; // courtage och spread per affär, uppskattat
+$('#cx-start').value = store.get('acct', '10000');
+$('#cx-risk').value = store.get('risk', '6');
+for (const id of ['cx-start', 'cx-month', 'cx-risk', 'cx-years', 'cx-rate']) $('#' + id).addEventListener('input', () => runCalc());
+$('#calc-box').addEventListener('toggle', async e => {
+  if (!e.target.open || trades10y) return;
+  $('#calc-out').innerHTML = '<div class="loading">Hämtar affärerna…</div>';
+  try { trades10y = await (await fetch('/api/trades10y')).json(); runCalc(); } catch { $('#calc-out').innerHTML = '<p class="muted">Kunde inte hämta affärerna.</p>'; }
+});
+const kr = v => Math.round(v).toLocaleString('sv-SE') + ' kr';
+const krShort = v => v >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mn' : v >= 1e4 ? Math.round(v / 1000) + ' tkr' : Math.round(v).toLocaleString('sv-SE');
+function runCalc() {
+  if (!trades10y) return;
+  const start = Math.max(0, +$('#cx-start').value || 0), monthly = Math.max(0, +$('#cx-month').value || 0);
+  const risk = Math.min(10, Math.max(0, +$('#cx-risk').value || 0)) / 100, years = Math.min(20, Math.max(1, Math.round(+$('#cx-years').value || 1)));
+  const rate = Math.max(0, +$('#cx-rate').value || 0) / 100;
+  const R = trades10y.r.map(x => x - CALC_COST_R);
+  const span = (Date.now() - Date.parse(trades10y.from)) / (365.25 * 864e5), perYear = R.length / span, lambda = perYear / 12;
+  const M = years * 12, N = 2000;
+  // Fast slumpfrö så att siffrorna inte hoppar när man skriver.
+  let seed = 12345; const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const poisson = () => { const L = Math.exp(-lambda); let k = 0, p = 1; do { k++; p *= rnd(); } while (p > L); return k - 1; };
+  const cols = Array.from({ length: M + 1 }, () => new Float64Array(N)), dds = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    let eq = start, peak = start, dd = 0; cols[0][i] = eq;
+    for (let m = 1; m <= M; m++) {
+      eq += monthly; peak += monthly;
+      for (let k = poisson(); k > 0; k--) { eq = Math.max(0, eq * (1 + risk * R[Math.floor(rnd() * R.length)])); peak = Math.max(peak, eq); dd = Math.min(dd, peak > 0 ? eq / peak - 1 : 0); }
+      cols[m][i] = eq;
+    }
+    dds[i] = dd;
+  }
+  const q = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(p * arr.length))];
+  const bands = cols.map(c => { const a = Float64Array.from(c).sort(); return { p10: q(a, .1), p25: q(a, .25), p50: q(a, .5), p75: q(a, .75), p90: q(a, .9) }; });
+  const paid = m => start + monthly * m;
+  const fixed = []; let f = start; fixed.push(f); for (let m = 1; m <= M; m++) { f = f * (1 + rate) ** (1 / 12) + monthly; fixed.push(f); }
+  const last = bands[M], sortedDD = Float64Array.from(dds).sort();
+  const below = cols[M].filter(v => v < paid(M)).length / N;
+  $('#calc-out').innerHTML = `
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${kr(last.p50)}</b><span>normalt utfall (median)</span></div>
+      <div class="stat"><b class="num">${kr(last.p10)}</b><span>dåligt (1 av 10 sämre)</span></div>
+      <div class="stat"><b class="num">${kr(last.p90)}</b><span>bra (1 av 10 bättre)</span></div>
+      <div class="stat"><b class="num">${kr(paid(M))}</b><span>insatt totalt</span></div>
+    </div>
+    <div class="calc-chart" id="calc-chart"></div>
+    <div class="calc-legend">
+      <span><i class="lg-band"></i>Strategin, 8 av 10 utfall</span><span><i class="lg-line"></i>Strategin, median</span>
+      <span><i class="lg-fixed"></i>Fast ränta ${(rate * 100).toFixed(1).replace(/\.0$/, '').replace('.', ',')} %</span><span><i class="lg-paid"></i>Insatt</span>
+    </div>
+    <p class="small">På vägen: i hälften av utfallen var kontot som mest <b>${Math.round(-q(sortedDD, .5) * 100)} %</b> under sin topp, och i 1 av 10 utfall <b>${Math.round(-q(sortedDD, .1) * 100)} %</b>.
+      ${below >= 0.005 ? `I ${Math.round(below * 100)} % av utfallen slutade kontot under det insatta beloppet.` : 'Nästan inga utfall slutade under det insatta beloppet.'}</p>
+    <p class="muted small">Räknat på ${R.length} affärer från tioårstestet (${esc(trades10y.from.slice(0, 4))}–${esc(trades10y.to.slice(0, 4))}, de bolag som faktiskt var med i OMXS30), cirka ${Math.round(perYear)} affärer om året,
+      ${String(CALC_COST_R).replace('.', ',')} R i avgifter per affär. Varje affär riskerar ${(risk * 100).toFixed(1).replace(/\.0$/, '').replace('.', ',')} % av kontot vid stopp. ${N.toLocaleString('sv-SE')} slumpade framtider.
+      Ingen skatt, och ingen hänsyn till makrofaktorn eller att flera affärer kan vara öppna samtidigt. Historiska resultat är ingen garanti för framtiden.</p>`;
+  drawCalc(bands, fixed, paid, M);
+}
+function drawCalc(bands, fixed, paid, M) {
+  const el = $('#calc-chart'), W = Math.max(300, Math.round(el.clientWidth || 640)), H = W < 500 ? 220 : 260, L = 56, Rm = 12, T = 12, B = 26;
+  const top = Math.max(bands[M].p90, fixed[M], paid(M)) * 1.05;
+  const x = m => L + (W - L - Rm) * m / M, y = v => T + (H - T - B) * (1 - v / top);
+  const line = (fn) => bands.map((_, m) => `${m ? 'L' : 'M'}${x(m).toFixed(1)},${y(fn(m)).toFixed(1)}`).join('');
+  const area = (lo, hi) => line(m => bands[m][hi]) + bands.map((_, m) => `L${x(M - m).toFixed(1)},${y(bands[M - m][lo]).toFixed(1)}`).join('') + 'Z';
+  const ticks = [0, .25, .5, .75, 1].map(f => top / 1.05 * f);
+  const yrs = M / 12, step = yrs > 10 ? 2 : 1;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kontots utveckling">
+    ${ticks.map(v => `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${krShort(v)}</text>`).join('')}
+    ${Array.from({ length: Math.floor(yrs / step) + 1 }, (_, k) => k * step).map(a => `<text x="${x(a * 12)}" y="${H - 8}" class="ax" text-anchor="middle">${a ? a + ' år' : 'nu'}</text>`).join('')}
+    <path d="${area('p10', 'p90')}" class="band"/><path d="${area('p25', 'p75')}" class="band2"/>
+    <path d="${line(m => paid(m))}" class="paid"/><path d="${line(m => fixed[m])}" class="fixed"/><path d="${line(m => bands[m].p50)}" class="med"/>
+    <line id="cx-hair" y1="${T}" y2="${H - B}" class="hair" visibility="hidden"/>
+    <rect x="${L}" y="${T}" width="${W - L - Rm}" height="${H - T - B}" fill="transparent" id="cx-hit"/>
+  </svg><div class="calc-tip" id="cx-tip" hidden></div>`;
+  const svg = el.querySelector('svg'), tip = $('#cx-tip'), hair = $('#cx-hair');
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    const m = Math.max(0, Math.min(M, Math.round((px - L) / (W - L - Rm) * M)));
+    hair.setAttribute('x1', x(m)); hair.setAttribute('x2', x(m)); hair.setAttribute('visibility', 'visible');
+    const b = bands[m];
+    tip.innerHTML = `<div class="muted">${m < 12 ? m + ' mån' : (m / 12).toFixed(1).replace('.', ',') + ' år'}</div>
+      <div><i class="lg-line"></i><b>${kr(b.p50)}</b> median</div><div><i class="lg-band"></i><b>${kr(b.p10)} – ${kr(b.p90)}</b> 8 av 10</div>
+      <div><i class="lg-fixed"></i><b>${kr(fixed[m])}</b> fast ränta</div><div><i class="lg-paid"></i><b>${kr(paid(m))}</b> insatt</div>`;
+    tip.hidden = false;
+    const left = x(m) / W * r.width; tip.style.left = Math.min(left + 12, r.width - tip.offsetWidth - 4) + 'px';
+  };
+  svg.addEventListener('pointermove', move);
+  svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
+}
+
 async function loadSummary() {
   try {
     const s = await (await fetch('/api/summary')).json();
@@ -678,7 +802,7 @@ async function loadSummary() {
 setView(view);
 loadScan(false);
 loadSummary();
-loadLog();
+loadLog().then(loadCalendar);
 
 // Börsen i Stockholm är öppen vardagar 09.00–17.30. Då uppdateras appen var
 // femte minut, så att signaler, kravlistor och öppna affärer följer kursen live.

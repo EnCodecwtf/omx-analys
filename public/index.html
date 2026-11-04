@@ -38,6 +38,7 @@
       <section class="view" id="v-today">
         <div id="today"><div class="loading">Hämtar och analyserar…</div></div>
         <div id="panic" class="panic" hidden></div>
+        <div id="today-cal"></div>
         <div id="macro" class="macro"></div>
       </section>
 
@@ -65,6 +66,21 @@
           <div id="dd-rule" class="dd-rule"></div>
           <p class="muted small">Används för att räkna ut hur mycket du ska köpa för. En förlust vid stopp blir risken × kontot × riskfaktorerna × nedgångsregeln. Backtestet 2017–2026 använde 6–8 % grundrisk.</p>
         </div>
+        <div class="panel-box">
+          <h3>Kalender, 60 dagar</h3>
+          <div id="calendar"><div class="loading">Hämtar rapportdatum och makrobesked…</div></div>
+        </div>
+        <details class="panel-box fold" id="calc-box">
+          <summary>Ränta på ränta med strategin</summary>
+          <div class="calc-in">
+            <label>Startkapital <span><input id="cx-start" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+            <label>Sparande per månad <span><input id="cx-month" type="number" min="0" step="500" inputmode="numeric" value="0"> kr</span></label>
+            <label>Risk per affär <span><input id="cx-risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
+            <label>Antal år <span><input id="cx-years" type="number" min="1" max="20" step="1" inputmode="numeric" value="5"> år</span></label>
+            <label>Jämför med fast ränta <span><input id="cx-rate" type="number" min="0" max="30" step="0.5" inputmode="decimal" value="7"> %</span></label>
+          </div>
+          <div id="calc-out"></div>
+        </details>
         <div class="panel-box">
           <h3>Fungerar systemet?</h3>
           <div id="summary" class="summary muted">Räknar backtest…</div>

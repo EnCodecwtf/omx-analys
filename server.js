@@ -330,6 +330,30 @@ async function markInTrade(rows, kindOf = () => undefined) {
   return rows;
 }
 
+// Kalender för de kommande 60 dagarna: rapporter för OMXS30-bolagen (markerade
+// om du har en öppen affär eller aktien är nära signal), makrobesked och säljdagar.
+async function calendar() {
+  return cached('calendar', async () => {
+    const from = today(), to = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+    const live = (await withOutcomes()).filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
+    const open = new Set(live.map(e => e.symbol));
+    let rows = [];
+    try { rows = (await scan()).rows; } catch { /* kalendern visas ändå */ }
+    const near = new Set(rows.filter(r => !r.inTrade && r.missing?.length && r.missing.length <= 2).map(r => r.symbol));
+    const days = d => tradingDaysBetween(from, d);
+    const events = [];
+    await mapLimit(symbols.stocks, 6, async s => {
+      const rep = await nextReport(s.symbol).catch(() => null);
+      if (rep && rep.date >= from && rep.date <= to) events.push({ date: rep.date, kind: 'report', symbol: s.symbol, name: s.name, estimated: !!rep.estimated,
+        open: open.has(s.symbol), near: near.has(s.symbol), days: days(rep.date) });
+    });
+    for (const m of upcomingMacro(from, 20)) if (m.date <= to) events.push({ ...m, kind: 'macro', macroKind: m.kind, days: days(m.date) });
+    for (const e of live) if (e.exitDate && (e.kind === 'panic' || e.kind === 'crypto') && e.exitDate >= from) events.push({ date: e.exitDate, kind: 'exit', symbol: e.symbol, name: e.name, open: true, days: days(e.exitDate) });
+    events.sort((a, b) => a.date.localeCompare(b.date) || (b.open - a.open));
+    return { from, to, events };
+  });
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -559,6 +583,9 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh')) cache.delete('shorts');
       return send(res, 200, await shortScan());
     }
+    if (url.pathname === '/api/calendar') return send(res, 200, await calendar());
+    // Affärerna från tioårstestet (R per affär), för kalkylatorn ränta på ränta.
+    if (url.pathname === '/api/trades10y') return send(res, 200, JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'trades-10y.json'), 'utf8')));
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {
       const meta = bySymbol.get(url.searchParams.get('symbol'));

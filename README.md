@@ -801,6 +801,13 @@ Därför sparas varje kandidat i signalloggen med frysta nivåer vid stängninge
 räknas i R under Släppta signaler. Efter 20–30 stängda blankningar går det att se
 om metoden har en fördel. Förlorar den, ska den stängas av.
 
+### Ränta på ränta och kalender
+Under **Mer** finns en kalkylator för ränta på ränta som räknar med strategins egna affärer i stället för en fast ränta: 2 000
+slumpade framtider dragna ur de 365 affärerna i tioårstestet (de bolag som var med i OMXS30 på signaldagen, cirka 41 affärer
+om året, 0,05 R i avgifter per affär). Den visar normalt, dåligt och bra utfall, nedgångar på vägen och jämför med en fast
+ränta. Kalendern visar rapporter, makrobesked och säljdagar 60 dagar framåt, med dina öppna affärer markerade, och under
+Idag syns rapporter för öppna affärer inom 10 handelsdagar.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att

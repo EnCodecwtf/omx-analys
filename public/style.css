@@ -316,3 +316,40 @@ tr:last-child td { border-bottom: 0; }
 .macro details > summary, .macro summary { color: var(--text); }
 #normal-body { overflow-x: auto; }
 .normal-table { font-size: 12px; min-width: 420px; }
+
+/* Kalender */
+ul.cal { list-style: none; margin: 0; padding: 0; }
+.cal-row { display: grid; grid-template-columns: 92px 1fr; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.cal-row:last-child { border-bottom: 0; }
+.cal-row[data-symbol] { cursor: pointer; }
+.cal-row.mine .cal-date { color: var(--green); font-weight: 600; }
+.cal-date { color: var(--text-2); }
+.cal-in { display: block; }
+.small-btn { font-size: 12px; padding: 4px 10px; margin-top: 8px; }
+#today-cal ul.cal { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 2px 12px; }
+
+/* Ränta på ränta */
+.calc-in { display: grid; gap: 8px; margin: 12px 0; }
+.calc-in label { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--text-2); font-size: 13px; }
+.calc-in input { width: 110px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; }
+.calc-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.calc-tiles .stat { background: var(--panel); text-align: left; }
+.calc-tiles .stat b { font-size: 16px; }
+.calc-chart { position: relative; margin: 12px 0 4px; }
+.calc-chart svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.calc-chart .grid { stroke: var(--border); stroke-width: 1; }
+.calc-chart .ax { fill: var(--muted); font-size: 11px; }
+.calc-chart .band { fill: rgba(57,135,229,.16); }
+.calc-chart .band2 { fill: rgba(57,135,229,.22); }
+.calc-chart .med { fill: none; stroke: #3987e5; stroke-width: 2; }
+.calc-chart .fixed { fill: none; stroke: #c98500; stroke-width: 2; stroke-dasharray: 6 4; }
+.calc-chart .paid { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.calc-chart .hair { stroke: var(--text-2); stroke-width: 1; }
+.calc-tip { position: absolute; top: 8px; background: rgba(21,27,35,.95); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 12px; pointer-events: none; white-space: nowrap; }
+.calc-tip div { display: flex; align-items: center; gap: 6px; }
+.calc-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-2); }
+.calc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg-band { display: inline-block; width: 14px; height: 10px; background: rgba(57,135,229,.35); border-radius: 2px; }
+.lg-line, .lg-fixed, .lg-paid { display: inline-block; width: 14px; height: 0; border-top: 2px solid #3987e5; }
+.lg-fixed { border-top: 2px dashed #c98500; }
+.lg-paid { border-top: 2px dashed var(--muted); }
