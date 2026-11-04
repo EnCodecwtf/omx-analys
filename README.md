@@ -1061,7 +1061,7 @@ listan när bolag går in eller ut (Yahoo-symbol med `.ST` på slutet).
    kl. 21.30 UTC (efter USA-börsens stängning). Det fungerar på
    gratisplanen, men körningen kan ske när som helst inom timmen. Nya starka köpsignaler sparas i signalloggen och skickas
    som notis, och dagens mål och stopp för öppna affärer kontrolleras.
-5. **Live under dagen:** Vercels gratisplan tillåter bara en schemalagd körning per dag. Skapa därför ett gratis jobb på
+5. **Live under dagen:** Vercels gratisplan tillåter bara en schemalagd körning per dag. Repot har därför en GitHub Actions-körning (`.github/workflows/live.yml`) som anropar live-kontrollen var 15:e minut vardagar. GitHub kan försena körningarna några minuter. Alternativt kan du skapa ett gratis jobb på
    cron-job.org som anropar `https://<din-app>.vercel.app/api/cron/live?key=<CRON_SECRET>` var 10:e minut vardagar
    09.00–17.40 (tidszon Europe/Stockholm), och lägg samma hemliga nyckel i `CRON_SECRET` i Vercel. Då skickas notis när en
    öppen affär når TP1, TP2, TP3 eller stoppet, på säljdagen för krypto, och 16.30–17.30 en förvarning när en köpsignal
