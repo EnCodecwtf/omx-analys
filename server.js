@@ -17,6 +17,7 @@ import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
+import { macroOutcomes, nextKpifDates, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -347,10 +348,11 @@ async function calendar() {
       if (rep && rep.date >= from && rep.date <= to) events.push({ date: rep.date, kind: 'report', symbol: s.symbol, name: s.name, estimated: !!rep.estimated,
         open: open.has(s.symbol), near: near.has(s.symbol), days: days(rep.date) });
     });
-    for (const m of upcomingMacro(from, 20)) if (m.date <= to) events.push({ ...m, kind: 'macro', macroKind: m.kind, days: days(m.date) });
+    const [kpifDates, outcomes] = await Promise.all([nextKpifDates(), macroOutcomes().catch(() => ({}))]);
+    for (const m of upcomingMacro(from, 40, { kpif: kpifDates })) if (m.date <= to) events.push({ ...m, kind: 'macro', macroKind: m.kind, last: outcomes[m.kind] || null, days: days(m.date) });
     for (const e of live) if (e.exitDate && (e.kind === 'panic' || e.kind === 'crypto') && e.exitDate >= from) events.push({ date: e.exitDate, kind: 'exit', symbol: e.symbol, name: e.name, open: true, days: days(e.exitDate) });
     events.sort((a, b) => a.date.localeCompare(b.date) || (b.open - a.open));
-    return { from, to, events };
+    return { from, to, events, outcomes: OUTCOME_ORDER.map(k => outcomes[k]).filter(Boolean) };
   });
 }
 

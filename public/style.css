@@ -353,3 +353,7 @@ ul.cal { list-style: none; margin: 0; padding: 0; }
 .lg-line, .lg-fixed, .lg-paid { display: inline-block; width: 14px; height: 0; border-top: 2px solid #3987e5; }
 .lg-fixed { border-top: 2px dashed #c98500; }
 .lg-paid { border-top: 2px dashed var(--muted); }
+
+table.outcomes td { font-size: 13px; padding: 7px 4px; }
+table.outcomes td.r { white-space: normal; }
+table.outcomes .arrow { color: var(--text-2); font-size: 10px; }

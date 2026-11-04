@@ -668,7 +668,7 @@ function calRow(e) {
   const tags = [e.open ? '<span class="tp-chip hit">Din affär</span>' : '', e.near ? '<span class="tp-chip">Nära signal</span>' : '',
     e.estimated ? '<span class="muted small">uppskattat</span>' : '', e.scored ? '<span class="muted small">påverkar makropoängen veckan före</span>' : ''].filter(Boolean).join(' ');
   return `<li class="cal-row${e.open ? ' mine' : ''}"${e.symbol ? ` data-symbol="${esc(e.symbol)}"` : ''}><span class="cal-date num">${dayName(e.date)}</span>
-    <span class="cal-what">${what} ${tags}<span class="muted small cal-in">${inDays(e.days)}</span></span></li>`;
+    <span class="cal-what">${what} ${tags}<span class="muted small cal-in">${inDays(e.days)}${e.last ? ` · förra: ${esc(e.last.text)}${e.last.period ? ` (${esc(e.last.period)})` : ''}` : ''}</span></span></li>`;
 }
 function renderCalendar() {
   const el = $('#calendar');
@@ -676,9 +676,13 @@ function renderCalendar() {
   const important = e => e.kind !== 'report' || e.open || e.near;
   const list = calData.events.filter(e => calAll || important(e));
   const hidden = calData.events.length - calData.events.filter(important).length;
+  const outs = calData.outcomes || [];
   el.innerHTML = (list.length ? `<ul class="cal">${list.map(calRow).join('')}</ul>` : '<p class="muted small">Inget inplanerat.</p>')
     + (hidden ? `<button class="btn small-btn" id="cal-all">${calAll ? 'Visa bara viktiga' : `Visa alla rapporter (${hidden} till)`}</button>` : '')
-    + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>';
+    + '<p class="muted small" style="margin-top:8px">Nya köpsignaler spärras om bolaget rapporterar inom 10 handelsdagar. För en öppen affär kan en rapport ge ett stort hopp åt båda hållen.</p>'
+    + (outs.length ? `<h3 style="margin-top:16px">Senaste makroutfall</h3><table class="outcomes">${outs.map(o => `<tr><td>${esc(o.label)}${o.period ? `<div class="muted small">${esc(o.period)}</div>` : ''}</td>
+        <td class="r num"><b>${esc(o.text)}</b> ${o.dir > 0 ? '<span class="arrow">▲</span>' : o.dir < 0 ? '<span class="arrow">▼</span>' : ''}<div class="muted small">${esc(o.detail)}</div></td></tr>`).join('')}</table>
+      <p class="muted small" style="margin-top:6px">▲ ▼ visar jämfört med förra utfallet. Analytikernas förväntningar finns inte gratis, så utfallen jämförs med förra. Källor: FRED, Riksbanken och SCB.</p>` : '');
   $('#cal-all')?.addEventListener('click', () => { calAll = !calAll; renderCalendar(); });
   bindRows(el);
   // På Idag: rapporter för öppna affärer inom 10 handelsdagar och makrobesked inom 3 dagar.
