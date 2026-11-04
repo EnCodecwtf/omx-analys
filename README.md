@@ -810,6 +810,13 @@ om året, 0,05 R i avgifter per affär). Den visar normalt, dåligt och bra utfa
 ränta. Kalendern visar rapporter, makrobesked (Fed, Riksbanken, ECB, svensk KPIF, amerikansk KPI, PCE, jobb, BNP och detaljhandel) och säljdagar 60 dagar framåt, med FedWatch (marknadens sannolikheter för Feds kommande räntebesked, räknade som CME FedWatch ur terminerna på Feds styrränta från Yahoo), förra utfallet vid varje makrobesked och en tabell med de senaste utfallen (FRED, Riksbanken och SCB; analytikernas förväntningar finns inte gratis), med dina öppna affärer markerade, och under
 Idag syns rapporter för öppna affärer inom 10 handelsdagar.
 
+### Betala av lån med snöbollsmetoden
+Under **Mer → Betala av lån** finns Dave Ramseys snöbollsmetod (Baby Step 2): minimibetalning på alla lån och allt som blir
+över till det minsta lånet. När det är betalt flyttas dess betalning till nästa minsta, så att summan per månad är densamma men
+lånen försvinner allt fortare. Lån markerade *Enligt plan* (till exempel CSN och bolån) betalas som vanligt och ingår inte.
+Verktyget visar ordningen, när varje lån är betalt, total ränta och jämför med lavinmetoden (dyraste räntan först) och med
+bara minimibetalningar. Lånen sparas bara i webbläsaren och skickas aldrig till servern.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att

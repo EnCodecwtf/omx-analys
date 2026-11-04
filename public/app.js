@@ -97,6 +97,7 @@ function openTool(name) {
   if (name === 'shorts' && !shortData) loadShorts();
   if (name === 'strategy') loadStrategyCalc();
   if (name === 'compound') runCompound();
+  if (name === 'loans') renderLoans();
 }
 function closeTool() {
   tool = null;
@@ -795,6 +796,126 @@ function drawCompound(rows) {
     tip.hidden = false; tip.style.left = Math.min(x(i) / W * rc.width + 12, rc.width - tip.offsetWidth - 4) + 'px';
   });
   svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
+}
+
+// Betala av lån med snöbollsmetoden (Dave Ramsey): minimibetalning på alla lån,
+// och allt som blir över går till det minsta lånet. När det är betalt flyttas
+// dess betalning till nästa minsta, så att summan per månad är densamma men
+// lånen försvinner allt fortare. Lån markerade "Enligt plan" (till exempel CSN
+// och bolån) betalas som vanligt och ingår inte. Sparas bara i webbläsaren.
+const LOAN_EXAMPLE = [
+  { name: 'Kreditkort', debt: 8000, rate: 18, pay: 300, plan: false },
+  { name: 'Privatlån', debt: 25000, rate: 9, pay: 600, plan: false },
+  { name: 'Billån', debt: 60000, rate: 6, pay: 1500, plan: false },
+  { name: 'CSN', debt: 180000, rate: 1.8, pay: 1100, plan: true },
+];
+let loans = (() => { try { return JSON.parse(store.get('loans', '')) || LOAN_EXAMPLE; } catch { return LOAN_EXAMPLE; } })();
+const loansExample = () => store.get('loans', '') === '';
+$('#loan-extra').value = store.get('loanExtra', '0');
+$('#loan-extra').addEventListener('input', () => { store.set('loanExtra', $('#loan-extra').value); runLoans(); });
+$('#loan-add').addEventListener('click', () => { loans.push({ name: `Lån ${loans.length + 1}`, debt: 10000, rate: 5, pay: 500, plan: false }); saveLoans(); renderLoans(); });
+function saveLoans() { store.set('loans', JSON.stringify(loans)); }
+function renderLoans() {
+  $('#loan-list').innerHTML = (loansExample() ? '<p class="note small">Exempel. Skriv in dina egna lån, så sparas de.</p>' : '')
+    + `<div class="loan-row loan-headrow"><span>Namn</span><span>Skuld, kr</span><span>Ränta, %</span><span>Per månad, kr</span><span>Enligt plan</span><span></span></div>`
+    + loans.map((l, i) => `<div class="loan-row" data-i="${i}">
+      <label class="lf lf-name"><span>Namn</span><input data-k="name" value="${esc(l.name)}"></label>
+      <label class="lf"><span>Skuld, kr</span><input data-k="debt" type="number" min="0" step="1000" inputmode="numeric" value="${l.debt}"></label>
+      <label class="lf"><span>Ränta, %</span><input data-k="rate" type="number" min="0" max="50" step="0.1" inputmode="decimal" value="${l.rate}"></label>
+      <label class="lf"><span>Per månad, kr</span><input data-k="pay" type="number" min="0" step="100" inputmode="numeric" value="${l.pay}"></label>
+      <label class="loan-plan"><input data-k="plan" type="checkbox"${l.plan ? ' checked' : ''}><span>Enligt plan</span></label>
+      <button class="btn loan-del" title="Ta bort lånet" aria-label="Ta bort lånet">×</button></div>`).join('');
+  for (const row of document.querySelectorAll('.loan-row[data-i]')) {
+    const i = +row.dataset.i;
+    for (const inp of row.querySelectorAll('input')) inp.addEventListener('input', () => {
+      const k = inp.dataset.k;
+      loans[i][k] = k === 'plan' ? inp.checked : k === 'name' ? inp.value : Math.max(0, +inp.value || 0);
+      saveLoans(); runLoans();
+    });
+    row.querySelector('.loan-del').addEventListener('click', () => { loans.splice(i, 1); saveLoans(); renderLoans(); });
+  }
+  runLoans();
+}
+// Simulerar månad för månad. order: 'snowball' (minst skuld först), 'avalanche'
+// (högst ränta först) eller 'min' (bara minimibetalningar). Returnerar när varje lån är betalt.
+function simulateLoans(list, extra, order) {
+  const L = list.map((l, i) => ({ ...l, i, bal: l.debt, paidAt: l.debt > 0 ? null : 0, interest: 0 }));
+  const snow = L.filter(l => !l.plan), plan = L.filter(l => l.plan);
+  const pool = snow.reduce((a, l) => a + l.pay, 0) + (order === 'min' ? 0 : extra);
+  const sorted = snow.slice().sort((a, b) => order === 'avalanche' ? b.rate - a.rate || a.debt - b.debt : a.debt - b.debt || b.rate - a.rate);
+  const curve = [snow.reduce((a, l) => a + l.bal, 0)];
+  let m = 0;
+  while (m < 600 && L.some(l => l.bal > 0.5)) {
+    m++;
+    for (const l of L) if (l.bal > 0) { const r = l.bal * l.rate / 100 / 12; l.bal += r; l.interest += r; }
+    for (const l of plan) if (l.bal > 0) { l.bal -= Math.min(l.bal, l.pay); if (l.bal <= 0.5 && l.paidAt == null) { l.bal = 0; l.paidAt = m; } }
+    let left = pool;
+    if (order === 'min') { for (const l of snow) if (l.bal > 0) { const p = Math.min(l.bal, l.pay); l.bal -= p; } }
+    else {
+      for (const l of snow) if (l.bal > 0) { const p = Math.min(l.bal, l.pay); l.bal -= p; left -= p; }
+      for (const l of sorted) { if (left <= 0) break; if (l.bal > 0) { const p = Math.min(l.bal, left); l.bal -= p; left -= p; } }
+    }
+    for (const l of snow) if (l.bal <= 0.5 && l.paidAt == null) { l.bal = 0; l.paidAt = m; }
+    curve.push(snow.reduce((a, l) => a + Math.max(0, l.bal), 0));
+    if (snow.every(l => l.bal <= 0.5) && plan.every(l => l.bal <= 0.5)) break;
+  }
+  const done = snow.length ? Math.max(...snow.map(l => l.paidAt ?? Infinity)) : 0;
+  return { loans: L, sorted, pool, done, interest: snow.reduce((a, l) => a + l.interest, 0), curve };
+}
+const monthName = m => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + m); return d.toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' }); };
+const dur = m => !isFinite(m) ? 'aldrig' : m < 12 ? `${m} mån` : `${Math.floor(m / 12)} år${m % 12 ? ` ${m % 12} mån` : ''}`;
+function runLoans() {
+  const out = $('#loan-out');
+  const extra = Math.max(0, +$('#loan-extra').value || 0);
+  const list = loans.filter(l => l.debt > 0);
+  const snowList = list.filter(l => !l.plan);
+  if (!snowList.length) { out.innerHTML = '<p class="muted">Lägg till minst ett lån som inte är markerat Enligt plan.</p>'; return; }
+  const never = list.filter(l => l.pay <= l.debt * l.rate / 100 / 12);
+  const sb = simulateLoans(list, extra, 'snowball'), av = simulateLoans(list, extra, 'avalanche'), mn = simulateLoans(list, extra, 'min');
+  // Betalningen som rullar vidare när varje lån är betalt.
+  let roll = 0;
+  const steps = sb.sorted.map((l, k) => {
+    const res = sb.loans[l.i];
+    const payNow = l.pay + (k === 0 ? extra : 0) + roll;
+    roll += l.pay + (k === 0 ? extra : 0);
+    return { name: l.name, debt: l.debt, rate: l.rate, payNow, at: res.paidAt };
+  });
+  const plans = sb.loans.filter(l => l.plan);
+  out.innerHTML = `
+    ${never.length ? `<p class="warn small">⚠ ${never.map(l => esc(l.name)).join(', ')}: betalningen täcker inte räntan, så lånet växer. Höj betalningen.</p>` : ''}
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${dur(sb.done)}</b><span>till skuldfri med snöbollen${isFinite(sb.done) ? ` (${monthName(sb.done)})` : ''}</span></div>
+      <div class="stat"><b class="num">${kr(sb.pool)}</b><span>betalar du varje månad, hela vägen</span></div>
+      <div class="stat"><b class="num">${kr(sb.interest)}</b><span>i ränta totalt</span></div>
+      <div class="stat"><b class="num ${mn.done - sb.done > 0 ? 'pos' : ''}">${isFinite(mn.done) ? dur(mn.done - sb.done) : '–'}</b><span>snabbare än bara minimibetalningar</span></div>
+    </div>
+    <h4 class="loan-h">Ordning</h4>
+    <ol class="snow">${steps.map((s, k) => `<li><div><b>${esc(s.name)}</b> <span class="muted small">${kr(s.debt)} · ${String(s.rate).replace('.', ',')} %</span></div>
+      <div class="small">${k === 0 ? 'Betala nu' : 'Därefter'} <b>${kr(s.payNow)}</b> i månaden${k ? ` <span class="muted">(${kr(steps[k - 1].payNow)} flyttas hit)</span>` : ''} · betalt <b>${isFinite(s.at) && s.at != null ? monthName(s.at) : 'aldrig'}</b></div></li>`).join('')}</ol>
+    ${plans.length ? `<p class="small muted">Enligt plan: ${plans.map(l => `${esc(l.name)} ${kr(l.pay)}/mån, klart ${l.paidAt != null ? monthName(l.paidAt) : 'om mer än 50 år'}`).join(' · ')}</p>` : ''}
+    <div class="calc-chart" id="loan-chart"></div>
+    <div class="calc-legend"><span><i class="lg-line"></i>Snöbollen</span><span><i class="lg-paid"></i>Bara minimibetalningar</span></div>
+    <h4 class="loan-h">Jämförelse</h4>
+    <table class="cc-table"><tr><th></th><th class="r">Skuldfri</th><th class="r">Ränta totalt</th></tr>
+      <tr><td>Snöbollen (minsta lånet först)</td><td class="r num">${dur(sb.done)}</td><td class="r num">${kr(sb.interest)}</td></tr>
+      <tr><td>Lavinen (dyraste räntan först)</td><td class="r num">${dur(av.done)}</td><td class="r num">${kr(av.interest)}</td></tr>
+      <tr><td>Bara minimibetalningar</td><td class="r num">${dur(mn.done)}</td><td class="r num">${isFinite(mn.done) ? kr(mn.interest) : '–'}</td></tr></table>
+    <p class="muted small">${av.interest < sb.interest - 1 ? `Lavinen sparar ${kr(sb.interest - av.interest)} i ränta, men snöbollen ger snabba segrar när små lån försvinner, och det är därför Ramsey förordar den.` : 'Här kostar snöbollen inte mer i ränta än lavinen.'}
+      Räknat med samma ränta hela tiden och betalning en gång i månaden. Ramsey rekommenderar en buffert på cirka 10 000 kr innan man börjar.</p>`;
+  drawLoans(sb.curve, mn.curve);
+}
+function drawLoans(a, b) {
+  const el = $('#loan-chart'), W = Math.max(300, Math.round(el.clientWidth || 600)), H = W < 500 ? 200 : 240, L = 60, Rm = 12, T = 12, B = 26;
+  // Visa bara tiden tills snöbollslånen är betalda (lån enligt plan kan pågå i många år till).
+  const lastDebt = c => { let i = c.length - 1; while (i > 0 && c[i] <= 0.5) i--; return i + 1; };
+  const n = Math.max(12, Math.min(Math.max(lastDebt(a), lastDebt(b)) + 3, 600)), top = Math.max(a[0], 1) * 1.05;
+  const x = i => L + (W - L - Rm) * i / n, y = v => T + (H - T - B) * (1 - v / top);
+  const path = c => c.slice(0, n + 1).map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const yrs = n / 12, step = yrs > 20 ? 5 : yrs > 8 ? 2 : yrs > 3 ? 1 : 0.5;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Skulden över tid">
+    ${[0, .5, 1].map(f => top / 1.05 * f).map(v => `<line x1="${L}" x2="${W - Rm}" y1="${y(v)}" y2="${y(v)}" class="grid"/><text x="${L - 6}" y="${y(v) + 4}" class="ax" text-anchor="end">${krShort(v)}</text>`).join('')}
+    ${Array.from({ length: Math.floor(yrs / step) + 1 }, (_, k) => k * step).map(t => `<text x="${x(t * 12)}" y="${H - 8}" class="ax" text-anchor="middle">${t ? String(t).replace('.', ',') + ' år' : 'nu'}</text>`).join('')}
+    <path d="${path(b)}" class="paid"/><path d="${path(a)}" class="med"/></svg>`;
 }
 
 // Ränta på ränta med strategin: tusentals möjliga framtider dragna ur de

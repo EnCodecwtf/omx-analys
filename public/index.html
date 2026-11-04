@@ -60,6 +60,7 @@
           <div class="menu-head">Verktyg</div>
           <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
           <button class="menu-item" data-tool="compound"><span class="mi-ico">％</span><span><b>Ränta på ränta</b><small>Vanlig kalkylator med fast avkastning</small></span></button>
+          <button class="menu-item" data-tool="loans"><span class="mi-ico">❄</span><span><b>Betala av lån</b><small>Snöbollsmetoden: minsta lånet först</small></span></button>
           <button class="menu-item" data-tool="strategy"><span class="mi-ico">📈</span><span><b>Ränta på ränta med strategin</b><small>Möjliga utfall med appens riktiga affärer</small></span></button>
           <div class="menu-head">Inställningar och statistik</div>
           <button class="menu-item" data-tool="account"><span class="mi-ico">👤</span><span><b>Mitt konto</b><small>Kontots värde och risk per affär</small></span></button>
@@ -150,6 +151,22 @@
           </div>
           <div id="cc-out"></div>
         </article>
+      </div>
+
+      <div class="tool" data-tool="loans" data-title="Betala av lån – snöbollsmetoden" hidden>
+        <div class="tool-grid loans-grid">
+          <article class="card">
+            <h3>Dina lån</h3>
+            <p class="muted small" style="margin-top:0">Dina lån sparas bara i den här webbläsaren. De skickas inte till servern och syns inte för någon annan.</p>
+            <div id="loan-list"></div>
+            <button class="btn small-btn" id="loan-add">+ Lägg till lån</button>
+            <div class="calc-in" style="margin-top:14px">
+              <label>Extra per månad till snöbollen <span><input id="loan-extra" type="number" min="0" step="100" inputmode="numeric" value="0"> kr</span></label>
+            </div>
+            <p class="muted small">Markera <b>Enligt plan</b> för lån som bara ska betalas som vanligt, till exempel CSN och bolån. De ingår inte i snöbollen.</p>
+          </article>
+          <article class="card"><h3>Planen</h3><div id="loan-out"></div></article>
+        </div>
       </div>
 
       <div class="tool" data-tool="strategy" data-title="Ränta på ränta med strategin" hidden>
