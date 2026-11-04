@@ -108,9 +108,25 @@
         Analysen är automatisk och bygger på historiska kurser från Yahoo Finance, som kommer med fördröjning. Den är inte
         investeringsrådgivning. Historiskt resultat är ingen garanti för framtiden. Använd alltid stoppnivån och anpassa
         positionsstorleken så att en förlust på 1 R är en förlust du har råd med.
+        <a href="#" id="show-terms">Läs ansvarsfriskrivningen</a>
       </p>
     </section>
   </main>
+
+  <div id="terms" class="terms" hidden role="dialog" aria-modal="true" aria-labelledby="terms-title">
+    <div class="terms-box">
+      <h2 id="terms-title">Innan du börjar</h2>
+      <p>Signalerna i OMX Analys tas fram automatiskt av datorprogram utifrån historiska kurser och annan offentlig data.
+        De är inte investeringsrådgivning och inte en uppmaning att köpa eller sälja något värdepapper.</p>
+      <p>Det är alltid du som bestämmer om du gör en affär. <b>Du ansvarar själv för alla beslut, och för alla vinster och
+        förluster</b> som följer av dem. Appen och den som driver den tar inget ansvar för vad som händer om du väljer att
+        följa en signal.</p>
+      <p>Handel med aktier och särskilt med hävstångsprodukter är riskfylld. Du kan förlora hela det belopp du satsar.
+        Historiska resultat och backtest är ingen garanti för framtiden, och data kan vara fördröjd eller felaktig.
+        Handla bara för pengar du har råd att förlora.</p>
+      <button id="terms-ok" class="btn primary">Jag förstår och tar eget ansvar</button>
+    </div>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
   <script type="module" src="app.js"></script>

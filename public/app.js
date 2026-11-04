@@ -43,6 +43,13 @@ for (const id of ['acct', 'risk', 'peak']) $('#' + id).addEventListener('input',
   if (lastDetail?.isCrypto) renderCryptoCards(lastDetail);
   else if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
 });
+// Ansvarsfriskrivning: visas tills den har godkänts på den här enheten.
+const TERMS = 'termsOk-1';
+function showTerms() { $('#terms').hidden = false; $('#terms-ok').focus(); }
+$('#terms-ok').addEventListener('click', () => { store.set(TERMS, '1'); $('#terms').hidden = true; });
+$('#show-terms').addEventListener('click', e => { e.preventDefault(); showTerms(); });
+if (store.get(TERMS, '0') !== '1') showTerms();
+
 let filter = 'all';
 let current = null;
 const chart = new PriceChart($('#chart'), $('#rsi-chart'), $('#tooltip'));
