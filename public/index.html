@@ -28,36 +28,62 @@
 
   <main class="layout">
     <aside class="scanner">
-      <div class="scanner-sticky">
-        <h2>OMXS30-skanner</h2>
-        <div class="filters" role="tablist">
-          <button class="chip active" data-filter="all">Alla</button>
-          <button class="chip" data-filter="signals">Köpsignaler</button>
-          <button class="chip" data-filter="watch">Bevaka</button>
-          <button class="chip" data-filter="log">Släppta signaler</button>
-          <button class="chip" data-filter="us">USA</button>
-          <button class="chip" data-filter="crypto">Krypto</button>
-          <button class="chip" data-filter="shorts">Blankning (AI)</button>
-        </div>
-      </div>
-      <div class="scanner-head">
+      <nav class="views" aria-label="Vyer">
+        <button class="view-btn active" data-view="today"><span class="ico">◎</span>Idag</button>
+        <button class="view-btn" data-view="trades"><span class="ico">⇅</span>Affärer<span id="trades-count" class="count" hidden></span></button>
+        <button class="view-btn" data-view="stocks"><span class="ico">☰</span>Aktier</button>
+        <button class="view-btn" data-view="more"><span class="ico">⋯</span>Mer</button>
+      </nav>
+
+      <section class="view" id="v-today">
+        <div id="today"><div class="loading">Hämtar och analyserar…</div></div>
+        <div id="panic" class="panic" hidden></div>
         <div id="macro" class="macro"></div>
-        <div id="panic" class="panic"></div>
-        <div id="summary" class="summary muted">Räknar backtest för alla signaler…</div>
-        <details id="normal" class="log">
-          <summary>Vad är normalt? Förluster och nedgångar</summary>
-          <div id="normal-body" class="muted">Laddar…</div>
+      </section>
+
+      <section class="view" id="v-trades" hidden>
+        <div id="trades"><div class="loading">Hämtar signalloggen…</div></div>
+      </section>
+
+      <section class="view" id="v-stocks" hidden>
+        <div class="segment" role="tablist">
+          <button class="seg active" data-market="omx">OMX</button>
+          <button class="seg" data-market="us">USA</button>
+          <button class="seg" data-market="crypto">Krypto</button>
+        </div>
+        <div id="scan-list" class="scan-list"><div class="loading">Hämtar och analyserar…</div></div>
+      </section>
+
+      <section class="view" id="v-more" hidden>
+        <div class="panel-box">
+          <h3>Mitt konto</h3>
+          <div class="sizing">
+            <label>Kontots värde <span><input id="acct" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+            <label>Risk per affär <span><input id="risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</span></label>
+            <label>Kontots högsta värde <span><input id="peak" type="number" min="0" step="1000" inputmode="numeric"> kr</span></label>
+          </div>
+          <div id="dd-rule" class="dd-rule"></div>
+          <p class="muted small">Används för att räkna ut hur mycket du ska köpa för. En förlust vid stopp blir risken × kontot × riskfaktorerna × nedgångsregeln. Backtestet 2017–2026 använde 6–8 % grundrisk.</p>
+        </div>
+        <div class="panel-box">
+          <h3>Fungerar systemet?</h3>
+          <div id="summary" class="summary muted">Räknar backtest…</div>
+          <div id="normal-body" class="muted small">Laddar…</div>
+        </div>
+        <details class="panel-box fold" id="shorts-box">
+          <summary>Blankning (AI) <span class="tag">experimentell</span></summary>
+          <div id="shorts"><div class="loading">Hämtar…</div></div>
         </details>
-        <details class="log">
-          <summary>Nyheter</summary>
+        <details class="panel-box fold">
+          <summary>Börsnyheter och geopolitik</summary>
           <div id="news-body" class="muted">Laddar…</div>
         </details>
-        <details id="log" class="log">
-          <summary>Signallogg (framåttest)</summary>
-          <div id="log-body" class="muted">Laddar…</div>
-        </details>
-      </div>
-      <div id="scan-list" class="scan-list"><div class="loading">Hämtar och analyserar 31 instrument…</div></div>
+        <div class="panel-box">
+          <h3>Om appen</h3>
+          <p class="muted small">Automatiska signaler från historiska kurser (Yahoo Finance, cirka 15 minuter fördröjda). Inte investeringsrådgivning.
+            <a href="#" id="show-terms">Läs ansvarsfriskrivningen</a></p>
+        </div>
+      </section>
     </aside>
 
     <section class="detail" id="detail">
@@ -71,44 +97,44 @@
       </div>
 
       <div class="chart-wrap">
-        <div class="layers">
-          <label><input type="checkbox" data-layer="zones" checked> Stöd/motstånd</label>
-          <label><input type="checkbox" data-layer="fvg" checked> FVG</label>
-          <label><input type="checkbox" data-layer="elliott" checked> Elliott</label>
-          <label><input type="checkbox" data-layer="zigzag"> ZigZag</label>
-          <label><input type="checkbox" data-layer="fib"> Fibonacci</label>
-          <label><input type="checkbox" data-layer="patterns" checked> Formationer</label>
-          <label><input type="checkbox" data-layer="ema" checked> EMA</label>
-          <label><input type="checkbox" data-layer="plan" checked> Handelsplan</label>
-          <label><input type="checkbox" data-layer="history" checked> Historiska signaler</label>
-        </div>
+        <details class="layers-box" id="layers-box">
+          <summary>Lager i grafen</summary>
+          <div class="layers">
+            <label><input type="checkbox" data-layer="plan" checked> Handelsplan</label>
+            <label><input type="checkbox" data-layer="zones" checked> Stöd/motstånd</label>
+            <label><input type="checkbox" data-layer="ema" checked> EMA</label>
+            <label><input type="checkbox" data-layer="history" checked> Historiska signaler</label>
+            <label><input type="checkbox" data-layer="fvg"> FVG</label>
+            <label><input type="checkbox" data-layer="elliott"> Elliott</label>
+            <label><input type="checkbox" data-layer="patterns"> Formationer</label>
+            <label><input type="checkbox" data-layer="zigzag"> ZigZag</label>
+            <label><input type="checkbox" data-layer="fib"> Fibonacci</label>
+          </div>
+        </details>
         <canvas id="chart"></canvas>
         <canvas id="rsi-chart" class="rsi"></canvas>
         <div id="tooltip" class="tooltip" hidden></div>
       </div>
 
-      <div class="sizing">
-        <label>Kontots värde <input id="acct" type="number" min="0" step="1000" inputmode="numeric"> kr</label>
-        <label>Risk per affär <input id="risk" type="number" min="0.5" max="10" step="0.5" inputmode="decimal"> %</label>
-        <label>Kontots högsta värde <input id="peak" type="number" min="0" step="1000" inputmode="numeric"> kr</label>
-        <span id="dd-rule" class="dd-rule"></span>
-        <span class="muted">Positionsstorleken räknas så att en förlust vid stopp blir risken × kontot × riskfaktorerna × nedgångsregeln. Backtestet 2017–2026 använde 6–8 % grundrisk.</span>
-      </div>
       <div class="cards">
         <article class="card" id="c-signal"></article>
         <article class="card" id="c-plan"></article>
         <article class="card wide" id="c-products"></article>
-        <article class="card" id="c-elliott"></article>
-        <article class="card" id="c-levels"></article>
-        <article class="card" id="c-backtest"></article>
-        <article class="card" id="c-news"></article>
+        <article class="card wide" id="c-news"></article>
       </div>
+      <details class="deep">
+        <summary>Fördjupning: Elliottvågor, nivåer och backtest för aktien</summary>
+        <div class="cards">
+          <article class="card" id="c-elliott"></article>
+          <article class="card" id="c-levels"></article>
+          <article class="card wide" id="c-backtest"></article>
+        </div>
+      </details>
 
       <p class="disclaimer">
         Analysen är automatisk och bygger på historiska kurser från Yahoo Finance, som kommer med fördröjning. Den är inte
         investeringsrådgivning. Historiskt resultat är ingen garanti för framtiden. Använd alltid stoppnivån och anpassa
         positionsstorleken så att en förlust på 1 R är en förlust du har råd med.
-        <a href="#" id="show-terms">Läs ansvarsfriskrivningen</a>
       </p>
     </section>
   </main>

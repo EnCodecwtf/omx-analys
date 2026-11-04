@@ -50,20 +50,39 @@ $('#terms-ok').addEventListener('click', () => { store.set(TERMS, '1'); $('#term
 $('#show-terms').addEventListener('click', e => { e.preventDefault(); showTerms(); });
 if (store.get(TERMS, '0') !== '1') showTerms();
 
-let filter = 'all';
+// Fyra vyer: Idag (finns det något att göra?), Affärer (hur går det?),
+// Aktier (alla instrument) och Mer (konto, statistik, experiment).
+let view = store.get('view', 'today');
+let market = 'omx';
 let current = null;
 const chart = new PriceChart($('#chart'), $('#rsi-chart'), $('#tooltip'));
 
+// Graflagren: enkla förval, valen sparas.
 for (const cb of document.querySelectorAll('[data-layer]')) {
-  cb.addEventListener('change', () => chart.setLayer(cb.dataset.layer, cb.checked));
+  const saved = store.get('layer-' + cb.dataset.layer, null);
+  if (saved != null) cb.checked = saved === '1';
+  chart.setLayer(cb.dataset.layer, cb.checked);
+  cb.addEventListener('change', () => { chart.setLayer(cb.dataset.layer, cb.checked); store.set('layer-' + cb.dataset.layer, cb.checked ? '1' : '0'); });
 }
-for (const b of document.querySelectorAll('[data-filter]')) {
+function setView(v) {
+  view = v; store.set('view', v);
+  document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('active', x.dataset.view === v));
+  for (const id of ['today', 'trades', 'stocks', 'more']) $('#v-' + id).hidden = id !== v;
+  document.body.classList.remove('show-detail');
+  if (v === 'stocks') renderScan();
+  if (v === 'trades') renderTrades();
+  if (v === 'today') renderToday();
+  $('.scanner').scrollTop = 0; window.scrollTo(0, 0);
+}
+for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => setView(b.dataset.view));
+for (const b of document.querySelectorAll('[data-market]')) {
   b.addEventListener('click', () => {
-    document.querySelectorAll('[data-filter]').forEach(x => x.classList.toggle('active', x === b));
-    filter = b.dataset.filter;
-    if (filter === 'us' && !usData) loadUS(); else if (filter === 'shorts' && !shortData) loadShorts(); else renderScan();
+    market = b.dataset.market;
+    document.querySelectorAll('[data-market]').forEach(x => x.classList.toggle('active', x === b));
+    if (market === 'us' && !usData) loadUS(); else renderScan();
   });
 }
+$('#shorts-box').addEventListener('toggle', e => { if (e.target.open && !shortData) loadShorts(); });
 
 // USA-listan (S&P 500-bolag med hävstångspapper på Avanza) hämtas först när
 // fliken öppnas, eftersom den är mycket större än OMX-listan.
@@ -76,33 +95,35 @@ async function loadUS(refresh) {
     $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta USA-listan: ${esc(e.message)}</div>`;
     return;
   }
-  if (filter === 'us') renderScan();
+  if (market === 'us') renderScan();
 }
 // AI-analytiker för blankning. Hämtas först när fliken öppnas (cirka 10 sekunder).
 let shortData = null;
 async function loadShorts(refresh) {
-  if (!shortData) $('#scan-list').innerHTML = '<div class="loading">Analytikern läser prognoser, blankningsregistret, nyheter och kurser för 30 bolag…</div>';
+  if (!shortData) $('#shorts').innerHTML = '<div class="loading">Analytikern läser prognoser, blankningsregistret, nyheter och kurser för 30 bolag…</div>';
   try {
     shortData = await (await fetch('/api/shorts' + (refresh ? '?refresh=1' : ''))).json();
   } catch (e) {
-    $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta blankningsanalysen: ${esc(e.message)}</div>`;
+    $('#shorts').innerHTML = `<div class="loading">Kunde inte hämta blankningsanalysen: ${esc(e.message)}</div>`;
     return;
   }
-  if (filter === 'shorts') renderScan();
+  renderShorts();
 }
 const SHORT_BADGE = { short: '<span class="badge avoid">BLANKA</span>', watch: '<span class="badge watch">BEVAKA</span>', none: '<span class="badge neutral">INGEN</span>' };
 const SHORT_KEY = { trend: 'nedtrend', rejection: 'vändning', rsi: 'RSI', analyst: 'analytiker', report: 'rapport', score: 'poäng', products: 'papper' };
 function renderShorts() {
-  const list = $('#scan-list');
+  const list = $('#shorts');
   if (!shortData) { list.innerHTML = '<div class="loading">Hämtar…</div>'; return; }
   const n = v => v == null ? '–' : String(v).replace(/(\d)\.(\d)/g, '$1,$2');
-  const head = `<div class="us-head"><b>AI-analytiker: blankning</b> <span class="tag">experimentell</span>
+  const head = `<div class="small">
     <div class="muted" style="font-size:12px;margin-top:4px">Väger ihop det en analytiker tittar på: sänkta vinstprognoser och riktkurser, rapporter under förväntan, svaga nyckeltal,
     blankningsregistret hos FI, negativa nyheter och en teknisk nedtrend där kursen studsat upp och vänt ned. Blanka bara när alla krav är gröna och det finns minst tre säkra korta papper på Avanza.</div>
     <div class="muted" style="font-size:12px;margin-top:4px"><b>Går inte att backtesta</b> (historiska prognoser finns inte gratis). Därför halv position, och varje kandidat sparas med frysta nivåer så att träffsäkerheten mäts framåt under Släppta signaler.
     ${logData?.stats?.short?.closed ? `Hittills: ${logData.stats.short.closed} stängda, ${logData.stats.short.wins} vinnare, snitt ${n(logData.stats.short.avgR)} R.` : 'Inga stängda blankningar än.'}</div>
     ${shortData.register ? '' : '<div class="neg" style="font-size:12px">Blankningsregistret kunde inte hämtas just nu.</div>'}</div>`;
-  const rows = shortData.rows.map(r => {
+  const shown = shortData.rows.filter(r => r.error || r.inTrade || r.status !== 'none');
+  const rest = shortData.rows.length - shown.length;
+  const rows = shown.map(r => {
     if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
     const up = r.changePct >= 0;
     const groups = {};
@@ -128,16 +149,16 @@ function renderShorts() {
       <p><a href="#${encodeURIComponent(r.symbol)}" data-open="${esc(r.symbol)}">Visa graf</a>${r.avanzaUrl ? ` · <a href="${esc(r.avanzaUrl)}" target="_blank" rel="noopener">Aktien på Avanza</a>` : ''}</p>
       </div></details>`;
   }).join('');
-  list.innerHTML = head + rows;
+  list.innerHTML = head + rows + `<p class="muted small" style="margin-top:8px">${shown.length ? '' : 'Inga blankningskandidater just nu. '}${rest} bolag visar inga tecken på svaghet och visas inte.</p>`;
   for (const a of list.querySelectorAll('[data-open]')) a.addEventListener('click', ev => { ev.preventDefault(); openSymbol(a.dataset.open); });
 }
-$('#refresh').addEventListener('click', () => { loadScan(true); if (filter === 'shorts') loadShorts(true); });
+$('#refresh').addEventListener('click', () => { loadScan(true); loadLog(); if (shortData) loadShorts(true); if (usData) loadUS(true); });
 $('#back').addEventListener('click', () => { document.body.classList.remove('show-detail'); history.replaceState(null, '', '#'); });
 
-function spark(values, up) {
+function spark(values, up, quiet) {
   const w = 64, h = 22, lo = Math.min(...values), hi = Math.max(...values);
   const pts = values.map((v, i) => `${(i / (values.length - 1) * w).toFixed(1)},${(h - (v - lo) / (hi - lo || 1) * h).toFixed(1)}`).join(' ');
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="1.5" points="${pts}"/></svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline fill="none" stroke="${quiet ? '#5b6878' : up ? '#22c55e' : '#ef4444'}" stroke-width="1.5" points="${pts}"/></svg>`;
 }
 
 async function loadScan(refresh, auto = false) {
@@ -150,12 +171,15 @@ async function loadScan(refresh, auto = false) {
     renderScan();
     renderMacro(scanData.macro, scanData.stress, scanData.cycle, scanData.calendar);
     renderPanic(scanData.panic);
+    renderToday();
+    // På datorn visas först en signal, annars en öppen affär, annars index.
     const fromHash = decodeURIComponent(location.hash.slice(1));
-    const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current)) || scanData.rows[0];
+    const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current))
+      || scanData.rows.find(isSignal) || scanData.rows.find(r => r.inTrade) || scanData.rows[0];
     // Vid automatisk uppdatering stannar vyn där den är (listan eller aktien).
     if (pick) openSymbol(auto && current ? current : pick.symbol, { keepView: auto || (!fromHash && !refresh), refresh });
   } catch (e) {
-    $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta data: ${esc(e.message)}</div>`;
+    $('#today').innerHTML = $('#scan-list').innerHTML = `<div class="loading">Kunde inte hämta data: ${esc(e.message)}</div>`;
   } finally {
     $('#refresh').disabled = false;
   }
@@ -171,32 +195,36 @@ function byCloseness(a, b) {
   return (b.isIndex - a.isIndex) || (isSignal(b) - isSignal(a)) || (left(a) - left(b)) || ((b.score ?? 0) - (a.score ?? 0));
 }
 
+// Rad i aktielistan. Signaler och öppna affärer får färg, övriga är dämpade.
+function stockRow(r) {
+  if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
+  const up = r.changePct >= 0, hot = isSignal(r) || r.inTrade || r.status === 'watch';
+  const tag = r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>${r.inTrade.hit ? ` <span class="tp-chip hit">TP${r.inTrade.hit} ✓</span>` : ''}`
+    : r.status === 'neutral' ? '' : badge(r.status);
+  const near = r.missing?.length && !isSignal(r) && !r.inTrade && r.missing.length <= 2
+    ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : '';
+  return `<div class="row${hot ? '' : ' quiet'}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
+    <div class="name">${esc(r.name)} ${tag}${!r.inTrade && r.preliminary && isSignal(r) ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
+    <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0], !hot)}
+      <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
+    </div>
+    ${near || r.isIndex ? `<div class="meta">${r.isIndex ? `<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>` : ''}${near}</div>` : ''}
+  </div>`;
+}
+const bindRows = el => { for (const x of el.querySelectorAll('[data-symbol]')) x.addEventListener('click', () => openSymbol(x.dataset.symbol)); };
+
 function renderScan() {
-  if (filter === 'log') { renderReleased(); return; }
-  if (filter === 'shorts') { renderShorts(); return; }
-  const src = filter === 'us' ? (usData?.rows || []) : scanData.rows;
-  const rows = src.slice().sort(byCloseness);
-  // Kryptovalutorna visas bara under fliken Krypto, så att listan är ren OMX.
-  const visible = filter === 'us' ? rows : rows.filter(r => filter === 'crypto' ? r.isCrypto : !r.isCrypto && (r.isIndex || filter === 'all'
-    || (filter === 'signals' && isSignal(r))
-    || (filter === 'watch' && r.status === 'watch')));
+  if (!scanData) return;
   const list = $('#scan-list');
-  const um = filter === 'us' && usData?.macro;
-  const usHead = um ? `<div class="us-head">USA-läge: <b class="${um.score >= um.need ? 'pos' : 'neg'}">${esc(um.label)}</b> <span class="muted">(poäng ${um.score}, köpsignaler kräver ${um.need})</span>
-    <div class="macro-comment">${esc(um.comment || '')}</div>
-    <div class="muted" style="font-size:12px;margin-top:4px">USA-signaler kommer bara vid full rädsla i den amerikanska marknaden, det enda läge där de gav en fördel i backtestet, och bara om minst tre säkra hävstångspapper finns på Avanza.</div></div>` : '';
-  list.innerHTML = usHead + visible.map(r => {
-    if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
-    const up = r.changePct >= 0;
-    return `<div class="row${r.isIndex ? ' index' : ''}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
-      <div class="name">${esc(r.name)} ${r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>${r.inTrade.hit ? ` <span class="tp-chip hit">TP${r.inTrade.hit} ✓</span>` : ''}` : badge(r.status)}${!r.inTrade && r.preliminary && r.status !== 'neutral' && r.status !== 'avoid' ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
-      <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0])}
-        <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
-      </div>
-      <div class="meta">${r.isCrypto ? '<span class="tag">Krypto</span>' : r.isUS ? `<span class="tag">USA</span><span>Poäng ${r.score}</span>` : `<span>Poäng ${r.score}</span>`}<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>${r.missing?.length && !isSignal(r) && !r.inTrade ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}${r.elliott ? `<span>${esc(r.elliott.label)}</span>` : ''}</div>
-    </div>`;
-  }).join('') + (visible.length <= (filter === 'crypto' || filter === 'us' ? 0 : 1) ? '<div class="empty">Inga aktier matchar filtret just nu.</div>' : '');
-  for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+  if (market === 'us' && !usData) return;
+  const src = market === 'us' ? usData.rows : scanData.rows.filter(r => market === 'crypto' ? r.isCrypto : !r.isCrypto);
+  const rows = src.slice().sort(byCloseness);
+  const um = market === 'us' && usData?.macro;
+  const head = um ? `<div class="note">USA-läge: <b class="${um.score >= um.need ? 'pos' : ''}">${esc(um.label)}</b> <span class="muted">(poäng ${um.score}, kräver ${um.need})</span>
+    <div class="muted small">Signaler bara vid full rädsla i USA och med minst tre säkra papper på Avanza.</div></div>`
+    : market === 'crypto' ? '<div class="note muted small">Krypto-utbrott: ny 20-dagarstopp över EMA 200, sälj efter 7 dagar. Signalerna kommer även på helger.</div>' : '';
+  list.innerHTML = head + rows.map(stockRow).join('') + (rows.length ? '' : '<div class="empty">Inget att visa.</div>');
+  bindRows(list);
 }
 
 async function openSymbol(symbol, { keepView, refresh } = {}) {
@@ -240,7 +268,7 @@ function renderCryptoCards(d) {
     <p class="muted" style="font-size:12px">En annan strategi än OMX-signalerna: köp styrka i stället för rekyler. Den slog att bara äga
     samma dagar i alla perioder 2017–2026, men svänger mycket: en enskild affär har gått −25 %.</p>`;
   const acct = Math.max(0, +$('#acct').value || 0);
-  $('#c-plan').innerHTML = `<h3>Handelsplan ${pl.frozen ? `<span class="muted">(öppen affär från ${esc(pl.frozen)}${pl.hit ? `, TP${pl.hit} nådd` : ''})</span>` : active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
+  $('#c-plan').innerHTML = `<h3>Handelsplan ${active ? '' : '<span class="muted">(om signal kommer)</span>'}</h3>
     <dl class="kv">
       <dt>Köp</dt><dd>${active ? `nu, runt <span class="num">${fmt(cs.price)}</span>` : `vid stängning över <span class="num">${fmt(cs.level)}</span>`}</dd>
       <dt>Sälj</dt><dd>${active ? `${esc(cs.exitDate)}, oavsett kurs` : '7 dagar efter köpet, oavsett kurs'}</dd>
@@ -277,9 +305,10 @@ function renderDetail(d) {
   lastDetail = d;
   const A = d.analysis;
   const lastT = new Date(d.bars[d.bars.length - 1][0] * 1000).toLocaleDateString('sv-SE');
-  $('#d-name').textContent = d.name;
-  $('#d-sub').innerHTML = `${esc(d.symbol)} · stängning ${lastT} · <span class="num">${fmt(A.price)}</span> · ATR ${fmt(A.atr)} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
-  $('#d-badge').innerHTML = d.inTrade ? '<span class="badge strong big">I AFFÄR</span>' : badge(A.status, true);
+  const prev = d.bars[d.bars.length - 2]?.[4], ch = prev ? (A.price / prev - 1) * 100 : null;
+  $('#d-name').innerHTML = `${esc(d.name)} <span class="d-price num">${fmt(A.price)}</span>${ch == null ? '' : ` <span class="d-ch ${ch >= 0 ? 'pos' : 'neg'}">${ch >= 0 ? '+' : ''}${ch.toFixed(2).replace('.', ',')} %</span>`}`;
+  $('#d-sub').innerHTML = `${esc(d.symbol)} · ${lastT} · ${esc(A.trendLabel)}${d.avanzaUrl ? ` · <a href="${esc(d.avanzaUrl)}" target="_blank" rel="noopener">Öppna i Avanza ↗</a>` : ''}`;
+  $('#d-badge').innerHTML = d.inTrade ? '<span class="badge strong big">I AFFÄR</span>' : A.status === 'neutral' ? '' : badge(A.status, true);
   chart.setData(d);
 
   if (d.isCrypto) renderCryptoCards(d);
@@ -301,19 +330,33 @@ function renderSignalCards(d) {
     neutral: 'Inget tydligt köpläge just nu.',
     avoid: 'Sent eller överköpt läge. Vänta på en rekyl.',
   }[A.status];
-  $('#c-signal').innerHTML = `<h3>Signal</h3>
-    <div class="score"><span class="score-val num">${A.score}</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="muted">/ 100</span></div>
-    <p>${explain}</p>
-    ${d.preliminary ? `<p class="warn" style="font-size:12px">Preliminärt: räknat på kursen just nu (cirka 15 minuter fördröjd). Signalen gäller först när dagen stänger ${d.isUS ? '22:00 (USA-börsen)' : '17:30'}, och köpet sker på öppningen nästa dag${d.isUS ? ' (15:30 svensk tid)' : ''}.</p>` : ''}
-    ${checklist(A)}
-    <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
-    ${A.warnings.map(w => `<div class="warn">⚠ ${esc(w)}</div>`).join('')}
-    ${A.blocked ? `<p class="warn">Utan spärren hade detta varit ${STATUS[A.blocked].text.toLowerCase()}.</p>` : ''}
-    <dl class="kv" style="margin-top:10px">
-      ${A.guards?.report ? `<dt>Nästa rapport</dt><dd>${esc(A.guards.report.date)} <span class="muted">(om ${A.guards.report.days} handelsdagar, ${esc(A.guards.report.source)})</span></dd>` : ''}
-      ${A.guards?.macro ? `<dt>Makro</dt><dd>${esc(A.guards.macro.label)} <span class="muted">(poäng ${A.guards.macro.score})</span></dd>` : ''}
-      ${A.guards?.stress ? `<dt>Riskfaktorer</dt><dd>${A.guards.stress.factors ? `${A.guards.stress.factors} av 3 – positionen × ${String(A.guards.stress.size).replace('.', ',')}` : 'Inga'}</dd>` : ''}
-    </dl>`;
+  const missing = (A.checklist || []).filter(c => !c.ok);
+  const active0 = A.status === 'strong' || A.status === 'buy';
+  const verdict = d.inTrade ? '' : active0
+    ? `<div class="verdict go"><b>${A.status === 'strong' ? 'Stark köpsignal' : 'Köpsignal'}</b><span>${esc(explain)}</span></div>`
+    : `<div class="verdict"><b>Ingen signal${A.checklist?.length ? ` – ${A.checklist.length - missing.length} av ${A.checklist.length} krav uppfyllda` : ''}</b>
+      <span>${missing.length ? `Saknas: ${missing.map(c => esc(c.text.toLowerCase())).join(', ')}.` : esc(explain)}</span></div>`;
+  const trade = d.inTrade ? (logData?.entries || []).find(e => isLive(e) && e.symbol === d.symbol && !e.kind) : null;
+  $('#c-signal').innerHTML = d.inTrade
+    ? `<h3>Din affär</h3>${trade ? tradeCard(trade) : `<p>Öppen affär från signalen ${esc(d.inTrade.date)}.</p>`}
+      <p class="muted small">Stopp och mål är frysta från signalen. Ingen ny signal medan affären är öppen.</p>
+      <details class="fold-in"><summary>Dagens analys (gäller nya köp, inte din affär)</summary>
+        <p class="small">Signalstyrka ${A.score} av 100. ${esc(explain)}</p>${checklist(A)}</details>`
+    : `<h3>Signal</h3>${verdict}
+    ${d.preliminary && active0 ? `<p class="warn small">Preliminärt: räknat på kursen just nu (cirka 15 minuter fördröjd). Signalen gäller först när dagen stänger ${d.isUS ? '22:00 (USA-börsen)' : '17:30'}, och köpet sker på öppningen nästa dag${d.isUS ? ' (15:30 svensk tid)' : ''}.</p>` : ''}
+    <div class="score"><span class="muted small">Signalstyrka</span><div class="score-bar"><span style="width:${A.score}%;background:${col}"></span></div><span class="num"><b>${A.score}</b><span class="muted"> / 100</span></span></div>
+    ${A.warnings.length ? `<div class="warn small">⚠ ${esc(A.warnings[0])}</div>` : ''}
+    <details class="fold-in"><summary>Varför – alla krav, poäng och varningar</summary>
+      ${checklist(A)}
+      <ul class="reasons">${A.reasons.map(r => `<li><span class="pts ${r.pts >= 0 ? 'pos' : 'neg'}">${r.pts > 0 ? '+' : ''}${r.pts}</span><span>${esc(r.text)}</span></li>`).join('') || '<li class="muted">Inga faktorer slog till.</li>'}</ul>
+      ${A.warnings.slice(1).map(w => `<div class="warn small">⚠ ${esc(w)}</div>`).join('')}
+      ${A.blocked ? `<p class="warn small">Utan spärren hade detta varit ${STATUS[A.blocked].text.toLowerCase()}.</p>` : ''}
+      <dl class="kv" style="margin-top:10px">
+        ${A.guards?.report ? `<dt>Nästa rapport</dt><dd>${esc(A.guards.report.date)} <span class="muted">(om ${A.guards.report.days} handelsdagar)</span></dd>` : ''}
+        ${A.guards?.macro ? `<dt>Makro</dt><dd>${esc(A.guards.macro.label)} <span class="muted">(poäng ${A.guards.macro.score})</span></dd>` : ''}
+        ${A.guards?.stress ? `<dt>Riskfaktorer</dt><dd>${A.guards.stress.factors ? `${A.guards.stress.factors} av 3 – positionen × ${String(A.guards.stress.size).replace('.', ',')}` : 'Inga'}</dd>` : ''}
+      </dl>
+    </details>`;
 
   // Handelsplan
   const active = A.status === 'strong' || A.status === 'buy';
@@ -324,11 +367,9 @@ function renderSignalCards(d) {
       <tr class="plan-row sl"><td>Stopp${pl.frozen && pl.hit >= 2 ? '<div class="why">Flyttat till köpkursen efter TP2</div>' : ''}</td><td class="r num">${fmt(pl.stop)}</td><td class="r num neg">−${pl.riskPct.toString().replace('.', ',')} %</td><td class="r num">−1</td></tr>
       ${pl.tps.map((t, k) => `<tr class="plan-row tp${pl.frozen && k < pl.hit ? ' hit' : ''}"><td>TP${k + 1}${pl.frozen && k < pl.hit ? ' ✓' : ''}<div class="why">${t.why.map(esc).join(' · ')}</div></td><td class="r num">${fmt(t.price)}</td><td class="r num pos">+${pct(t.price, pl.entry)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
     </table>
-    <p class="muted" style="font-size:12px;margin-top:10px">Sälj en tredjedel vid varje mål. Flytta stoppet till köpkursen när TP2 är nådd.
-    TP1 ligger på närmaste nivå 0,5–1,2 R bort och TP2 på nästa nivå upp till 2 R, för att målen ska nås ofta.
-    Stoppet ligger under stödet och de senaste dagarnas botten, minst 1 ATR från köpkursen.</p>`;
+    <p class="muted small" style="margin-top:10px">Sälj en tredjedel vid varje mål och flytta stoppet till köpkursen när TP2 är nådd.</p>`;
 
-  loadProducts(d.symbol, A.status);
+  loadProducts(d.symbol, d.inTrade ? 'trade' : A.status);
 }
 
 function renderElliott(d) {
@@ -418,8 +459,7 @@ async function loadProducts(symbol, status) {
         <dt>Köp för</dt><dd class="num"><b>${Math.round(invest(p)).toLocaleString('sv-SE')} kr</b> <span class="muted">≈ ${Math.floor(invest(p) / p.ask).toLocaleString('sv-SE')} st, risk ${Math.round(riskKr).toLocaleString('sv-SE')} kr</span></dd>
       </dl>
     </div>`;
-  el.innerHTML = `<h3>Hävstång på Avanza ${active ? '' : '<span class="muted">(ingen köpsignal just nu – bara för bevakning)</span>'}</h3>
-    <p style="font-size:13px">Positionsstorlek: risk ${String(riskPct).replace('.', ',')} % av ${acct.toLocaleString('sv-SE')} kr × makrofaktor ${String(size).replace('.', ',')}
+  const inner = `<p style="font-size:13px">Positionsstorlek: risk ${String(riskPct).replace('.', ',')} % av ${acct.toLocaleString('sv-SE')} kr × makrofaktor ${String(size).replace('.', ',')}
     ${dd < 1 ? ` × nedgångsregeln ${String(dd).replace('.', ',')}` : ''} = <b>${Math.round(riskKr).toLocaleString('sv-SE')} kr</b> i förlust om stoppet nås.${size === 0 ? ' Makroläget är ogynnsamt, så positionsstorleken är 0.' : ''}</p>
     ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut.</p>
     <div class="prod">${r.minis.map((p, k) => item(p, k, true)).join('')}</div>`
@@ -430,11 +470,14 @@ async function loadProducts(symbol, status) {
     ${r.rejected.spread} med spread över ${r.rules.maxSpreadPct} %, ${r.rejected.knockout} med knock-out för nära stoppet, ${r.rejected.leverage} med för hög hävstång
     (max ${r.rules.maxLev}x för minifutures, ${r.rules.maxBull}x för bull-certifikat, högst ${r.rules.maxLossPct} % förlust vid stopp).
     Kurserna kan vara fördröjda. Kontrollera köp- och säljkurs hos Avanza innan du handlar. Sätt stoppet på underliggande (${num(r.stop ?? null)}), inte på certifikatet.</p>`;
+  el.innerHTML = active ? `<h3>Köp på Avanza</h3>${inner}`
+    : `<details class="fold-in"><summary><h3 style="display:inline">Hävstångspapper på Avanza</h3> <span class="muted small">${status === 'trade' ? '(för din öppna affär)' : '(ingen signal – bara bevakning)'}</span></summary>${inner}</details>`;
 }
 
 // Panikvecka: tre mest fallna OMXS30-aktier när VIX är minst 25, säljs efter 5 handelsdagar.
 function renderPanic(p) {
   const el = $('#panic');
+  el.hidden = !p?.active;
   if (!p) { el.innerHTML = ''; return; }
   const list = p.picks.map(x => `<a href="#${encodeURIComponent(x.symbol)}" data-open="${esc(x.symbol)}">${esc(x.name)}</a> <span class="neg">${String(x.ret5).replace('.', ',')} %</span>`).join(', ');
   const v = p.vix == null ? '–' : String(p.vix).replace('.', ',');
@@ -462,10 +505,9 @@ function renderMacro(m, st, cy, cal) {
   // Sammanfattningen syns alltid. Detaljerna fälls ihop så att listan med aktier
   // inte trycks ned (valet sparas i webbläsaren).
   const open = store.get('macroOpen', '0') === '1';
-  $('#macro').innerHTML = `Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">(poäng ${m.score > 0 ? '+' : ''}${m.score})</span>
+  $('#macro').innerHTML = `<details id="macro-details"${open ? ' open' : ''}><summary><span>Marknadsläge: <b class="${cls}">${esc(m.label)}</b> <span class="muted">· poäng ${m.score > 0 ? '+' : ''}${m.score} av ${m.need} som krävs</span></span></summary>
     ${m.summary ? `<div class="macro-sum">${esc(m.summary)}</div>` : ''}
     ${m.comment ? `<div class="macro-comment">${esc(m.comment)}</div>` : ''}
-    <details id="macro-details"${open ? ' open' : ''}><summary>Detaljer: vad som behövs, makrokalender och positionsstorlek</summary>
     <ul>${m.parts.map(p => `<li class="${p.ok ? 'ok' : p.bad ? 'bad' : ''}">${esc(p.text.replace('.', ','))}${p.pts ? ` (${p.pts > 0 ? '+' : ''}${p.pts})` : ''}${p.need ? `<div class="need">${esc(p.need)}</div>` : ''}</li>`).join('')}</ul>
     ${calLine}${stressLine}${cycleLine}</details>`;
   $('#macro-details').addEventListener('toggle', e => store.set('macroOpen', e.target.open ? '1' : '0'));
@@ -521,62 +563,96 @@ function renderNormal() {
     <p style="margin-top:8px">${c?.trades && (c.currentLosing > NORMAL_10Y.longestLosing || c.currentDD < NORMAL_10Y.maxDD)
       ? '<b class="neg">Läget är sämre än något som hänt i testerna. Det kan betyda att strategin har slutat fungera: minska risken och se över den.</b>'
       : 'Så länge läget nu ligger inom det som har hänt förut är det inget tecken på att strategin har slutat fungera. Följ reglerna.'}</p>
-    <p>Nedgångsregeln under grafen halverar risken när kontot är 20 % under sin topp och ger en fjärdedel vid 30 %. Fyll i kontots högsta värde där.</p>`;
+    <p>Nedgångsregeln under Mitt konto halverar risken när kontot är 20 % under sin topp och ger en fjärdedel vid 30 %. Fyll i kontots högsta värde där.</p>`;
 }
 
-// Alla släppta signaler på ett ställe: OMX, USA, krypto och panikvecka.
-// Öppna affärer överst, sedan avslutade, nyast först.
+// Signalloggen: affärskort för öppna affärer och en lista över avslutade.
 let logData = null;
 // Målen med bock och grön färg när de är nådda.
 const tpChips = (tps, hit = 0) => tps.map((p, k) => `<span class="tp-chip${k < hit ? ' hit' : ''}" title="${k < hit ? 'Nådd' : 'Inte nådd än'}">TP${k + 1} ${fmt(p)}${k < hit ? ' ✓' : ''}</span>`).join(' ');
 const KIND = e => e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
-function renderReleased() {
-  const list = $('#scan-list');
-  if (!logData) { list.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
-  const live = e => e.state === 'öppen' || e.state === 'väntar på köp';
-  const es = logData.entries.slice().sort((a, b) => (live(b) - live(a)) || b.date.localeCompare(a.date));
-  const res = e => e.pct != null ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
-    : e.r != null && e.state === 'stängd' ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
-    : e.r != null ? `<span>${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>` : '–';
-  const plan = e => e.kind === 'panic' || e.kind === 'crypto'
-    ? `Köp ${e.entry ? fmt(e.entry) : 'på öppningen'} · säljdag ${esc(e.exitDate || '–')}`
-    : `${e.kind === 'short' ? 'Blanka' : 'Köp'} ${e.entry ? fmt(e.entry) : fmt(e.close)} · ${(e.hit || 0) >= 2 ? `stopp flyttat till ${e.entry ? fmt(e.entry) : 'köpkursen'}` : `stopp ${fmt(e.stop)}`} · ${tpChips(e.tps, e.hit)}`;
-  const head = `<div class="us-head"><b>Släppta signaler</b> <span class="muted">(${logData.stats.n} st, ${logData.stats.open} öppna)</span>
-    <div class="muted" style="font-size:12px;margin-top:4px">Alla köpsignaler som har gått ut, med frysta nivåer och utfall räknat med samma regler som backtestet.</div></div>`;
-  list.innerHTML = head + (es.length ? es.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
-      <div class="name">${esc(e.name)} <span class="tag">${KIND(e)}</span>${live(e) ? ' <span class="badge strong">ÖPPEN</span>' : ''}</div>
-      <div class="right"><div class="num"><div>${res(e)}</div><div class="muted" style="font-size:12px">${esc(e.state)}${e.hit ? ' · TP' + e.hit : ''}</div></div></div>
-      <div class="meta"><span>${esc(e.date)}</span><span>${plan(e)}</span></div>
-    </div>`).join('') : '<div class="empty">Inga signaler har släppts än. De samlas här så fort de kommer, oavsett om de blir vinnare eller förlorare.</div>');
-  for (const el of list.querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+const isLive = e => e.state === 'öppen' || e.state === 'väntar på köp';
+const sv = v => String(v).replace('.', ',');
+const resText = e => e.pct != null ? `${e.pct > 0 ? '+' : ''}${sv(e.pct)} %` : e.r != null ? `${e.r > 0 ? '+' : ''}${sv(e.r)} R` : '–';
+const resCls = e => (e.pct ?? e.r) == null ? '' : (e.pct ?? e.r) > 0 ? 'pos' : (e.pct ?? e.r) < 0 ? 'neg' : '';
+
+// Mätare från stoppet till TP3 med köp, mål och kursen just nu.
+function tradeBar(e) {
+  const entry = e.entry ?? e.close, lo = e.stop, hi = e.tps[2];
+  const at = v => Math.max(0, Math.min(100, (v - lo) / (hi - lo) * 100));
+  const mark = (v, label, cls) => `<i class="${cls}" style="left:${at(v)}%"><b>${label}</b></i>`;
+  const fill = e.last != null ? at(e.last) : at(entry);
+  return `<div class="trade-bar"><span class="fill ${e.last != null && e.last < entry === (e.kind !== 'short') && e.last !== entry ? 'down' : ''}" style="left:${Math.min(at(entry), fill)}%;width:${Math.abs(fill - at(entry))}%"></span>
+    ${mark(lo, 'SL', 'sl')}${mark(entry, 'IN', 'in')}${e.tps.map((p, k) => mark(p, 'TP' + (k + 1), k < (e.hit || 0) ? 'tp hit' : 'tp')).join('')}
+    ${e.last != null ? `<i class="now" style="left:${at(e.last)}%"></i>` : ''}</div>`;
+}
+// Nästa steg i klartext.
+function nextStep(e) {
+  const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
+  if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen. Sälj ${esc(e.exitDate)}.` : `Sälj ${esc(e.exitDate)}, oavsett kurs.`;
+  if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
+  if (hit === 0) return `Nästa: ${act} 1/3 vid TP1 <b>${fmt(e.tps[0])}</b>. Stopp ${fmt(e.stop)}.`;
+  if (hit === 1) return `TP1 nådd – ${act} 1/3 om du inte gjort det. Nästa: ${act} 1/3 vid TP2 <b>${fmt(e.tps[1])}</b> och flytta stoppet till ${fmt(entry)}.`;
+  return `Stoppet ligger på köpkursen ${fmt(entry)}. Nästa: ${act} resten vid TP3 <b>${fmt(e.tps[2])}</b>.`;
+}
+function tradeCard(e) {
+  const days = e.kind === 'panic' || e.kind === 'crypto';
+  return `<div class="trade-card" data-symbol="${esc(e.symbol)}">
+    <div class="tc-head"><div><b>${esc(e.name)}</b> <span class="tag">${KIND(e)}</span></div>
+      <div class="tc-res ${e.state === 'väntar på köp' ? '' : resCls(e)}">${e.state === 'väntar på köp' ? '<span class="muted small">väntar på köp</span>' : resText(e)}</div></div>
+    <div class="muted small">Signal ${esc(e.date)}${e.entry ? ` · köp ${fmt(e.entry)}` : ''}${e.last != null ? ` · nu ${fmt(e.last)}` : ''}</div>
+    ${!days && e.tps ? tradeBar(e) : ''}
+    <div class="tc-next">${nextStep(e)}</div>
+  </div>`;
+}
+
+function renderTrades() {
+  const el = $('#trades');
+  if (!logData) { el.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
+  const open = logData.entries.filter(isLive), closed = logData.entries.filter(e => !isLive(e));
+  const s = logData.stats;
+  el.innerHTML = `<h2 class="v-title">Öppna affärer <span class="muted">(${open.length})</span></h2>
+    ${open.length ? open.map(tradeCard).join('') : '<div class="empty small">Inga öppna affärer. Nya signaler visas under Idag.</div>'}
+    <h2 class="v-title">Avslutade <span class="muted">(${closed.length})</span></h2>
+    ${s.closed ? `<div class="note small">OMX: ${s.closed} stängda · TP1 ${s.tp1Rate ?? '–'} % · snitt ${s.avgR == null ? '–' : sv(s.avgR) + ' R'}${s.panic?.closed ? ` · panikveckor snitt ${sv(s.panic.avgPct)} %` : ''}${s.crypto?.closed ? ` · krypto snitt ${sv(s.crypto.avgPct)} %` : ''}</div>` : ''}
+    ${closed.length ? closed.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
+      <div class="name">${esc(e.name)} <span class="tag">${KIND(e)}</span></div>
+      <div class="right num ${resCls(e)}">${resText(e)}</div>
+      <div class="meta"><span>${esc(e.date)}</span><span>${esc(e.state)}${e.hit ? ' · TP' + e.hit + ' ✓' : ''}</span></div></div>`).join('')
+      : '<div class="empty small">Inga avslutade affärer än. Alla signaler sparas med frysta nivåer, vinnare som förlorare.</div>'}`;
+  bindRows(el);
+}
+
+// Idag: svaret på "finns det något att göra?".
+function renderToday() {
+  const el = $('#today');
+  if (!scanData) return;
+  const signals = scanData.rows.filter(isSignal);
+  const open = (logData?.entries || []).filter(isLive);
+  const near = scanData.rows.filter(r => !r.isCrypto && !isSignal(r) && !r.inTrade && r.missing?.length === 1).sort(byCloseness).slice(0, 4);
+  const p = scanData.panic, panicOn = p?.active && !p.holding;
+  const m = scanData.macro;
+  const n = signals.length + (panicOn ? p.picks.length : 0);
+  const status = n
+    ? `<div class="status go"><b>${n} ${n === 1 ? 'ny signal' : 'nya signaler'}</b><span>${signals.some(r => r.preliminary) ? 'Preliminärt – bekräftas vid stängningen 17:30, köp på öppningen.' : 'Köp på öppningen. Se planen för stopp och mål.'}</span></div>`
+    : `<div class="status"><b>Inget nytt att köpa</b><span>${open.length ? `Du har ${open.length} öppna ${open.length === 1 ? 'affär' : 'affärer'}. ` : ''}${m && m.score < m.need ? `Marknadsläget räcker inte (poäng ${m.score}, kräver ${m.need}). ` : ''}Nästa bedömning vid stängningen 17:30.</span></div>`;
+  el.innerHTML = status
+    + (signals.length ? `<h2 class="v-title">Nya signaler</h2>${signals.map(stockRow).join('')}` : '')
+    + (open.length ? `<h2 class="v-title">Öppna affärer</h2>${open.map(tradeCard).join('')}` : '')
+    + (near.length ? `<h2 class="v-title">Nära signal <span class="muted">(1 krav kvar)</span></h2>${near.map(stockRow).join('')}` : '');
+  bindRows(el);
 }
 
 async function loadLog() {
   try {
-    const d = await (await fetch('/api/log')).json();
-    logData = d;
-    if (filter === 'log') renderReleased();
-    const s = d.stats;
-    normalLive = s.current; renderNormal();
-    const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    const state = e => (e.kind === 'crypto' || e.kind === 'panic') && e.pct != null
-      ? `<span class="${e.state === 'stängd' ? (e.pct > 0 ? 'pos' : 'neg') : ''}">${e.state === 'öppen' ? 'öppen ' : ''}${e.pct > 0 ? '+' : ''}${String(e.pct).replace('.', ',')} %</span>`
-      : e.state === 'stängd'
-      ? `<span class="${e.r > 0 ? 'pos' : 'neg'}">${e.r > 0 ? '+' : ''}${String(e.r).replace('.', ',')} R</span>`
-      : e.state === 'öppen' ? `öppen${e.hit ? ' · TP' + e.hit : ''}` : esc(e.state);
-    $('#log-body').innerHTML = d.entries.length
-      ? `<p>${s.n} signaler sparade sedan start, ${s.closed} stängda och ${s.open} öppna.
-          Stängda OMX: TP1 ${pc(s.tp1Rate)}, TP2 ${pc(s.tp2Rate)}, snitt ${s.avgR == null ? '–' : String(s.avgR).replace('.', ',') + ' R'}.
-          ${s.crypto?.closed ? `Stängda krypto: ${s.crypto.closed}, snitt ${String(s.crypto.avgPct).replace('.', ',')} %.` : ''}
-          ${s.short?.closed ? `Stängda blankningar (AI): ${s.short.closed}, snitt ${String(s.short.avgR).replace('.', ',')} R.` : ''}
-          ${s.panic?.closed ? `Stängda panikveckor: ${s.panic.closed} affärer, snitt ${String(s.panic.avgPct).replace('.', ',')} %.` : ''}</p>
-        <table><tr><th>Datum</th><th>Aktie</th><th class="r">Köp</th><th class="r">Utfall</th></tr>
-        ${d.entries.slice(0, 15).map(e => `<tr data-symbol="${esc(e.symbol)}"><td>${esc(e.date)}</td><td>${esc(e.name)}${e.kind === 'panic' ? ' <span class="tag">panik</span>' : e.kind === 'short' ? ' <span class="tag">blankning</span>' : e.market === 'USA' ? ' <span class="tag">USA</span>' : ''}</td>
-          <td class="r num">${e.entry ? fmt(e.entry) : '–'}</td><td class="r">${state(e)}</td></tr>`).join('')}</table>`
-      : '<p>Inga signaler sparade än. Varje stark köpsignal sparas när dagens stängningskurs är klar, och utfallet följs med samma regler som backtestet. Det är det riktiga beviset på om strategin fungerar.</p>';
-    for (const el of $('#log-body').querySelectorAll('[data-symbol]')) el.addEventListener('click', () => openSymbol(el.dataset.symbol));
+    logData = await (await fetch('/api/log')).json();
+    normalLive = logData.stats.current; renderNormal();
+    const open = logData.entries.filter(isLive).length;
+    $('#trades-count').hidden = !open; $('#trades-count').textContent = open;
+    renderToday();
+    if (view === 'trades') renderTrades();
   } catch {
-    $('#log-body').textContent = 'Kunde inte läsa signalloggen.';
+    $('#trades').innerHTML = '<div class="loading">Kunde inte läsa signalloggen.</div>';
   }
 }
 
@@ -586,7 +662,7 @@ async function loadSummary() {
     normalBacktest = s.normal; renderNormal();
     const a = s.all;
     const pc = v => v == null ? '–' : String(v).replace('.', ',') + ' %';
-    $('#summary').innerHTML = `<span>Backtest, starka köpsignaler med rapportspärr och makrofilter (${a.n} st):</span>
+    $('#summary').innerHTML = `<span>Backtest för OMX-signalerna (${a.n} st, cirka 4 år):</span>
       <span class="pill">TP1 <b class="${a.tp1Rate >= 60 ? 'pos' : 'neg'}">${pc(a.tp1Rate)}</b></span>
       <span class="pill">TP2 <b class="${a.tp2Rate >= 54 ? 'pos' : 'neg'}">${pc(a.tp2Rate)}</b></span>
       <span class="pill">TP3 <b>${pc(a.tp3Rate)}</b></span>
@@ -596,6 +672,7 @@ async function loadSummary() {
   }
 }
 
+setView(view);
 loadScan(false);
 loadSummary();
 loadLog();
@@ -608,6 +685,8 @@ function marketOpen(now = new Date()) {
   return !/lör|sön/.test(p.weekday) && min >= 9 * 60 && min <= 17 * 60 + 35;
 }
 setInterval(() => { if (marketOpen() && !document.hidden) { loadScan(true, true); loadLog(); } }, 5 * 60 * 1000);
+// Notiser och länkar kan öppna Affärer direkt (#affarer).
+if (location.hash === '#affarer') setView('trades');
 loadMarketNews();
 
 // Webbnotiser: ingen extra app behövs. På iPhone måste appen först läggas till

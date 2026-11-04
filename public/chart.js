@@ -165,7 +165,7 @@ export class PriceChart {
     if (this.layers.zones) {
       for (const z of A.zones) {
         const col = z.kind === 'resistance' ? '239,68,68' : z.kind === 'support' ? '34,197,94' : '245,158,11';
-        const a = 0.06 + 0.16 * z.score / 100;
+        const a = 0.03 + 0.07 * z.score / 100;
         const y1 = this.y(z.hi), y2 = this.y(z.lo);
         ctx.fillStyle = `rgba(${col},${a})`; ctx.fillRect(0, y1, PW, Math.max(2, y2 - y1));
         ctx.strokeStyle = `rgba(${col},${a + .2})`; ctx.lineWidth = 1;
@@ -181,7 +181,7 @@ export class PriceChart {
         const col = g.type === 'bull' ? '45,212,191' : '244,114,182';
         const x1 = this.x(g.i) - this.barW / 2;
         const y1 = this.y(g.hi), y2 = this.y(g.lo);
-        ctx.fillStyle = `rgba(${col},.16)`; ctx.fillRect(x1, y1, PW - x1, Math.max(1, y2 - y1));
+        ctx.fillStyle = `rgba(${col},.08)`; ctx.fillRect(x1, y1, PW - x1, Math.max(1, y2 - y1));
         ctx.strokeStyle = `rgba(${col},.5)`; ctx.setLineDash([3, 3]); ctx.strokeRect(x1, y1, PW - x1, Math.max(1, y2 - y1)); ctx.setLineDash([]);
         ctx.fillStyle = `rgba(${col},.95)`; ctx.font = '10px Inter, system-ui, sans-serif'; ctx.textAlign = 'left';
         ctx.fillText(g.type === 'bull' ? 'FVG ↑' : 'FVG ↓', x1 + 3, (y1 + y2) / 2);
