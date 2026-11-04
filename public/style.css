@@ -426,3 +426,10 @@ ol.snow li { padding-left: 2px; }
   .lf-name { grid-column: 1 / -1; }
   .loan-del { justify-self: end; }
 }
+
+.loan-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.loan-top h3 { margin: 0; }
+.loan-top .small-btn { margin-top: 0; }
+#loan-lock.locked { border-color: rgba(34,197,94,.55); color: var(--green); }
+.loan-locked td { font-size: 13px; }
+#loan-extra:disabled { opacity: .7; }

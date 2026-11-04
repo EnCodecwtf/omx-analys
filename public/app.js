@@ -815,7 +815,21 @@ $('#loan-extra').value = store.get('loanExtra', '0');
 $('#loan-extra').addEventListener('input', () => { store.set('loanExtra', $('#loan-extra').value); runLoans(); });
 $('#loan-add').addEventListener('click', () => { loans.push({ name: `Lån ${loans.length + 1}`, debt: 10000, rate: 5, pay: 500, plan: false }); saveLoans(); renderLoans(); });
 function saveLoans() { store.set('loans', JSON.stringify(loans)); }
+// Låsta lån går inte att ändra av misstag. Valet sparas.
+let loansLocked = store.get('loansLocked', '0') === '1';
+$('#loan-lock').addEventListener('click', () => { loansLocked = !loansLocked; store.set('loansLocked', loansLocked ? '1' : '0'); renderLoans(); });
 function renderLoans() {
+  $('#loan-lock').textContent = loansLocked ? '🔒 Låst – lås upp för att ändra' : '🔓 Lås siffrorna';
+  $('#loan-lock').setAttribute('aria-pressed', String(loansLocked));
+  $('#loan-lock').classList.toggle('locked', loansLocked);
+  $('#loan-add').hidden = loansLocked;
+  $('#loan-extra').disabled = loansLocked;
+  if (loansLocked) {
+    $('#loan-list').innerHTML = `<table class="cc-table loan-locked"><tr><th>Lån</th><th class="r">Skuld</th><th class="r">Ränta</th><th class="r">Per månad</th></tr>
+      ${loans.map(l => `<tr><td>${esc(l.name)}${l.plan ? ' <span class="tp-chip">Enligt plan</span>' : ''}</td><td class="r num">${kr(l.debt)}</td><td class="r num">${String(l.rate).replace('.', ',')} %</td><td class="r num">${kr(l.pay)}</td></tr>`).join('')}</table>`;
+    runLoans();
+    return;
+  }
   $('#loan-list').innerHTML = (loansExample() ? '<p class="note small">Exempel. Skriv in dina egna lån, så sparas de.</p>' : '')
     + `<div class="loan-row loan-headrow"><span>Namn</span><span>Skuld, kr</span><span>Ränta, %</span><span>Per månad, kr</span><span>Enligt plan</span><span></span></div>`
     + loans.map((l, i) => `<div class="loan-row" data-i="${i}">
