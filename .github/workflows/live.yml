@@ -1,0 +1,15 @@
+# Live-bevakning under dagen: anropar appens live-kontroll var 15:e minut
+# vardagar 09.00–22.15 svensk tid (mål, stopp, säljdagar och förvarningar).
+# Vercels gratisplan kör bara en schemalagd körning per dag, därför görs det här.
+# Lägg samma nyckel som CRON_SECRET i Vercel som hemlighet CRON_SECRET här om den används.
+name: Live-bevakning
+on:
+  schedule:
+    - cron: '*/15 7-21 * * 1-5'
+  workflow_dispatch:
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${{ secrets.CRON_SECRET }}"
