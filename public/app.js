@@ -43,12 +43,11 @@ for (const id of ['acct', 'risk', 'peak']) $('#' + id).addEventListener('input',
   if (lastDetail?.isCrypto) renderCryptoCards(lastDetail);
   else if (lastDetail) loadProducts(lastDetail.symbol, lastDetail.analysis.status);
 });
-// Ansvarsfriskrivning: visas tills den har godkänts på den här enheten.
-const TERMS = 'termsOk-1';
+// Ansvarsfriskrivning: visas varje gång sidan öppnas.
 function showTerms() { $('#terms').hidden = false; $('#terms-ok').focus(); }
-$('#terms-ok').addEventListener('click', () => { store.set(TERMS, '1'); $('#terms').hidden = true; });
+$('#terms-ok').addEventListener('click', () => { $('#terms').hidden = true; });
 $('#show-terms').addEventListener('click', e => { e.preventDefault(); showTerms(); });
-if (store.get(TERMS, '0') !== '1') showTerms();
+showTerms();
 
 // Fyra vyer: Idag (finns det något att göra?), Affärer (hur går det?),
 // Aktier (alla instrument) och Mer (konto, statistik, experiment).
