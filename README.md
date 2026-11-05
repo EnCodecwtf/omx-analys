@@ -822,7 +822,7 @@ Varje vardag kl 07.30 skriver appen en morgonsession i text (GitHub Actions anro
 skickas). Den bygger bara på data appen redan har: natten i USA och Asien, terminer, VIX, guld, olja, bitcoin och kronan,
 dagens makrobesked och rapporter med förra utfallet, FedWatch, dina öppna affärer med coachen, makroläget, aktier ett krav
 från signal, panikveckans läge och nattens rubriker. Inga AI-tjänster och inga kostnader. Sessionen sparas och visas överst
-under Idag och under Mer → Morgonsoffan med Glen.
+under Idag och under Mer → Morgonsoffan med Glen. Knappen **Lyssna** läser upp sessionen med enhetens inbyggda svenska röst (Web Speech): gratis, utan server, med paus, nästa avsnitt och tempo. Texten skrivs om för tal (minus, procent, mål ett, datum och klockslag).
 
 ### Natten och indikation för öppningen
 När Stockholm är stängt visar Idag vad som hänt sedan 17.30: USA-terminerna (S&P 500, Nasdaq, Dow), Ericsson och

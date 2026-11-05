@@ -89,6 +89,7 @@ for (const b of document.querySelectorAll('[data-market]')) {
 // Verktygen under Mer öppnas på en egen sida (på datorn i den stora ytan till höger).
 let tool = null;
 function openTool(name) {
+  if (tool === 'morning' && name !== 'morning') stopSpeech();
   tool = name;
   for (const t of document.querySelectorAll('.tool')) t.hidden = t.dataset.tool !== name;
   document.querySelectorAll('.menu-item').forEach(x => x.classList.toggle('active', x.dataset.tool === name));
@@ -104,6 +105,7 @@ function openTool(name) {
   if (name === 'morning') renderMorning();
 }
 function closeTool() {
+  if (tool === 'morning') stopSpeech();
   tool = null;
   document.body.classList.remove('show-tool');
   document.querySelectorAll('.menu-item').forEach(x => x.classList.remove('active'));
@@ -901,14 +903,102 @@ async function loadMorning() {
 function renderMorning() {
   const el = $('#morning');
   const m = morningData;
+  stopSpeech();
   if (!m) { el.innerHTML = '<p class="muted">Ingen session än. Glen sätter sig i soffan kl 07.30 varje vardag.</p>'; return; }
+  // Varje stycke får ett nummer, så att uppläsningen kan markera var den är.
+  let i = 0;
+  const p = (t, cls = '') => `<p class="say${cls ? ' ' + cls : ''}" data-say="${i++}">${esc(t)}</p>`;
+  const sections = m.sections.filter(x => x.lines.length);
   el.innerHTML = `<div class="m-head"><span class="m-cup">☕</span><div><b>Morgonsoffan med Glen</b><div class="muted small">${esc(m.date)} · skriven ${new Date(m.createdAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</div></div></div>
-    <p class="m-intro">${esc(m.intro)}</p>
-    ${m.sections.filter(x => x.lines.length).map(x => `<h4 class="loan-h">${esc(x.title)}</h4>${x.links
-      ? `<ul class="m-list">${x.lines.map((l, i) => `<li><a href="${esc(x.links[i])}" target="_blank" rel="noopener">${esc(l)}</a></li>`).join('')}</ul>`
-      : x.lines.map(l => `<p>${esc(l)}</p>`).join('')}`).join('')}
-    <p class="m-outro">${esc(m.outro)}</p>
+    <div class="listen" id="listen">
+      <button class="btn listen-play" id="say-play">▶ Lyssna</button>
+      <button class="btn" id="say-next" title="Nästa avsnitt" hidden>⏭</button>
+      <button class="btn" id="say-stop" title="Stoppa" hidden>⏹</button>
+      <label class="small muted">Tempo <select id="say-rate"><option value="0.9">0,9×</option><option value="1" selected>1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select></label>
+      <span class="small muted" id="say-voice"></span>
+    </div>
+    ${p(m.intro, 'm-intro')}
+    ${sections.map(x => `<h4 class="loan-h say" data-say="${i++}" data-head="1">${esc(x.title)}</h4>${x.links
+      ? `<ul class="m-list">${x.lines.map((l, k) => `<li class="say" data-say="${i++}"><a href="${esc(x.links[k])}" target="_blank" rel="noopener">${esc(l)}</a></li>`).join('')}</ul>`
+      : x.lines.map(l => p(l)).join('')}`).join('')}
+    ${p(m.outro, 'm-outro')}
     <p class="muted small">Skriven automatiskt av appen från marknadsdata (Yahoo Finance, FRED, SCB, Riksbanken, Google Nyheter) och dina loggade affärer. Inte investeringsrådgivning.</p>`;
+  $('#say-rate').value = store.get('sayRate', '1');
+  $('#say-rate').addEventListener('change', e => store.set('sayRate', e.target.value));
+  $('#say-play').addEventListener('click', toggleSpeech);
+  $('#say-stop').addEventListener('click', stopSpeech);
+  $('#say-next').addEventListener('click', nextSection);
+  const v = pickVoice();
+  $('#say-voice').textContent = !('speechSynthesis' in window) ? 'Webbläsaren saknar uppläsning.' : v ? `Röst: ${v.name}` : 'Ingen svensk röst hittades på enheten.';
+}
+
+// Uppläsning med enhetens inbyggda talsyntes (Web Speech). Gratis, ingen server.
+// Texten skrivs om för tal: minus/plus, procent, mål, datum och klockslag.
+const MONTHS = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
+function forSpeech(t) {
+  return t
+    .replace(/(\d)[ \u00a0](\d{3})\b/g, '$1$2')
+    .replace(/(\d{4})-(\d{2})-(\d{2})/g, (_, y, mo, d) => `${+d} ${MONTHS[+mo - 1]}`)
+    .replace(/\b[Kk]l\.? (\d{1,2})\.(\d{2})/g, (_, h, mi) => `klockan ${+h}${mi === '00' ? '' : ' och ' + +mi}`)
+    .replace(/\b(\d{1,2})\.(\d{2})\b(?=\D|$)/g, (_, h, mi) => (+h < 24 && +mi < 60 ? `${+h}${mi === '00' ? '' : ' och ' + +mi}` : `${h}.${mi}`))
+    .replace(/[−-](?=\d)/g, 'minus ').replace(/\+(?=\d)/g, 'plus ')
+    .replace(/\bTP(\d)\b/g, (_, n) => `mål ${['', 'ett', 'två', 'tre'][+n] || n}`)
+    .replace(/OMXS30/g, 'O M X trettio').replace(/S&P/g, 'S och P').replace(/\bVIX\b/g, 'vix')
+    .replace(/\bEMA (\d+)/g, 'E M A $1').replace(/\bRSI\b/g, 'R S I').replace(/\bKPIF\b/g, 'K P I F').replace(/\bKPI\b/g, 'K P I').replace(/\bPCE\b/g, 'P C E').replace(/\bBNP\b/g, 'B N P')
+    .replace(/(\d) %/g, '$1 procent').replace(/%/g, ' procent').replace(/(\d) \$/g, '$1 dollar').replace(/\$/g, ' dollar')
+    .replace(/(\d) kr\b/g, '$1 kronor').replace(/ – /g, ', ').replace(/·/g, ',').replace(/[()]/g, ', ')
+    .replace(/(\d)[ \u00a0](\d{3})\b/g, '$1$2').replace(/\s*,(\s*,)+/g, ',').replace(/\s+,/g, ',').replace(/,\s*\./g, '.').replace(/\s{2,}/g, ' ');
+}
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const sv = speechSynthesis.getVoices().filter(v => /^sv/i.test(v.lang));
+  const score = v => (/enhanced|förbättrad|premium|natural|neural/i.test(v.name) ? 4 : 0) + (/alva|klara|sofie|hillevi|mattias/i.test(v.name) ? 2 : 0) + (v.localService ? 1 : 0);
+  return sv.sort((a, b) => score(b) - score(a))[0] || null;
+}
+if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if (tool === 'morning' && $('#say-voice')) { const v = pickVoice(); $('#say-voice').textContent = v ? `Röst: ${v.name}` : 'Ingen svensk röst hittades på enheten.'; } };
+let speech = null; // { idx, playing }
+function sayItems() { return [...document.querySelectorAll('#morning [data-say]')]; }
+function sayFrom(idx) {
+  const items = sayItems();
+  document.querySelectorAll('#morning .speaking').forEach(x => x.classList.remove('speaking'));
+  if (idx >= items.length) { stopSpeech(); return; }
+  const el = items[idx];
+  el.classList.add('speaking');
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  const u = new SpeechSynthesisUtterance(forSpeech(el.textContent) + (el.dataset.head ? '.' : ''));
+  const v = pickVoice(); if (v) u.voice = v;
+  u.lang = 'sv-SE'; u.rate = +($('#say-rate')?.value || 1);
+  u.onend = () => { if (speech?.playing && speech.idx === idx) { speech.idx = idx + 1; sayFrom(idx + 1); } };
+  speech = { idx, playing: true };
+  speechSynthesis.speak(u);
+  setSayButtons();
+}
+function setSayButtons() {
+  if (!$('#say-play')) return;
+  const on = !!speech;
+  $('#say-play').textContent = !on ? '▶ Lyssna' : speech.playing ? '⏸ Pausa' : '▶ Fortsätt';
+  $('#say-next').hidden = $('#say-stop').hidden = !on;
+}
+function toggleSpeech() {
+  if (!('speechSynthesis' in window)) return;
+  if (!speech) { speechSynthesis.cancel(); sayFrom(0); return; }
+  if (speech.playing) { speech.playing = false; speechSynthesis.pause(); }
+  else { speech.playing = true; speechSynthesis.resume(); if (!speechSynthesis.speaking) sayFrom(speech.idx); }
+  setSayButtons();
+}
+function nextSection() {
+  if (!speech) return;
+  const items = sayItems();
+  let k = speech.idx + 1;
+  while (k < items.length && !items[k].dataset.head) k++;
+  speech.playing = false; speechSynthesis.cancel();
+  sayFrom(k);
+}
+function stopSpeech() {
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  speech = null;
+  document.querySelectorAll('#morning .speaking').forEach(x => x.classList.remove('speaking'));
+  setSayButtons();
 }
 
 // Börstider i användarens egen tid (webbläsarens tidszon). Helgdagar räknas inte.
