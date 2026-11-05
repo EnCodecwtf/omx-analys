@@ -918,7 +918,7 @@ function renderMorning() {
       <span class="small muted" id="say-voice"></span>
     </div>
     ${p(m.intro, 'm-intro')}
-    ${sections.map(x => `<h4 class="loan-h say" data-say="${i++}" data-head="1">${esc(x.title)}</h4>${x.links
+    ${sections.map(x => `<h4 class="loan-h say" data-say="${i++}" data-head="1" data-title="${esc(x.title)}">${esc(x.title)}</h4>${x.links
       ? `<ul class="m-list">${x.lines.map((l, k) => `<li class="say" data-say="${i++}"><a href="${esc(x.links[k])}" target="_blank" rel="noopener">${esc(l)}</a></li>`).join('')}</ul>`
       : x.lines.map(l => p(l)).join('')}`).join('')}
     ${p(m.outro, 'm-outro')}
@@ -957,18 +957,30 @@ function pickVoice() {
 }
 if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if (tool === 'morning' && $('#say-voice')) { const v = pickVoice(); $('#say-voice').textContent = v ? `Röst: ${v.name}` : 'Ingen svensk röst hittades på enheten.'; } };
 let speech = null; // { idx, playing }
-function sayItems() { return [...document.querySelectorAll('#morning [data-say]')]; }
+// Det som läses upp: talmanuset (skrivet för tal) om det finns, annars texten på sidan.
+// Varje post pekar på stycket eller avsnittsrubriken som markeras medan den läses.
+function sayItems() {
+  const dom = [...document.querySelectorAll('#morning [data-say]')];
+  const talk = morningData?.talk;
+  if (!talk?.length) return dom.map(el => ({ el, text: forSpeech(el.textContent) + (el.dataset.head ? '.' : ''), head: !!el.dataset.head, section: el.dataset.title || null }));
+  const head = t => document.querySelector(`#morning h4[data-title="${CSS.escape(t)}"]`);
+  return talk.map((t, k) => ({ el: t.section ? head(t.section) : k === 0 ? dom[0] : dom[dom.length - 1], text: forSpeech(t.text), section: t.section, head: k > 0 && t.section !== talk[k - 1].section }));
+}
 function sayFrom(idx) {
   const items = sayItems();
   document.querySelectorAll('#morning .speaking').forEach(x => x.classList.remove('speaking'));
   if (idx >= items.length) { stopSpeech(); return; }
-  const el = items[idx];
-  el.classList.add('speaking');
-  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  const u = new SpeechSynthesisUtterance(forSpeech(el.textContent) + (el.dataset.head ? '.' : ''));
+  const it = items[idx];
+  if (it.el) { it.el.classList.add('speaking'); it.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  const u = new SpeechSynthesisUtterance(it.text);
   const v = pickVoice(); if (v) u.voice = v;
   u.lang = 'sv-SE'; u.rate = +($('#say-rate')?.value || 1);
-  u.onend = () => { if (speech?.playing && speech.idx === idx) { speech.idx = idx + 1; sayFrom(idx + 1); } };
+  u.onend = () => {
+    if (!(speech?.playing && speech.idx === idx)) return;
+    speech.idx = idx + 1;
+    // En kort paus mellan avsnitten, som en människa gör.
+    setTimeout(() => { if (speech?.playing && speech.idx === idx + 1) sayFrom(idx + 1); }, items[idx + 1]?.head ? 450 : 120);
+  };
   speech = { idx, playing: true };
   speechSynthesis.speak(u);
   setSayButtons();
@@ -990,7 +1002,7 @@ function nextSection() {
   if (!speech) return;
   const items = sayItems();
   let k = speech.idx + 1;
-  while (k < items.length && !items[k].dataset.head) k++;
+  while (k < items.length && !items[k].head) k++;
   speech.playing = false; speechSynthesis.cancel();
   sayFrom(k);
 }
