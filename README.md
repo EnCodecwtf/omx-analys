@@ -817,6 +817,13 @@ lånen försvinner allt fortare. Lån markerade *Enligt plan* (till exempel CSN 
 Verktyget visar ordningen, när varje lån är betalt, total ränta och jämför med lavinmetoden (dyraste räntan först) och med
 bara minimibetalningar. Lånen sparas bara i webbläsaren och skickas aldrig till servern.
 
+### Börstider
+Under **Mer → Börstider** visas när Tokyo, Shanghai, Hongkong, Sydney, Stockholm, Frankfurt, London och New York öppnar och
+stänger i användarens egen tid (webbläsarens tidszon, sommar- och vintertid räknas om), med status och tidslinje. Bredvid
+visas hur dagens handel fördelar sig per kvart i Stockholm (10 stora OMX-aktier) och New York (SPY och QQQ), i snitt de
+senaste 60 handelsdagarna: stängningsauktionen står för cirka 40 % av volymen i Stockholm, och öppningen och USA:s öppning
+15.30 ger tydliga toppar. Helgdagar ingår inte.
+
 ### Coachen
 Varje öppen affär har en coach som kommenterar läget med riktiga data: nådda mål, kursen mot köpet, om studsen från stödet
 håller, om kursen gjort nya bottnar sedan signalen, EMA 20, motstånd före nästa mål, överköpt RSI och kommande rapport. Den

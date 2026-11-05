@@ -359,6 +359,46 @@ async function calendar() {
   });
 }
 
+// Volym över dagen: hur stor del av dagens handel som sker i varje kvart, i
+// börsens egen tid, i snitt de senaste 60 handelsdagarna (15-minutersdata från Yahoo).
+const VOL_MARKETS = {
+  omx: { tz: 'Europe/Stockholm', symbols: ['VOLV-B.ST', 'ERIC-B.ST', 'ATCO-A.ST', 'INVE-B.ST', 'SEB-A.ST', 'HM-B.ST', 'SAND.ST', 'ABB.ST', 'ASSA-B.ST', 'NDA-SE.ST'] },
+  us: { tz: 'America/New_York', symbols: ['SPY', 'QQQ'] },
+};
+let volCache = null;
+async function volumeProfile() {
+  if (volCache && Date.now() - volCache.at < 12 * 3600 * 1000) return volCache.value;
+  const out = {};
+  for (const [key, m] of Object.entries(VOL_MARKETS)) {
+    const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: m.tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+    const slots = new Map();
+    let days = 0;
+    for (const sym of m.symbols) {
+      try {
+        const j = await (await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=60d&interval=15m`, { headers: { 'User-Agent': 'Mozilla/5.0 (omx-analys)' } })).json();
+        const r = j.chart.result[0], v = r.indicators.quote[0].volume;
+        const byDay = new Map();
+        r.timestamp.forEach((t, i) => {
+          if (!v[i]) return;
+          const p = Object.fromEntries(fmt.formatToParts(new Date(t * 1000)).map(x => [x.type, x.value]));
+          const d = `${p.year}-${p.month}-${p.day}`, slot = `${p.hour}:${p.minute}`;
+          if (!byDay.has(d)) byDay.set(d, new Map());
+          byDay.get(d).set(slot, (byDay.get(d).get(slot) || 0) + v[i]);
+        });
+        for (const day of byDay.values()) {
+          const tot = [...day.values()].reduce((a, x) => a + x, 0);
+          if (tot <= 0 || day.size < 8) continue;
+          days++;
+          for (const [slot, x] of day) slots.set(slot, (slots.get(slot) || 0) + x / tot);
+        }
+      } catch (err) { console.error('Volymdata saknas för', sym, err.message); }
+    }
+    out[key] = { tz: m.tz, days, slots: [...slots].sort((a, b) => a[0].localeCompare(b[0])).map(([t, x]) => ({ t, share: Math.round(x / Math.max(1, days) * 10000) / 100 })) };
+  }
+  volCache = { at: Date.now(), value: out };
+  return out;
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -603,6 +643,7 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh')) cache.delete('shorts');
       return send(res, 200, await shortScan());
     }
+    if (url.pathname === '/api/volume-profile') return send(res, 200, await volumeProfile());
     if (url.pathname === '/api/calendar') return send(res, 200, await calendar());
     // Affärerna från tioårstestet (R per affär), för kalkylatorn ränta på ränta.
     if (url.pathname === '/api/trades10y') return send(res, 200, JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'trades-10y.json'), 'utf8')));

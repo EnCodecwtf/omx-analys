@@ -98,6 +98,7 @@ function openTool(name) {
   if (name === 'strategy') loadStrategyCalc();
   if (name === 'compound') runCompound();
   if (name === 'loans') renderLoans();
+  if (name === 'hours') { renderHours(); loadVolProfile(); }
 }
 function closeTool() {
   tool = null;
@@ -800,6 +801,106 @@ function drawCompound(rows) {
     tip.hidden = false; tip.style.left = Math.min(x(i) / W * rc.width + 12, rc.width - tip.offsetWidth - 4) + 'px';
   });
   svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
+}
+
+// Börstider i användarens egen tid (webbläsarens tidszon). Helgdagar räknas inte.
+const EXCHANGES = [
+  { name: 'Tokyo', tz: 'Asia/Tokyo', s: [['09:00', '11:30'], ['12:30', '15:30']] },
+  { name: 'Shanghai', tz: 'Asia/Shanghai', s: [['09:30', '11:30'], ['13:00', '15:00']] },
+  { name: 'Hongkong', tz: 'Asia/Hong_Kong', s: [['09:30', '12:00'], ['13:00', '16:00']] },
+  { name: 'Sydney', tz: 'Australia/Sydney', s: [['10:00', '16:00']] },
+  { name: 'Stockholm', tz: 'Europe/Stockholm', s: [['09:00', '17:30']], note: 'Stängningsauktion 17.25–17.30', mine: true },
+  { name: 'Frankfurt (Xetra)', tz: 'Europe/Berlin', s: [['09:00', '17:30']] },
+  { name: 'London', tz: 'Europe/London', s: [['08:00', '16:30']] },
+  { name: 'New York', tz: 'America/New_York', s: [['09:30', '16:00']], note: 'Förhandel från 04.00, efterhandel till 20.00 (New York-tid)' },
+];
+const myTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+// Tidpunkt (Date) för en klockslag i en viss tidszon, en viss dag (räknat i den zonen).
+function tzOffsetMin(date, tz) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(date).map(x => [x.type, x.value]));
+  return (Date.UTC(+p.year, p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - date.getTime()) / 60000;
+}
+function zoned(ymd, hhmm, tz) {
+  const [y, m, d] = ymd.split('-').map(Number), [h, mi] = hhmm.split(':').map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  return new Date(guess - tzOffsetMin(new Date(guess), tz) * 60000);
+}
+const ymdIn = (date, tz) => new Intl.DateTimeFormat('sv-SE', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+const hm = date => date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
+const isWeekday = (date, tz) => !/Sat|Sun/.test(new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(date));
+// Handelspass idag (i börsens tid) och nästa öppning, som Date.
+function sessions(ex, now = new Date()) {
+  const today = ymdIn(now, ex.tz);
+  const list = isWeekday(zoned(today, '12:00', ex.tz), ex.tz) ? ex.s.map(([a, b]) => [zoned(today, a, ex.tz), zoned(today, b, ex.tz)]) : [];
+  const open = list.find(([a, b]) => now >= a && now < b);
+  let next = list.find(([a]) => a > now)?.[0];
+  for (let k = 1; !next && k < 8; k++) {
+    const d = new Date(zoned(today, '12:00', ex.tz).getTime() + k * 864e5), ymd = ymdIn(d, ex.tz);
+    if (isWeekday(zoned(ymd, '12:00', ex.tz), ex.tz)) next = zoned(ymd, ex.s[0][0], ex.tz);
+  }
+  return { list, open, next };
+}
+const until = ms => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
+let hoursTimer = null;
+function renderHours() {
+  const now = new Date();
+  const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const pos = d => Math.max(0, Math.min(100, (d - dayStart) / 864e5 * 100));
+  const rows = EXCHANGES.map(ex => {
+    const { list, open, next } = sessions(ex, now);
+    const all = ex.s.map(([a, b]) => { const t = ymdIn(now, ex.tz); return [zoned(t, a, ex.tz), zoned(t, b, ex.tz)]; });
+    const span = `${hm(all[0][0])}–${hm(all.at(-1)[1])}${all.length > 1 ? ` <span class="muted small">(lunch ${hm(all[0][1])}–${hm(all[1][0])})</span>` : ''}`;
+    const status = open ? `<span class="tp-chip hit">Öppen</span> <span class="muted small">stänger om ${until(open[1] - now)}</span>`
+      : `<span class="tp-chip">Stängd</span> <span class="muted small">${next ? `öppnar ${next.toDateString() === now.toDateString() ? `om ${until(next - now)}` : next.toLocaleDateString('sv-SE', { weekday: 'long' }) + ' ' + hm(next)}` : ''}</span>`;
+    // Tidslinje 00–24 i din tid. Pass som går över midnatt delas.
+    const segs = [];
+    for (const [a, b] of all) {
+      for (const shift of [-864e5, 0, 864e5]) {
+        const A = new Date(+a + shift), B = new Date(+b + shift);
+        const l = pos(A), r = pos(B);
+        if (r > l) segs.push(`<span class="hr-seg${ex.mine ? ' mine' : ''}" style="left:${l}%;width:${r - l}%"></span>`);
+      }
+    }
+    return `<div class="hr-row"><div class="hr-top"><b>${esc(ex.name)}</b><span>${span}</span></div>
+      <div class="hr-line">${segs.join('')}<span class="hr-now" style="left:${pos(now)}%"></span></div>
+      <div class="hr-bot">${status}${ex.note ? `<span class="muted small">${esc(ex.note)}</span>` : ''}</div></div>`;
+  });
+  $('#hours').innerHTML = `<p class="small" style="margin-top:0">Din tid: <b>${hm(now)}</b> <span class="muted">(${esc(myTz)})</span>. Tiderna räknas om automatiskt vid sommar- och vintertid.</p>
+    <div class="hr-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+    ${rows.join('')}
+    <div class="hr-row"><div class="hr-top"><b>Hävstångscertifikat på Avanza</b><span>till cirka 22.00</span></div>
+      <div class="hr-bot"><span class="muted small">Emittenterna ställer kurser även när Stockholm är stängt, så länge USA handlas. Tiderna varierar mellan emittenter.</span></div></div>
+    <div class="hr-row"><div class="hr-top"><b>Krypto</b><span>dygnet runt</span></div></div>
+    <p class="muted small">Helgdagar ingår inte – kontrollera börsens kalender kring storhelger.</p>`;
+  clearInterval(hoursTimer);
+  hoursTimer = setInterval(() => { if (tool === 'hours') renderHours(); else clearInterval(hoursTimer); }, 60000);
+}
+// Volym per kvart, omräknad till din tid.
+let volData = null;
+async function loadVolProfile() {
+  if (!volData) { try { volData = await (await fetch('/api/volume-profile')).json(); } catch { $('#volprof').innerHTML = '<p class="muted small">Kunde inte hämta volymdata.</p>'; return; } }
+  const chart = (m, title, note) => {
+    if (!m?.slots?.length) return '';
+    const today = ymdIn(new Date(), m.tz);
+    const slots = m.slots.map(x => ({ ...x, at: zoned(today, x.t, m.tz) }));
+    const cap = Math.max(...slots.slice(0, -1).map(x => x.share)) * 1.15;
+    const top = slots.slice().sort((a, b) => b.share - a.share);
+    const bars = slots.map(x => { const big = x.share > cap; const h = Math.min(100, x.share / cap * 100);
+      return `<div class="vb${big ? ' cut' : ''}" title="${hm(x.at)}: ${String(x.share).replace('.', ',')} % av dagens volym"><span style="height:${h}%"></span>${big ? `<em>${Math.round(x.share)} %</em>` : ''}</div>`; }).join('');
+    const ticks = slots.filter((x, i) => i % 4 === 0).map(x => `<span>${hm(x.at)}</span>`).join('');
+    return `<h4 class="loan-h">${title}</h4><div class="vchart">${bars}</div><div class="vticks">${ticks}</div>
+      <p class="small">${note(top, slots)}</p>`;
+  };
+  const pctOf = (slots, from, to) => String(Math.round(slots.filter(x => hm(x.at) >= from && hm(x.at) < to).reduce((a, x) => a + x.share, 0) * 10) / 10).replace('.', ',');
+  const om = volData.omx, us = volData.us;
+  $('#volprof').innerHTML = `<p class="small" style="margin-top:0">Andel av dagens handel per kvart, i snitt de senaste 60 handelsdagarna. Mycket volym betyder mycket köpare och säljare: bättre priser, men också större rörelser.</p>`
+    + chart(om, 'Stockholm (10 stora OMX-aktier)', (top, sl) => {
+      const auction = sl.at(-1), usOpen = sl.find(x => x.t === '15:30');
+      return `Störst är <b>stängningsauktionen</b> i sista kvarten (${hm(auction.at)}–${hm(new Date(+auction.at + 15 * 6e4))}): <b>${String(auction.share).replace('.', ',')} %</b> av dagens volym.
+        Därefter <b>öppningen</b> (${hm(sl[0].at)}–${hm(sl[2].at)}: ${pctOf(sl, hm(sl[0].at), hm(sl[2].at))} %) och <b>när USA öppnar</b> (${usOpen ? hm(usOpen.at) : '15.30'}). Lugnast är lunchen.`;
+    })
+    + chart(us, 'New York (SPY och QQQ)', (top, sl) => `Första kvarten (${hm(sl[0].at)}) står för <b>${String(sl[0].share).replace('.', ',')} %</b> och sista kvarten (${hm(sl.at(-1).at)}) för <b>${String(sl.at(-1).share).replace('.', ',')} %</b> av dagens volym. Mitt på dagen är det lugnast.`)
+    + `<p class="muted small">Källa: Yahoo Finance, 15-minutersdata. Amerikanska makrosiffror (${hm(zoned(ymdIn(new Date(), 'America/New_York'), '08:30', 'America/New_York'))} i din tid) brukar ge en extra topp i både Stockholm och USA.</p>`;
 }
 
 // Betala av lån med snöbollsmetoden (Dave Ramsey): minimibetalning på alla lån,

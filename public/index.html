@@ -59,6 +59,7 @@
         <nav class="menu" aria-label="Verktyg och inställningar">
           <div class="menu-head">Verktyg</div>
           <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
+          <button class="menu-item" data-tool="hours"><span class="mi-ico">🕘</span><span><b>Börstider</b><small>Öppet och stängt i din tid, och när handeln är störst</small></span></button>
           <button class="menu-item" data-tool="compound"><span class="mi-ico">％</span><span><b>Ränta på ränta</b><small>Vanlig kalkylator med fast avkastning</small></span></button>
           <button class="menu-item" data-tool="loans"><span class="mi-ico">❄</span><span><b>Betala av lån</b><small>Snöbollsmetoden: minsta lånet först</small></span></button>
           <button class="menu-item" data-tool="strategy"><span class="mi-ico">📈</span><span><b>Ränta på ränta med strategin</b><small>Möjliga utfall med appens riktiga affärer</small></span></button>
@@ -137,6 +138,13 @@
             <article class="card"><h3>FedWatch: marknadens tro på Fed</h3><div id="fedwatch"><div class="loading">Räknar…</div></div></article>
             <article class="card"><h3>Senaste makroutfall</h3><div id="outcomes"><div class="loading">Hämtar…</div></div></article>
           </div>
+        </div>
+      </div>
+
+      <div class="tool" data-tool="hours" data-title="Börstider" hidden>
+        <div class="tool-grid">
+          <article class="card"><h3>Börserna i din tid</h3><div id="hours"></div></article>
+          <article class="card"><h3>När handeln är som störst</h3><div id="volprof"><div class="loading">Räknar på 60 dagars handel…</div></div></article>
         </div>
       </div>
 
