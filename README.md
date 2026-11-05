@@ -831,6 +831,13 @@ OMXS30 och DAX öppnar räknas med en regression på de senaste cirka 60 dagarna
 S&P 500-terminens rörelse mellan 17.30 och 08.45. Vid start (november 2026, 50 dagar): OMX beta 0,97, R² 0,58, riktningen
 rätt 95 % av gångerna när terminen rört sig mer än 0,3 %; DAX beta 0,69, R² 0,46, 89 %. Samma sak ingår i Morgonsoffan.
 
+### Morgonsoffan som ljud
+Varje vardag 07.40 läser GitHub Actions (`.github/workflows/morning-audio.yml`, `scripts/morning_audio.py`) upp talmanuset
+med Microsofts neurala svenska röst (Mattias, via edge-tts – samma tjänst som uppläsningen i Microsoft Edge), lägger ihop
+styckena med korta pauser och laddar upp en MP3 som release-fil (`morgon-ljud`, de senaste 7 dagarna sparas). Appen spelar
+filen via `/api/morning-audio/…` och markerar stycket som läses. Tjänsten är inofficiell: finns ingen ljudfil läser appen upp
+med enhetens egen röst.
+
 ### Börstider
 Under **Mer → Börstider** visas när Tokyo, Shanghai, Hongkong, Sydney, Stockholm, Frankfurt, London och New York öppnar och
 stänger i användarens egen tid (webbläsarens tidszon, sommar- och vintertid räknas om), med status och tidslinje. Bredvid

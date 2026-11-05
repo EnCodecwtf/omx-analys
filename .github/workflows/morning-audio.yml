@@ -1,0 +1,29 @@
+# Morgonsoffan som ljudfil: läser talmanuset med en neural svensk röst efter att
+# sessionen skrivits kl 07.30 (körs 07.40 svensk tid, både sommar- och vintertid).
+name: Morgonsoffan ljud
+on:
+  schedule:
+    - cron: '40 5,6 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Gör om ljudet även om dagens finns eller sessionen är från en annan dag'
+        required: false
+        default: ''
+permissions:
+  contents: write
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install edge-tts==7.3.1
+      - run: python scripts/morning_audio.py
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}

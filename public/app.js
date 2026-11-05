@@ -924,12 +924,39 @@ function renderMorning() {
     ${p(m.outro, 'm-outro')}
     <p class="muted small">Skriven automatiskt av appen från marknadsdata (Yahoo Finance, FRED, SCB, Riksbanken, Google Nyheter) och dina loggade affärer. Inte investeringsrådgivning.</p>`;
   $('#say-rate').value = store.get('sayRate', '1');
-  $('#say-rate').addEventListener('change', e => store.set('sayRate', e.target.value));
+  $('#say-rate').addEventListener('change', e => { store.set('sayRate', e.target.value); const a = $('#say-audio'); if (a) a.playbackRate = +e.target.value; });
+  // Färdig ljudfil med neural röst om den finns för dagens session, annars enhetens röst.
+  const audioOk = m.audio?.url && m.talk?.length && m.audio.offsets?.length === m.talk.length;
+  if (audioOk) {
+    const a = document.createElement('audio');
+    a.id = 'say-audio'; a.preload = 'none'; a.src = m.audio.url;
+    a.addEventListener('timeupdate', () => audioHighlight(a));
+    a.addEventListener('play', setSayButtons);
+    a.addEventListener('pause', setSayButtons);
+    a.addEventListener('ended', stopSpeech);
+    a.addEventListener('error', () => { a.remove(); toast('Ljudfilen kunde inte spelas. Enhetens egen röst används i stället.'); setVoiceLabel(); setSayButtons(); });
+    $('#listen').appendChild(a);
+  }
   $('#say-play').addEventListener('click', toggleSpeech);
   $('#say-stop').addEventListener('click', stopSpeech);
   $('#say-next').addEventListener('click', nextSection);
+  setVoiceLabel();
+}
+function setVoiceLabel() {
+  const el = $('#say-voice'); if (!el) return;
+  if ($('#say-audio')) { el.textContent = `Röst: ${(morningData.audio.voice || '').includes('Sofie') ? 'Sofie' : 'Mattias'} (neural)`; return; }
   const v = pickVoice();
-  $('#say-voice').textContent = !('speechSynthesis' in window) ? 'Webbläsaren saknar uppläsning.' : v ? `Röst: ${v.name}` : 'Ingen svensk röst hittades på enheten.';
+  el.textContent = !('speechSynthesis' in window) ? 'Webbläsaren saknar uppläsning.' : v ? `Röst: ${v.name}` : 'Ingen svensk röst hittades på enheten.';
+}
+// Ljudfil: markera stycket som spelas utifrån var varje stycke börjar.
+function audioHighlight(a) {
+  const off = morningData?.audio?.offsets || [];
+  let k = 0; while (k + 1 < off.length && off[k + 1] <= a.currentTime + 0.05) k++;
+  if (speech?.idx === k) return;
+  speech = { idx: k, playing: !a.paused };
+  const it = sayItems()[k];
+  document.querySelectorAll('#morning .speaking').forEach(x => x.classList.remove('speaking'));
+  if (it?.el) { it.el.classList.add('speaking'); it.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
 }
 
 // Uppläsning med enhetens inbyggda talsyntes (Web Speech). Gratis, ingen server.
@@ -987,11 +1014,20 @@ function sayFrom(idx) {
 }
 function setSayButtons() {
   if (!$('#say-play')) return;
+  const a = $('#say-audio');
+  if (a) {
+    const started = a.currentTime > 0 && !a.ended;
+    $('#say-play').textContent = !a.paused ? '⏸ Pausa' : started ? '▶ Fortsätt' : '▶ Lyssna';
+    $('#say-next').hidden = $('#say-stop').hidden = !started && a.paused;
+    return;
+  }
   const on = !!speech;
   $('#say-play').textContent = !on ? '▶ Lyssna' : speech.playing ? '⏸ Pausa' : '▶ Fortsätt';
   $('#say-next').hidden = $('#say-stop').hidden = !on;
 }
 function toggleSpeech() {
+  const a = $('#say-audio');
+  if (a) { a.playbackRate = +($('#say-rate')?.value || 1); if (a.paused) a.play().catch(() => a.dispatchEvent(new Event('error'))); else a.pause(); return; }
   if (!('speechSynthesis' in window)) return;
   if (!speech) { speechSynthesis.cancel(); sayFrom(0); return; }
   if (speech.playing) { speech.playing = false; speechSynthesis.pause(); }
@@ -999,6 +1035,13 @@ function toggleSpeech() {
   setSayButtons();
 }
 function nextSection() {
+  const a = $('#say-audio');
+  if (a) {
+    const items = sayItems(), off = morningData.audio.offsets;
+    let k = (speech?.idx ?? 0) + 1; while (k < items.length && !items[k].head) k++;
+    if (k < off.length) a.currentTime = off[k] + 0.01; else stopSpeech();
+    return;
+  }
   if (!speech) return;
   const items = sayItems();
   let k = speech.idx + 1;
@@ -1007,6 +1050,8 @@ function nextSection() {
   sayFrom(k);
 }
 function stopSpeech() {
+  const a = $('#say-audio');
+  if (a) { a.pause(); try { a.currentTime = 0; } catch { /* inte laddad */ } }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   speech = null;
   document.querySelectorAll('#morning .speaking').forEach(x => x.classList.remove('speaking'));

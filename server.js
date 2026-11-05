@@ -701,6 +701,29 @@ export default async function handler(req, res) {
     }
     if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
+    // Ljudfilen från GitHub-jobbet: sparas på dagens session.
+    if (url.pathname === '/api/cron/morning-audio' && req.method === 'POST') {
+      const a = await readJson(req);
+      if (!/^morgon-\d{4}-\d{2}-\d{2}\.mp3$/.test(a.file || '') || !Array.isArray(a.offsets)) return send(res, 400, { error: 'Ogiltig ljudfil' });
+      const saved = await signalLog.kvGet(MORNING_KEY, null);
+      if (!saved?.latest || saved.latest.date !== a.date) return send(res, 409, { error: 'Ingen session för det datumet' });
+      saved.latest.audio = { date: a.date, url: `/api/morning-audio/${a.file}`, offsets: a.offsets.map(Number), duration: +a.duration || null, voice: String(a.voice || '').slice(0, 60) };
+      saved.list = (saved.list || []).map(x => (x.date === a.date ? saved.latest : x));
+      await signalLog.kvSet(MORNING_KEY, saved);
+      return send(res, 200, { ok: true });
+    }
+    // Spelar upp ljudfilen via appen (rätt filtyp och stöd för spolning, som Safari kräver).
+    const audioMatch = url.pathname.match(/^\/api\/morning-audio\/(morgon-\d{4}-\d{2}-\d{2}\.mp3)$/);
+    if (audioMatch) {
+      const r = await fetch(`https://github.com/${process.env.GITHUB_REPO || 'EnCodecwtf/omx-analys'}/releases/download/morgon-ljud/${audioMatch[1]}`,
+        { headers: req.headers.range ? { Range: req.headers.range } : {}, redirect: 'follow', signal: AbortSignal.timeout(20000) });
+      if (!r.ok) return send(res, r.status === 404 ? 404 : 502, { error: 'Ljudet finns inte' });
+      const headers = { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=86400' };
+      for (const h of ['content-length', 'content-range']) if (r.headers.get(h)) headers[h.replace(/(^|-)./g, x => x.toUpperCase())] = r.headers.get(h);
+      res.writeHead(r.status, headers);
+      res.end(Buffer.from(await r.arrayBuffer()));
+      return;
+    }
     if (url.pathname === '/api/cron/morning') {
       const s = sthlm();
       // Schemat körs två gånger (sommar- och vintertid); bara den som träffar 07.15–09.00 publicerar.
