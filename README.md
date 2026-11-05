@@ -817,6 +817,11 @@ lånen försvinner allt fortare. Lån markerade *Enligt plan* (till exempel CSN 
 Verktyget visar ordningen, när varje lån är betalt, total ränta och jämför med lavinmetoden (dyraste räntan först) och med
 bara minimibetalningar. Lånen sparas bara i webbläsaren och skickas aldrig till servern.
 
+### Coachen
+Varje öppen affär har en coach som kommenterar läget med riktiga data: nådda mål, kursen mot köpet, om studsen från stödet
+håller, om kursen gjort nya bottnar sedan signalen, EMA 20, motstånd före nästa mål, överköpt RSI och kommande rapport. Den
+peppar men lovar inget, och påminner om att planen gäller. Två rader från coachen följer med notisen när TP1 eller TP2 nås.
+
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
 Geopolitik, Makro, Rapport, Bud eller Analys. Rubrikerna påverkar inte signalerna, eftersom det inte finns någon gratis historik att

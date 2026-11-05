@@ -433,3 +433,13 @@ ol.snow li { padding-left: 2px; }
 #loan-lock.locked { border-color: rgba(34,197,94,.55); color: var(--green); }
 .loan-locked td { font-size: 13px; }
 #loan-extra:disabled { opacity: .7; }
+
+/* Coachen */
+.coach { display: flex; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-3); font-size: 13px; color: var(--text-2); }
+.coach b { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.coach p { margin: 4px 0 0; line-height: 1.45; }
+.coach p:first-of-type { color: var(--text); }
+.coach.good { box-shadow: inset 3px 0 0 var(--green); }
+.coach.warn { box-shadow: inset 3px 0 0 var(--amber); }
+.coach.calm { box-shadow: inset 3px 0 0 var(--accent); }
+.coach-ico { font-size: 16px; line-height: 1.2; }

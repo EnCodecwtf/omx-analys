@@ -630,6 +630,7 @@ function tradeCard(e) {
     <div class="muted small">Signal ${esc(e.date)}${e.entry ? ` · köp ${fmt(e.entry)}` : ''}${e.last != null ? ` · nu ${fmt(e.last)}` : ''}</div>
     ${!days && e.tps ? tradeBar(e) : ''}
     <div class="tc-next">${nextStep(e)}</div>
+    ${e.coach?.lines?.length ? `<div class="coach ${e.coach.tone}"><span class="coach-ico" aria-hidden="true">🧭</span><div><b>Coachen</b>${e.coach.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div></div>` : ''}
   </div>`;
 }
 

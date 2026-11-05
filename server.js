@@ -17,6 +17,7 @@ import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
+import { coachTrade } from './lib/coach.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -388,7 +389,12 @@ async function liveCheck({ force = false } = {}) {
       if (o.state === 'stängd' && o.hit < 3) kinds.push('stop');
       // Affärer som stängdes för flera dagar sedan markeras utan notis.
       if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
-      for (const k of await signalLog.markAlerts(id, kinds)) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
+      const fresh = await signalLog.markAlerts(id, kinds);
+      if (fresh.length && o.state === 'öppen') {
+        // Coachens läsning av läget följer med notisen om ett nått mål.
+        try { const bars = await fetchBars(e.symbol); o.coach = coachTrade({ ...e, ...o }, bars, evaluate(bars.slice(-CHART_BARS)), null); } catch { /* notisen skickas ändå */ }
+      }
+      for (const k of fresh) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
     } catch (err) {
       console.error('Live-kontrollen misslyckades för', e.symbol, err.message);
     }
@@ -434,6 +440,16 @@ async function summary() {
 // Signalloggen med utfall räknat från kurserna efter signaldagen.
 async function logView() {
   const out = await withOutcomes();
+  // Coachens kommentarer för öppna affärer, byggda på riktiga data.
+  for (const e of out) {
+    if (e.state !== 'öppen' && e.state !== 'väntar på köp') continue;
+    try {
+      const bars = await fetchBars(e.symbol);
+      const meta = bySymbol.get(e.symbol);
+      const rep = meta && !meta.isIndex && !meta.isUS && !meta.isCrypto ? await nextReport(e.symbol).catch(() => null) : null;
+      e.coach = coachTrade(e, bars, evaluate(bars.slice(-CHART_BARS)), rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null);
+    } catch (err) { console.error('Coachen kunde inte räkna', e.symbol, err.message); }
+  }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
   const closed = out.filter(x => x.state === 'stängd' && !x.kind);

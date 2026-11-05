@@ -485,3 +485,20 @@ test('en affär i taget per aktie och strategi', async () => {
   assert.equal(until.get('ATCO-A.ST|'), '9999-12-31');
   assert.equal(until.get('LIFCO-B.ST|'), '9999-12-31');
 });
+
+test('coachen bygger på verkliga nivåer', async () => {
+  const { coachTrade } = await import('../lib/coach.js');
+  const d = i => 1_700_000_000 + i * 86400, day = i => new Date(d(i) * 1000).toISOString().slice(0, 10);
+  const bars = [{ t: d(0), o: 100, h: 101, l: 98, c: 100 }, { t: d(1), o: 100, h: 104, l: 99, c: 103 }, { t: d(2), o: 103, h: 108, l: 102, c: 107 }];
+  const ev = { zones: [{ kind: 'support', lo: 96, hi: 99, touches: 4 }, { kind: 'resistance', lo: 110, hi: 112, touches: 3 }], ema: { e20: 104 }, rsi: 55 };
+  const e = { name: 'Test', date: day(0), entry: 100, stop: 95, tps: [106, 114, 120], hit: 1, last: 107, state: 'öppen' };
+  const c = coachTrade(e, bars, ev, { date: '2099-01-01', days: 30 });
+  assert.equal(c.tone, 'good');
+  assert.match(c.lines[0], /TP1 är taget/);
+  assert.ok(c.lines.some(l => /stödet 96,00–99,00 håller/.test(l)));
+  assert.ok(c.lines.some(l => /Inga nya bottnar/.test(l)));
+  assert.ok(c.lines.some(l => /Motståndet 110,00–112,00 ligger före TP2/.test(l)));
+  // Under stödet men över stoppet: varning, planen gäller.
+  const w = coachTrade({ ...e, hit: 0, last: 95.5 }, bars, ev, null);
+  assert.equal(w.tone, 'warn');
+});
