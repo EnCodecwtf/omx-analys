@@ -439,7 +439,8 @@ async function morning({ publish = false } = {}) {
   const saved = await signalLog.kvGet(MORNING_KEY, null);
   const s = sthlm();
   const due = !s.weekend && s.min >= 7 * 60 + 15;
-  if (saved?.latest?.date === s.date || (!publish && !due)) return saved?.latest || null;
+  // En session utan talmanus (skriven före uppläsningen fanns) skrivs om.
+  if ((saved?.latest?.date === s.date && saved.latest.talk) || (!publish && !due)) return saved?.latest || null;
   const m = await makeMorning();
   await signalLog.kvSet(MORNING_KEY, { latest: m, list: [m, ...(saved?.list || []).filter(x => x.date !== m.date)].slice(0, 10) });
   if (publish) { try { await pushAll({ title: '☕ Morgonsoffan med Glen', body: m.summary || 'Dagens morgonsession är klar.', url: '/#morgon', tag: 'morgon' }); } catch { /* notisen är inte avgörande */ } }
