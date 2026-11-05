@@ -221,19 +221,28 @@ function byCloseness(a, b) {
 }
 
 // Rad i aktielistan. Signaler och öppna affärer får färg, övriga är dämpade.
+// Hur nära signal en aktie är: prickar för uppfyllda krav och en tydlig etikett.
+// 1 krav kvar = Nära signal, 2 kvar = Bevaka.
+const closeness = r => {
+  if (!r.checks || r.missing == null) return null;
+  const ok = r.checks - r.missing.length, left = r.missing.length;
+  return { ok, of: r.checks, left, label: left === 1 ? 'NÄRA SIGNAL' : left === 2 ? 'BEVAKA' : null, cls: left === 1 ? 'near1' : left === 2 ? 'near2' : 'far' };
+};
+const dots = c => `<span class="kdots" title="${c.ok} av ${c.of} krav uppfyllda">${'<i class="on"></i>'.repeat(c.ok)}${'<i></i>'.repeat(c.of - c.ok)}</span>`;
 function stockRow(r) {
   if (r.error) return `<div class="row"><div class="name">${esc(r.name)}</div><div class="meta">${esc(r.error)}</div></div>`;
-  const up = r.changePct >= 0, hot = isSignal(r) || r.inTrade || r.status === 'watch';
+  const up = r.changePct >= 0, c = !isSignal(r) && !r.inTrade && !r.isIndex ? closeness(r) : null;
+  const hot = isSignal(r) || r.inTrade || (c && c.left <= 2);
   const tag = r.inTrade ? `<span class="badge strong" title="Signal ${esc(r.inTrade.date)} är en öppen affär. En affär i taget per aktie.">I AFFÄR</span>${r.inTrade.hit ? ` <span class="tp-chip hit">TP${r.inTrade.hit} ✓</span>` : ''}`
-    : r.status === 'neutral' ? '' : badge(r.status);
-  const near = r.missing?.length && !isSignal(r) && !r.inTrade && r.missing.length <= 2
-    ? `<span class="${r.missing.length === 1 ? 'near' : ''}" title="${r.checks - r.missing.length} av ${r.checks} krav uppfyllda">${r.missing.length} krav kvar: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : '';
+    : isSignal(r) ? badge(r.status) : c?.label ? `<span class="kchip ${c.cls}">${c.label}</span>` : '';
+  const meta = r.isIndex ? `<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>`
+    : c ? `${dots(c)}<span class="kcount ${c.cls}">${c.ok} av ${c.of} krav</span>${c.left <= 2 ? `<span class="kmiss">Saknas: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}` : '';
   return `<div class="row${hot ? '' : ' quiet'}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
     <div class="name">${esc(r.name)} ${tag}${!r.inTrade && r.preliminary && isSignal(r) ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
     <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0], !hot)}
       <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
     </div>
-    ${near || r.isIndex ? `<div class="meta">${r.isIndex ? `<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>` : ''}${near}</div>` : ''}
+    ${meta ? `<div class="meta">${meta}</div>` : ''}
   </div>`;
 }
 const bindRows = el => {
@@ -250,7 +259,22 @@ function renderScan() {
   const head = um ? `<div class="note">USA-läge: <b class="${um.score >= um.need ? 'pos' : ''}">${esc(um.label)}</b> <span class="muted">(poäng ${um.score}, kräver ${um.need})</span>
     <div class="muted small">Signaler bara vid full rädsla i USA och med minst tre säkra papper på Avanza.</div></div>`
     : market === 'crypto' ? '<div class="note muted small">Krypto-utbrott: ny 20-dagarstopp över EMA 200, sälj efter 7 dagar. Signalerna kommer även på helger.</div>' : '';
-  list.innerHTML = head + rows.map(stockRow).join('') + (rows.length ? '' : '<div class="empty">Inget att visa.</div>');
+  // Grupper: köpsignaler, öppna affärer, nära signal, bevaka och övriga.
+  const groups = [
+    ['Köpsignaler', r => isSignal(r)],
+    ['I affär', r => r.inTrade],
+    ['Nära signal – 1 krav kvar', r => closeness(r)?.left === 1],
+    ['Bevaka – 2 krav kvar', r => closeness(r)?.left === 2],
+    ['Övriga', () => true],
+  ];
+  const used = new Set(), index = rows.filter(r => r.isIndex);
+  index.forEach(r => used.add(r));
+  const parts = groups.map(([title, f]) => {
+    const g = rows.filter(r => !used.has(r) && f(r));
+    g.forEach(r => used.add(r));
+    return g.length ? `<h2 class="v-title">${title} <span class="muted">(${g.length})</span></h2>${g.map(stockRow).join('')}` : '';
+  });
+  list.innerHTML = head + index.map(stockRow).join('') + parts.join('') + (rows.length ? '' : '<div class="empty">Inget att visa.</div>');
   bindRows(list);
 }
 

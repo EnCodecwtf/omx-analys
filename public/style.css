@@ -486,3 +486,17 @@ ol.snow li { padding-left: 2px; }
 .m-list li { margin: 4px 0; font-size: 13px; }
 .m-list a { color: var(--text-2); text-decoration: none; }
 .m-list a:hover { color: var(--accent); }
+
+/* Hur nära signal */
+.kchip { font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
+.kchip.near1 { background: var(--amber-soft); color: var(--amber); border: 1px solid rgba(245,158,11,.5); }
+.kchip.near2 { background: var(--blue-soft); color: #93c5fd; border: 1px solid rgba(59,130,246,.45); }
+.kdots { display: inline-flex; gap: 3px; align-items: center; }
+.kdots i { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-3); border: 1px solid #3a4655; }
+.kdots i.on { background: var(--text-2); border-color: var(--text-2); }
+.row:not(.quiet) .kdots i.on { background: var(--green); border-color: var(--green); }
+.kcount { font-variant-numeric: tabular-nums; }
+.kcount.near1 { color: var(--amber); font-weight: 600; }
+.kcount.near2 { color: #93c5fd; font-weight: 600; }
+.kmiss { color: var(--text-2); }
+.meta .near { color: var(--amber); }
