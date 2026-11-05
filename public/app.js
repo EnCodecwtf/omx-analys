@@ -19,7 +19,9 @@ let scanData = null;
 let lastDetail = null;
 const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignoreras */ } } };
 $('#acct').value = store.get('acct', '10000');
-$('#risk').value = store.get('risk', '6');
+// Standardrisk 2,5 % per affär: affärerna kommer ofta samma dag i samma sektor,
+// och fördelen framåt är troligen mindre än i backtestet (se README).
+$('#risk').value = store.get('risk', '2.5');
 $('#peak').value = store.get('peak', $('#acct').value);
 
 // Nedgångsregel: bestämd i förväg så att beslutet inte fattas när det känns
@@ -238,7 +240,7 @@ function stockRow(r) {
   const meta = r.isIndex ? `<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>`
     : c ? `${dots(c)}<span class="kcount ${c.cls}">${c.ok} av ${c.of} krav</span>${c.left <= 2 ? `<span class="kmiss">Saknas: ${r.missing.map(k => KEY_LABEL[k] || k).join(', ')}</span>` : ''}` : '';
   return `<div class="row${hot ? '' : ' quiet'}${r.symbol === current ? ' active' : ''}" data-symbol="${esc(r.symbol)}">
-    <div class="name">${esc(r.name)} ${tag}${!r.inTrade && r.preliminary && isSignal(r) ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
+    <div class="name">${esc(r.name)} ${tag}${r.stale ? ' <span class="tag" title="Yahoo har inte skickat dagens kurser – inga signaler loggas för den här aktien förrän datan är tillbaka">⚠ gammal data</span>' : ''}${!r.inTrade && r.preliminary && isSignal(r) ? ' <span class="tag" title="Räknat på kursen just nu, bekräftas vid stängningen">preliminär</span>' : ''}</div>
     <div class="right">${spark(r.spark, r.spark[r.spark.length - 1] >= r.spark[0], !hot)}
       <div class="num"><div>${fmt(r.price)}</div><div class="${up ? 'pos' : 'neg'}" style="font-size:12px">${up ? '+' : ''}${String(r.changePct).replace('.', ',')} %</div></div>
     </div>
@@ -663,12 +665,46 @@ function tradeCard(e) {
   </div>`;
 }
 
+// Sektor per OMXS30-bolag, för att se när öppna affärer i praktiken är samma satsning.
+const SECTOR = {
+  'ABB.ST': 'Industri', 'ADDT-B.ST': 'Industri', 'ALFA.ST': 'Industri', 'ASSA-B.ST': 'Industri', 'ATCO-A.ST': 'Industri', 'EPI-A.ST': 'Industri',
+  'LIFCO-B.ST': 'Industri', 'NIBE-B.ST': 'Industri', 'SAAB-B.ST': 'Industri', 'SAND.ST': 'Industri', 'SKA-B.ST': 'Industri', 'SKF-B.ST': 'Industri', 'VOLV-B.ST': 'Industri',
+  'AZN.ST': 'Hälsovård', 'BOL.ST': 'Råvaror', 'SCA-B.ST': 'Råvaror', 'ERIC-B.ST': 'Teknik', 'HEXA-B.ST': 'Teknik', 'ESSITY-B.ST': 'Dagligvaror',
+  'EVO.ST': 'Sällanköp', 'HM-B.ST': 'Sällanköp', 'EQT.ST': 'Finans', 'INDU-C.ST': 'Finans', 'INVE-B.ST': 'Finans',
+  'NDA-SE.ST': 'Bank', 'SEB-A.ST': 'Bank', 'SHB-A.ST': 'Bank', 'SWED-A.ST': 'Bank', 'TEL2-B.ST': 'Telekom', 'TELIA.ST': 'Telekom',
+};
+// Total risk i öppna affärer, räknad med appens positionsstorlek: risk × konto ×
+// riskfaktorer × nedgångsregeln, och bara den del som ligger kvar (2/3 efter TP1,
+// inget efter TP2 när stoppet ligger på köpkursen).
+function riskPanel(open) {
+  if (!open.length) return '';
+  const acct = Math.max(0, +$('#acct').value || 0), risk = Math.max(0, +$('#risk').value || 0) / 100, dd = ddFactor();
+  const left = e => (e.hit || 0) >= 2 ? 0 : (e.hit || 0) === 1 ? 2 / 3 : 1;
+  const stopped = open.filter(e => e.stop != null && e.kind !== 'panic' && e.kind !== 'crypto');
+  const noStop = open.filter(e => e.kind === 'panic' || e.kind === 'crypto');
+  const riskKr = stopped.reduce((a, e) => a + acct * risk * (e.size ?? 1) * dd * left(e), 0);
+  const pctAcct = acct ? riskKr / acct * 100 : 0;
+  const bySector = {};
+  for (const e of open.filter(e => SECTOR[e.symbol])) (bySector[SECTOR[e.symbol]] ||= []).push(e.name);
+  const cluster = Object.entries(bySector).filter(([, l]) => l.length >= 2).sort((a, b) => b[1].length - a[1].length)[0];
+  const sameDay = open.length >= 2 && new Set(open.map(e => e.date)).size === 1;
+  const warn = pctAcct > 8 ? 'warn' : '';
+  return `<div class="risk-panel ${warn}">
+    <div class="rp-row"><span>Risk om alla stopp nås</span><b class="num">${kr(riskKr)} <span class="muted">(${pctAcct.toFixed(1).replace('.', ',')} % av kontot)</span></b></div>
+    ${noStop.length ? `<div class="rp-row"><span>Utan stopp (panikvecka, krypto)</span><b class="num">${noStop.length} st</b></div>` : ''}
+    ${pctAcct > 8 ? '<p class="small warn">Över 8 % av kontot på en gång. Överväg att avstå nästa signal tills något mål nåtts.</p>' : ''}
+    ${cluster ? `<p class="small">⚠ ${cluster[1].length} av ${open.length} affärer är <b>${esc(cluster[0].toLowerCase())}</b>${sameDay ? ' och kom samma dag' : ''}. De rör sig ofta tillsammans, så räkna dem som en större satsning.</p>` : ''}
+    <p class="muted small">Räknat med ${String(risk * 100).replace('.', ',')} % risk på ${kr(acct)} (Mer → Mitt konto) och appens positionsstorlek. Mål som redan nåtts minskar risken.</p>
+  </div>`;
+}
+
 function renderTrades() {
   const el = $('#trades');
   if (!logData) { el.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
   const open = logData.entries.filter(isLive), closed = logData.entries.filter(e => !isLive(e));
   const s = logData.stats;
   el.innerHTML = `<h2 class="v-title">Öppna affärer <span class="muted">(${open.length})</span></h2>
+    ${riskPanel(open)}
     ${open.length ? open.map(tradeCard).join('') : '<div class="empty small">Inga öppna affärer. Nya signaler visas under Idag.</div>'}
     <h2 class="v-title">Avslutade <span class="muted">(${closed.length})</span></h2>
     ${s.closed ? `<div class="note small">OMX: ${s.closed} stängda · TP1 ${s.tp1Rate ?? '–'} % · snitt ${s.avgR == null ? '–' : sv(s.avgR) + ' R'}${s.panic?.closed ? ` · panikveckor snitt ${sv(s.panic.avgPct)} %` : ''}${s.crypto?.closed ? ` · krypto snitt ${sv(s.crypto.avgPct)} %` : ''}</div>` : ''}
@@ -1092,7 +1128,7 @@ function drawLoans(a, b) {
 let trades10y = null;
 const CALC_COST_R = 0.05; // courtage och spread per affär, uppskattat
 $('#cx-start').value = store.get('acct', '10000');
-$('#cx-risk').value = store.get('risk', '6');
+$('#cx-risk').value = store.get('risk', '2.5');
 for (const id of ['cx-start', 'cx-month', 'cx-risk', 'cx-years', 'cx-rate']) $('#' + id).addEventListener('input', () => runCalc());
 async function loadStrategyCalc() {
   if (trades10y) { runCalc(); return; }

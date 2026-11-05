@@ -897,6 +897,12 @@ marknaden är rädd. Om marknaden fortsätter ned förlorar många positioner sa
 | Olika risk för olika signalnivåer | Liten förbättring. Ersattes av regeln att bara starka signaler handlas |
 
 ### Signallogg (framåttest)
+Loggen skyddas mot dataförlust: ett läsfel tolkas aldrig som en tom logg (då sparas ingenting), varje sparning sammanfogar
+med det som redan ligger i Redis så att samtidiga körningar inte tappar poster, och en säkerhetskopia per dag sparas i
+Redis i 35 dagar (`omx-analys:signal-log:backup:ÅÅÅÅ-MM-DD`). Signaler loggas inte om Yahoos senaste stapel är från fel
+handelsdag (raden visas då som *gammal data*). Alla `/api/cron/*` kräver `CRON_SECRET` när den är satt, och
+Uppdatera-knappen får tömma cachen högst varannan minut.
+
 En affär i taget per aktie och strategi, precis som i backtestet: medan en loggad affär är öppen (eller väntar på köp) sparas ingen ny signal i samma aktie, och listan visar *I AFFÄR* i stället för en ny köpsignal. Signaler som ändå loggats medan en affär var öppen tas bort automatiskt.
 
 Varje stark köpsignal sparas när dagens stängningskurs är klar, efter 18.00 svensk tid. Servern kör skannern varje timme.

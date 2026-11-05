@@ -139,6 +139,17 @@ function isFinalUS(t) {
   return dayOf(t) < `${p.year}-${p.month}-${p.day}` || +p.hour * 60 + +p.minute >= 16 * 60 + 30;
 }
 
+// Är senaste stapeln från rätt handelsdag? Om Yahoo släpar eller saknar en dag
+// loggas inga signaler för instrumentet – hellre ingen signal än en på gammal data.
+function prevWeekday(d) { const x = new Date(d + 'T12:00:00Z'); do x.setUTCDate(x.getUTCDate() - 1); while (x.getUTCDay() % 6 === 0); return x.toISOString().slice(0, 10); }
+function isStale(t, { us = false } = {}) {
+  const s = sthlm(), last = dayOf(t);
+  const opened = !s.weekend && s.min >= (us ? 15 * 60 + 45 : 9 * 60 + 15);
+  const expected = opened ? s.date : prevWeekday(s.date + '');
+  // Helgdagar saknas i kalendern, så en dag till godtas.
+  return last < prevWeekday(expected);
+}
+
 // USA-listan. Hämtas separat (fliken USA och den egna kvällskörningen) eftersom
 // den har många fler bolag än OMX-listan.
 async function usScan() {
@@ -155,7 +166,7 @@ async function usScan() {
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinalUS(ev.t),
+          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinalUS(ev.t), stale: isStale(ev.t, { us: true }),
           missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, size: ev.guards.size,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
@@ -163,7 +174,7 @@ async function usScan() {
         return { symbol: s.symbol, name: s.name, isUS: true, error: err.message };
       }
     });
-    const signals = rows.filter(r => r.status === 'strong' && !r.preliminary);
+    const signals = rows.filter(r => r.status === 'strong' && !r.preliminary && !r.stale);
     if (signals.length) {
       const added = await recordFree(signals.map(r => ({ date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
         tps: r.plan.tps.map(x => x.price), size: r.size, market: 'USA', avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() })));
@@ -186,7 +197,7 @@ async function scan() {
           price: ev.price, changePct: prevClose ? Math.round((ev.price / prevClose - 1) * 10000) / 100 : null,
           t: ev.t, status: ev.status, score: ev.score, trend: ev.trend, trendLabel: ev.trendLabel, rsi: ev.rsi,
           elliott: ev.elliott.primary ? { label: ev.elliott.primary.label, bias: ev.elliott.primary.bias } : null,
-          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinal(ev.t), missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, report: ev.guards.report, size: ev.guards.size,
+          plan: ev.plan, blocked: ev.blocked || null, preliminary: !isFinal(ev.t), stale: !s.isIndex && isStale(ev.t), missing: ev.checklist.filter(c => !c.ok).map(c => c.key), checks: ev.checklist.length, report: ev.guards.report, size: ev.guards.size,
           spark: bars.slice(-60).map(b => Math.round(b.c * 100) / 100),
         };
       } catch (err) {
@@ -224,7 +235,9 @@ async function scan() {
     } catch (err) {
       console.error('Panikveckan kunde inte räknas:', err.message);
     }
-    const signals = rows.filter(r => r.status === 'strong' && (r.isCrypto || isFinal(r.t)));
+    const signals = rows.filter(r => r.status === 'strong' && !r.stale && (r.isCrypto || isFinal(r.t)));
+    const stale = rows.filter(r => r.stale).map(r => r.name);
+    if (stale.length) console.error('Gammal data, inga signaler loggas för:', stale.join(', '));
     if (signals.length) {
       const added = await recordFree(signals.map(r => r.isCrypto
         ? { kind: 'crypto', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, exitDate: r.crypto.exitDate, days: r.crypto.days, size: r.size, loggedAt: new Date().toISOString() }
@@ -267,7 +280,7 @@ async function shortScan() {
         return {
           symbol: s.symbol, name: s.name, price: tech.price, changePct: prev ? Math.round((last.c / prev.c - 1) * 10000) / 100 : null, t: last.t,
           status: sc.status, score: sc.score, analyst: sc.analyst, parts: sc.parts, checklist: sc.checklist, missing: sc.checklist.filter(c => !c.ok).map(c => c.key),
-          plan: tech.plan, rsi: tech.rsi, report, blocked, preliminary: !isFinal(last.t), size: SHORT_SIZE,
+          plan: tech.plan, rsi: tech.rsi, report, blocked, preliminary: !isFinal(last.t), stale: isStale(last.t), size: SHORT_SIZE,
           analysts: f ? { target: f.target, recMean: f.recMean, n: f.analysts, epsChange90: f.epsChange90 } : null, short: si,
           news: nw ? { neg: nw.neg.slice(0, 4).map(head), pos: nw.pos.slice(0, 2).map(head), total: nw.total } : null,
           products: products && { minis: products.minis, bulls: products.bulls },
@@ -279,7 +292,7 @@ async function shortScan() {
     });
     const order = { short: 0, watch: 1, none: 2 };
     rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || (b.score ?? -1) - (a.score ?? -1));
-    const signals = rows.filter(r => r.status === 'short' && !r.preliminary);
+    const signals = rows.filter(r => r.status === 'short' && !r.preliminary && !r.stale);
     if (signals.length) {
       const added = await recordFree(signals.map(r => ({ kind: 'short', date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
         tps: r.plan.tps.map(x => x.price), size: r.size, score: r.score, avanzaUrl: r.avanzaUrl, loggedAt: new Date().toISOString() })));
@@ -313,14 +326,19 @@ async function withOutcomes() {
 
 // Sparar nya signaler, men bara för instrument utan öppen affär i samma strategi.
 async function recordFree(list) {
-  const { until } = signalLog.busy(await withOutcomes());
+  // Går loggen inte att läsa sparas ingenting, hellre det än att skriva över den.
+  let out;
+  try { out = await withOutcomes(); } catch (err) { console.error('Signalloggen kunde inte läsas, inga nya signaler sparas:', err.message); return []; }
+  const { until } = signalLog.busy(out);
   return signalLog.record(list.filter(e => !(e.date <= (until.get(signalLog.slotOf(e.symbol, e.kind)) ?? ''))));
 }
 
 // Öppna affärer (eller som väntar på köp) per instrument och strategi, med signaldagen.
 async function openSlots() {
   const m = new Map();
-  for (const e of await withOutcomes()) if (e.state === 'öppen' || e.state === 'väntar på köp') m.set(signalLog.slotOf(e.symbol, e.kind), e);
+  let out = [];
+  try { out = await withOutcomes(); } catch (err) { console.error('Signalloggen kunde inte läsas:', err.message); }
+  for (const e of out) if (e.state === 'öppen' || e.state === 'väntar på köp') m.set(signalLog.slotOf(e.symbol, e.kind), e);
   return m;
 }
 // Markerar rader där en tidigare signal redan är en öppen affär: ingen ny signal då.
@@ -613,6 +631,11 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
+// Uppdatera-knappen får tömma cachen högst varannan minut, så att ingen kan
+// tvinga fram en ström av anrop mot Yahoo och Avanza.
+let lastRefresh = 0;
+const mayRefresh = () => { if (Date.now() - lastRefresh < 120000) return false; lastRefresh = Date.now(); return true; };
+
 export default async function handler(req, res) {
   const url = new URL(req.url, 'http://x');
   // Vercel skickar alla sökvägar till /api och lägger den riktiga i __path.
@@ -621,24 +644,28 @@ export default async function handler(req, res) {
     url.searchParams.delete('__path');
   }
   try {
+    // Schemalagda körningar skriver i loggen och skickar notiser. När CRON_SECRET
+    // är satt krävs den (Vercel Cron skickar den som Bearer, GitHub som ?key=).
+    if (url.pathname.startsWith('/api/cron/')) {
+      const secret = process.env.CRON_SECRET;
+      if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
+    }
     if (url.pathname === '/api/scan') {
-      if (url.searchParams.has('refresh')) cache.clear();
+      if (url.searchParams.has('refresh') && mayRefresh()) cache.clear();
       return send(res, 200, await scan());
     }
     // Anropas av Vercel Cron varje kväll (krypto handlas även på helger): sparar
     // nya starka köpsignaler i signalloggen och skickar avisering.
     if (url.pathname === '/api/cron/scan') {
       cache.delete('scan');
-      const before = (await signalLog.entries()).length;
+      const before = (await signalLog.entries().catch(() => [])).length;
       const s = await scan();
-      const after = (await signalLog.entries()).length;
+      const after = (await signalLog.entries().catch(() => [])).length;
       // Dagens sista kontroll av mål och stopp, även om ingen extern schemaläggare används.
       const live = await liveCheck({ force: true });
       return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), logged: after - before, alerts: live.sent });
     }
     if (url.pathname === '/api/cron/live') {
-      const secret = process.env.CRON_SECRET;
-      if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
       return send(res, 200, await liveCheck());
     }
     // Webbnotiser: publik nyckel, prenumeration och testnotis till den egna enheten.
@@ -651,7 +678,7 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: n > 0 });
     }
     if (url.pathname === '/api/us/scan') {
-      if (url.searchParams.has('refresh')) { cache.delete('usscan'); cache.delete('usmacro'); }
+      if (url.searchParams.has('refresh') && mayRefresh()) { cache.delete('usscan'); cache.delete('usmacro'); }
       return send(res, 200, await usScan());
     }
     // Kvällskörning efter USA-börsens stängning: sparar nya USA-signaler och kontrollerar mål och stopp.
@@ -668,13 +695,11 @@ export default async function handler(req, res) {
       return send(res, 200, { ok: true, candidates: s.rows.filter(r => r.status === 'short').map(r => r.symbol) });
     }
     if (url.pathname === '/api/shorts') {
-      if (url.searchParams.has('refresh')) cache.delete('shorts');
+      if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('shorts');
       return send(res, 200, await shortScan());
     }
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
     if (url.pathname === '/api/cron/morning') {
-      const secret = process.env.CRON_SECRET;
-      if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
       const s = sthlm();
       // Schemat körs två gånger (sommar- och vintertid); bara den som träffar 07.15–09.00 publicerar.
       if (s.weekend || s.min < 7 * 60 + 15 || s.min > 9 * 60) return send(res, 200, { ok: true, skipped: 'utanför 07.15–09.00' });

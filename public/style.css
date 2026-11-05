@@ -500,3 +500,9 @@ ol.snow li { padding-left: 2px; }
 .kcount.near2 { color: #93c5fd; font-weight: 600; }
 .kmiss { color: var(--text-2); }
 .meta .near { color: var(--amber); }
+
+/* Total risk */
+.risk-panel { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+.risk-panel.warn { border-color: rgba(245,158,11,.55); }
+.rp-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.risk-panel p { margin: 6px 0 0; }
