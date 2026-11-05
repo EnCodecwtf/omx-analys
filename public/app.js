@@ -99,6 +99,7 @@ function openTool(name) {
   if (name === 'compound') runCompound();
   if (name === 'loans') renderLoans();
   if (name === 'hours') { renderHours(); loadVolProfile(); }
+  if (name === 'morning') renderMorning();
 }
 function closeTool() {
   tool = null;
@@ -803,6 +804,31 @@ function drawCompound(rows) {
   svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
 }
 
+// Morgonsoffan med Glen: dagens morgonsession i text.
+let morningData = null;
+async function loadMorning() {
+  try { morningData = (await (await fetch('/api/morning')).json()).morning; } catch { morningData = null; }
+  const el = $('#morning-teaser');
+  if (!morningData) { el.innerHTML = ''; return; }
+  const isToday = morningData.date === new Date().toLocaleDateString('sv-SE');
+  el.innerHTML = `<button class="morning-teaser" id="morning-open"><span class="mt-ico">☕</span><span><b>Morgonsoffan med Glen</b>
+    <small>${isToday ? 'I dag' : esc(morningData.date)} · ${esc(morningData.summary || 'Läs dagens session')}</small></span><span class="mt-go">›</span></button>`;
+  $('#morning-open').addEventListener('click', () => { setView('more'); openTool('morning'); });
+  if (tool === 'morning') renderMorning();
+}
+function renderMorning() {
+  const el = $('#morning');
+  const m = morningData;
+  if (!m) { el.innerHTML = '<p class="muted">Ingen session än. Glen sätter sig i soffan kl 07.30 varje vardag.</p>'; return; }
+  el.innerHTML = `<div class="m-head"><span class="m-cup">☕</span><div><b>Morgonsoffan med Glen</b><div class="muted small">${esc(m.date)} · skriven ${new Date(m.createdAt).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</div></div></div>
+    <p class="m-intro">${esc(m.intro)}</p>
+    ${m.sections.filter(x => x.lines.length).map(x => `<h4 class="loan-h">${esc(x.title)}</h4>${x.links
+      ? `<ul class="m-list">${x.lines.map((l, i) => `<li><a href="${esc(x.links[i])}" target="_blank" rel="noopener">${esc(l)}</a></li>`).join('')}</ul>`
+      : x.lines.map(l => `<p>${esc(l)}</p>`).join('')}`).join('')}
+    <p class="m-outro">${esc(m.outro)}</p>
+    <p class="muted small">Skriven automatiskt av appen från marknadsdata (Yahoo Finance, FRED, SCB, Riksbanken, Google Nyheter) och dina loggade affärer. Inte investeringsrådgivning.</p>`;
+}
+
 // Börstider i användarens egen tid (webbläsarens tidszon). Helgdagar räknas inte.
 const EXCHANGES = [
   { name: 'Tokyo', tz: 'Asia/Tokyo', s: [['09:00', '11:30'], ['12:30', '15:30']] },
@@ -1158,8 +1184,9 @@ function marketOpen(now = new Date()) {
   return !/lör|sön/.test(p.weekday) && min >= 9 * 60 && min <= 17 * 60 + 35;
 }
 setInterval(() => { if (marketOpen() && !document.hidden) { loadScan(true, true); loadLog(); } }, 5 * 60 * 1000);
-// Notiser och länkar kan öppna Affärer direkt (#affarer).
+// Notiser och länkar kan öppna Affärer (#affarer) eller Morgonsoffan (#morgon) direkt.
 if (location.hash === '#affarer') setView('trades');
+loadMorning().then(() => { if (location.hash === '#morgon') { setView('more'); openTool('morning'); } });
 loadMarketNews();
 
 // Webbnotiser: ingen extra app behövs. På iPhone måste appen först läggas till

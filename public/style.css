@@ -469,3 +469,20 @@ ol.snow li { padding-left: 2px; }
 .vb em { position: absolute; top: -2px; left: 50%; transform: translate(-50%, -100%); font-size: 10px; font-style: normal; color: var(--text); white-space: nowrap; }
 .vchart { padding-top: 14px; }
 .vticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+/* Morgonsoffan med Glen */
+.morning-teaser { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; margin-bottom: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(201,133,0,.45); background: linear-gradient(90deg, rgba(201,133,0,.14), transparent 70%), var(--panel-2); color: var(--text); font: inherit; cursor: pointer; }
+.morning-teaser b { display: block; font-size: 14px; }
+.morning-teaser small { display: block; color: var(--text-2); font-size: 12px; margin-top: 2px; }
+.mt-ico { font-size: 22px; }
+.mt-go { margin-left: auto; color: var(--muted); font-size: 18px; }
+.morning .m-head { display: flex; gap: 12px; align-items: center; }
+.morning .m-cup { font-size: 30px; }
+.morning .m-head b { font-size: 17px; }
+.morning p { line-height: 1.55; color: var(--text-2); }
+.morning .m-intro { color: var(--text); font-size: 15px; }
+.morning .m-outro { color: var(--text); font-weight: 600; margin-top: 14px; }
+.m-list { margin: 4px 0; padding-left: 18px; }
+.m-list li { margin: 4px 0; font-size: 13px; }
+.m-list a { color: var(--text-2); text-decoration: none; }
+.m-list a:hover { color: var(--accent); }

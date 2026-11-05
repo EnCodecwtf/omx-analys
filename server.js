@@ -18,6 +18,7 @@ import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
 import { coachTrade } from './lib/coach.js';
+import { marketMoves, buildMorning } from './lib/morning.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -399,6 +400,33 @@ async function volumeProfile() {
   return out;
 }
 
+// Morgonsoffan med Glen: skrivs varje vardag kl 07.30 (GitHub Actions anropar
+// /api/cron/morning) och sparas, så att alla ser samma session hela dagen.
+const MORNING_KEY = 'omx-analys:morning';
+async function makeMorning() {
+  const [moves, s, cal, log, macroAt] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro()]);
+  const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
+  const label = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro' };
+  const omxRows = s.rows.filter(r => !r.isCrypto && !r.isIndex && !r.error);
+  const [mk, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }).catch(() => []), news(GEO_QUERY, { limit: 30 }).catch(() => [])]);
+  return buildMorning({
+    now: new Date(), moves, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic,
+    signals: omxRows.filter(r => (r.status === 'strong' || r.status === 'buy') && !r.inTrade),
+    near: omxRows.filter(r => !r.inTrade && r.missing?.length === 1).slice(0, 4).map(r => ({ name: r.name, missingText: label[r.missing[0]] || r.missing[0] })),
+    news: { market: mk, geo: geo.filter(n => n.tags.includes('Geopolitik')) },
+  });
+}
+async function morning({ publish = false } = {}) {
+  const saved = await signalLog.kvGet(MORNING_KEY, null);
+  const s = sthlm();
+  const due = !s.weekend && s.min >= 7 * 60 + 15;
+  if (saved?.latest?.date === s.date || (!publish && !due)) return saved?.latest || null;
+  const m = await makeMorning();
+  await signalLog.kvSet(MORNING_KEY, { latest: m, list: [m, ...(saved?.list || []).filter(x => x.date !== m.date)].slice(0, 10) });
+  if (publish) { try { await pushAll({ title: '☕ Morgonsoffan med Glen', body: m.summary || 'Dagens morgonsession är klar.', url: '/#morgon', tag: 'morgon' }); } catch { /* notisen är inte avgörande */ } }
+  return m;
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -642,6 +670,16 @@ export default async function handler(req, res) {
     if (url.pathname === '/api/shorts') {
       if (url.searchParams.has('refresh')) cache.delete('shorts');
       return send(res, 200, await shortScan());
+    }
+    if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
+    if (url.pathname === '/api/cron/morning') {
+      const secret = process.env.CRON_SECRET;
+      if (secret && url.searchParams.get('key') !== secret && req.headers.authorization !== `Bearer ${secret}`) return send(res, 401, { error: 'Fel nyckel' });
+      const s = sthlm();
+      // Schemat körs två gånger (sommar- och vintertid); bara den som träffar 07.15–09.00 publicerar.
+      if (s.weekend || s.min < 7 * 60 + 15 || s.min > 9 * 60) return send(res, 200, { ok: true, skipped: 'utanför 07.15–09.00' });
+      const m = await morning({ publish: true });
+      return send(res, 200, { ok: true, date: m?.date });
     }
     if (url.pathname === '/api/volume-profile') return send(res, 200, await volumeProfile());
     if (url.pathname === '/api/calendar') return send(res, 200, await calendar());

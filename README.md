@@ -817,6 +817,13 @@ lånen försvinner allt fortare. Lån markerade *Enligt plan* (till exempel CSN 
 Verktyget visar ordningen, när varje lån är betalt, total ränta och jämför med lavinmetoden (dyraste räntan först) och med
 bara minimibetalningar. Lånen sparas bara i webbläsaren och skickas aldrig till servern.
 
+### Morgonsoffan med Glen
+Varje vardag kl 07.30 skriver appen en morgonsession i text (GitHub Actions anropar `/api/cron/morning`, och en notis
+skickas). Den bygger bara på data appen redan har: natten i USA och Asien, terminer, VIX, guld, olja, bitcoin och kronan,
+dagens makrobesked och rapporter med förra utfallet, FedWatch, dina öppna affärer med coachen, makroläget, aktier ett krav
+från signal, panikveckans läge och nattens rubriker. Inga AI-tjänster och inga kostnader. Sessionen sparas och visas överst
+under Idag och under Mer → Morgonsoffan med Glen.
+
 ### Börstider
 Under **Mer → Börstider** visas när Tokyo, Shanghai, Hongkong, Sydney, Stockholm, Frankfurt, London och New York öppnar och
 stänger i användarens egen tid (webbläsarens tidszon, sommar- och vintertid räknas om), med status och tidslinje. Bredvid

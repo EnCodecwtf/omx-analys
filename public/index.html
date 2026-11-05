@@ -36,6 +36,7 @@
       </nav>
 
       <section class="view" id="v-today">
+        <div id="morning-teaser"></div>
         <div id="today"><div class="loading">Hämtar och analyserar…</div></div>
         <div id="panic" class="panic" hidden></div>
         <div id="today-cal"></div>
@@ -58,6 +59,7 @@
       <section class="view" id="v-more" hidden>
         <nav class="menu" aria-label="Verktyg och inställningar">
           <div class="menu-head">Verktyg</div>
+          <button class="menu-item" data-tool="morning"><span class="mi-ico">☕</span><span><b>Morgonsoffan med Glen</b><small>Dagens morgonsession, varje vardag kl 07.30</small></span></button>
           <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
           <button class="menu-item" data-tool="hours"><span class="mi-ico">🕘</span><span><b>Börstider</b><small>Öppet och stängt i din tid, och när handeln är störst</small></span></button>
           <button class="menu-item" data-tool="compound"><span class="mi-ico">％</span><span><b>Ränta på ränta</b><small>Vanlig kalkylator med fast avkastning</small></span></button>
@@ -129,6 +131,10 @@
       <div class="detail-head">
         <button class="btn back tool-back" id="tool-back" aria-label="Tillbaka till menyn">‹</button>
         <h1 id="tool-title">–</h1>
+      </div>
+
+      <div class="tool" data-tool="morning" data-title="Morgonsoffan med Glen" hidden>
+        <article class="card tool-card morning" id="morning"><div class="loading">Glen brygger kaffe…</div></article>
       </div>
 
       <div class="tool" data-tool="calendar" data-title="Kalender">

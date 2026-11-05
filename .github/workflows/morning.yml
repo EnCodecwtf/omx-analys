@@ -1,0 +1,14 @@
+# Morgonsoffan med Glen: skrivs och publiceras varje vardag kl 07.30 svensk tid.
+# Körs både 05.25 och 06.25 UTC så att det blir rätt vid sommar- och vintertid;
+# appen publicerar bara den körning som hamnar mellan 07.15 och 09.00 i Stockholm.
+name: Morgonsoffan
+on:
+  schedule:
+    - cron: '25 5,6 * * 1-5'
+  workflow_dispatch:
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - run: curl -fsS -m 120 "https://omx-analys.vercel.app/api/cron/morning?key=${{ secrets.CRON_SECRET }}"
