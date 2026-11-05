@@ -824,6 +824,13 @@ dagens makrobesked och rapporter med förra utfallet, FedWatch, dina öppna aff�
 från signal, panikveckans läge och nattens rubriker. Inga AI-tjänster och inga kostnader. Sessionen sparas och visas överst
 under Idag och under Mer → Morgonsoffan med Glen.
 
+### Natten och indikation för öppningen
+När Stockholm är stängt visar Idag vad som hänt sedan 17.30: USA-terminerna (S&P 500, Nasdaq, Dow), Ericsson och
+AstraZeneca i USA med efterhandel, guld, olja, bitcoin och kronan (15-minutersdata från Yahoo). En indikation för hur
+OMXS30 och DAX öppnar räknas med en regression på de senaste cirka 60 dagarna: öppningen mot förra stängningen förklarad av
+S&P 500-terminens rörelse mellan 17.30 och 08.45. Vid start (november 2026, 50 dagar): OMX beta 0,97, R² 0,58, riktningen
+rätt 95 % av gångerna när terminen rört sig mer än 0,3 %; DAX beta 0,69, R² 0,46, 89 %. Samma sak ingår i Morgonsoffan.
+
 ### Börstider
 Under **Mer → Börstider** visas när Tokyo, Shanghai, Hongkong, Sydney, Stockholm, Frankfurt, London och New York öppnar och
 stänger i användarens egen tid (webbläsarens tidszon, sommar- och vintertid räknas om), med status och tidslinje. Bredvid

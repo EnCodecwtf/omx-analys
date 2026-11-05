@@ -19,6 +19,7 @@ import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
 import { coachTrade } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
+import { overnight } from './lib/overnight.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -422,13 +423,13 @@ async function volumeProfile() {
 // /api/cron/morning) och sparas, så att alla ser samma session hela dagen.
 const MORNING_KEY = 'omx-analys:morning';
 async function makeMorning() {
-  const [moves, s, cal, log, macroAt] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro()]);
+  const [moves, s, cal, log, macroAt, night] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null)]);
   const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
   const label = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro' };
   const omxRows = s.rows.filter(r => !r.isCrypto && !r.isIndex && !r.error);
   const [mk, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }).catch(() => []), news(GEO_QUERY, { limit: 30 }).catch(() => [])]);
   return buildMorning({
-    now: new Date(), moves, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic,
+    now: new Date(), moves, overnight: night, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic,
     signals: omxRows.filter(r => (r.status === 'strong' || r.status === 'buy') && !r.inTrade),
     near: omxRows.filter(r => !r.inTrade && r.missing?.length === 1).slice(0, 4).map(r => ({ name: r.name, missingText: label[r.missing[0]] || r.missing[0] })),
     news: { market: mk, geo: geo.filter(n => n.tags.includes('Geopolitik')) },
@@ -698,6 +699,7 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('shorts');
       return send(res, 200, await shortScan());
     }
+    if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
     if (url.pathname === '/api/cron/morning') {
       const s = sthlm();

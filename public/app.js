@@ -864,6 +864,28 @@ function drawCompound(rows) {
   svg.addEventListener('pointerleave', () => { tip.hidden = true; hair.setAttribute('visibility', 'hidden'); });
 }
 
+// Natten: när Stockholm är stängt visas vad som hänt sedan 17.30 och en
+// indikation för hur OMXS30 och DAX öppnar. Uppdateras var femte minut.
+async function loadNight() {
+  const el = $('#night');
+  if (marketOpen()) { el.innerHTML = ''; return; }
+  let n;
+  try { n = await (await fetch('/api/overnight')).json(); } catch { return; }
+  if (!n?.moves?.length) { el.innerHTML = ''; return; }
+  const pc = v => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2).replace('.', ',')} %`;
+  const cls = v => v > 0.05 ? 'pos' : v < -0.05 ? 'neg' : '';
+  const ind = n.indication || {};
+  const tile = (k, name) => ind[k] ? `<div class="stat"><b class="num ${cls(ind[k].value)}">${pc(ind[k].value)}</b><span>${name} väntas öppna<br><span class="muted">spann ${pc(ind[k].lo)} till ${pc(ind[k].hi)}</span></span></div>` : '';
+  el.innerHTML = `<div class="night-card">
+    <div class="nc-head"><b>🌙 Natten – inför öppningen</b><span class="muted small">sedan Stockholm stängde ${esc(n.since)} 17.30 · ${new Date(n.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}</span></div>
+    <div class="calc-tiles">${tile('omx', 'OMXS30')}${tile('dax', 'DAX')}</div>
+    <ul class="night-list">${n.moves.map(m => `<li><span>${esc(m.name)}</span><b class="num ${cls(m.change)}">${pc(m.change)}</b></li>`).join('')}</ul>
+    ${ind.omx ? `<p class="muted small">Indikationen bygger på S&P 500-terminen (${pc(ind.omx.basis)} sedan 17.30). De senaste ${ind.omx.n} dagarna förklarade den ${Math.round(ind.omx.r2 * 100)} % av OMX-öppningen, och riktningen stämde ${ind.omx.hit} % av gångerna när terminen rört sig mer än 0,3 %. Nyheter under natten kan ändra bilden.</p>` : ''}
+  </div>`;
+}
+setInterval(() => { if (!document.hidden) loadNight(); }, 5 * 60 * 1000);
+loadNight();
+
 // Morgonsoffan med Glen: dagens morgonsession i text.
 let morningData = null;
 async function loadMorning() {
