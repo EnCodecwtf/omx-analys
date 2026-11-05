@@ -234,7 +234,9 @@ function stockRow(r) {
     ${near || r.isIndex ? `<div class="meta">${r.isIndex ? `<span>${esc(r.trendLabel)}</span><span>RSI ${Math.round(r.rsi)}</span>` : ''}${near}</div>` : ''}
   </div>`;
 }
-const bindRows = el => { for (const x of el.querySelectorAll('[data-symbol]')) x.addEventListener('click', () => openSymbol(x.dataset.symbol)); };
+const bindRows = el => {
+  for (const x of el.querySelectorAll('[data-symbol]')) x.addEventListener('click', ev => { if (!ev.target.closest('.coach')) openSymbol(x.dataset.symbol); });
+};
 
 function renderScan() {
   if (!scanData) return;
@@ -630,7 +632,8 @@ function tradeCard(e) {
     <div class="muted small">Signal ${esc(e.date)}${e.entry ? ` · köp ${fmt(e.entry)}` : ''}${e.last != null ? ` · nu ${fmt(e.last)}` : ''}</div>
     ${!days && e.tps ? tradeBar(e) : ''}
     <div class="tc-next">${nextStep(e)}</div>
-    ${e.coach?.lines?.length ? `<div class="coach ${e.coach.tone}"><span class="coach-ico" aria-hidden="true">🧭</span><div><b>Coachen</b>${e.coach.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div></div>` : ''}
+    ${e.coach?.lines?.length ? `<details class="coach ${e.coach.tone}"><summary><span class="coach-ico" aria-hidden="true">🧭</span><b>Coachen</b><span class="coach-peek">${esc(e.coach.lines[0])}</span></summary>
+      <div class="coach-body">${e.coach.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div></details>` : ''}
   </div>`;
 }
 

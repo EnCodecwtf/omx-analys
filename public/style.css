@@ -434,12 +434,19 @@ ol.snow li { padding-left: 2px; }
 .loan-locked td { font-size: 13px; }
 #loan-extra:disabled { opacity: .7; }
 
-/* Coachen */
-.coach { display: flex; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-3); font-size: 13px; color: var(--text-2); }
-.coach b { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
-.coach p { margin: 4px 0 0; line-height: 1.45; }
-.coach p:first-of-type { color: var(--text); }
+/* Coachen: ihopfälld, tryck för att visa */
+.coach { margin-top: 10px; border-radius: 10px; background: var(--surface-3); font-size: 13px; color: var(--text-2); }
+.coach > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; min-height: 40px; }
+.coach > summary::-webkit-details-marker { display: none; }
+.coach > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 16px; }
+.coach[open] > summary::after { content: '⌄'; }
+.coach b { color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; flex: none; }
+.coach-peek { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.coach[open] .coach-peek { display: none; }
+.coach-body { padding: 0 12px 10px 38px; }
+.coach-body p { margin: 4px 0 0; line-height: 1.45; }
+.coach-body p:first-child { color: var(--text); margin-top: 0; }
 .coach.good { box-shadow: inset 3px 0 0 var(--green); }
 .coach.warn { box-shadow: inset 3px 0 0 var(--amber); }
 .coach.calm { box-shadow: inset 3px 0 0 var(--accent); }
-.coach-ico { font-size: 16px; line-height: 1.2; }
+.coach-ico { font-size: 15px; line-height: 1; flex: none; }
