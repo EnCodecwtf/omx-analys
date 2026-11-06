@@ -671,7 +671,7 @@ function renderAi() {
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
     ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
     <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen. Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
-      Besluten tas av en regelmodell som varje dag väger trend (EMA 20), RSI, mål, stopp, rapporter och tid i affären – inte av en språkmodell. Inte investeringsrådgivning.</p>`;
+      Vid TP1 avgör en maskininlärningsmodell (tränad på 2017–2021, testad på 2022–2026) om resten ska få löpa eller säljas. Övriga beslut följer regler som väger trend (EMA 20), mål, stopp, rapporter och tid i affären. Inte investeringsrådgivning.</p>`;
   bindRows(el);
 }
 

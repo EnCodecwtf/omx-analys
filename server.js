@@ -507,7 +507,10 @@ async function aiTrader() {
       const meta = bySymbol.get(e.symbol);
       if (meta && !meta.isUS && !meta.isIndex) { const r = await nextReport(e.symbol).catch(() => null); reports.set(e.symbol, [...reportDates(e.symbol), ...(r ? [r.date] : [])]); }
     }
-    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], { productFor: e => picks[signalLog.idOf(e)] || null }) };
+    const [macroAt, vix] = await Promise.all([macro(), fetchBars('^VIX').catch(() => [])]);
+    const vixAt = new Map(vix.map(b => [dayOf(b.t), b.c]));
+    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
+      productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20 }) };
   });
 }
 

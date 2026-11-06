@@ -502,3 +502,12 @@ test('coachen bygger på verkliga nivåer', async () => {
   const w = coachTrade({ ...e, hit: 0, last: 95.5 }, bars, ev, null);
   assert.equal(w.tone, 'warn');
 });
+
+test('AI-traderns modell vid TP1 ger rimliga sannolikheter', async () => {
+  const { tp1Hold, TP1_MODEL } = await import('../lib/aitrader.js');
+  const mid = tp1Hold(TP1_MODEL.mu);
+  assert.ok(mid > 0.4 && mid < 0.6, 'snittläget ger ungefär 50 %');
+  // Högre RSI och stängning högre över köpet talar för att låta resten löpa.
+  const strong = TP1_MODEL.mu.slice(); strong[0] += 0.15; strong[9] += 0.8;
+  assert.ok(tp1Hold(strong) > mid);
+});
