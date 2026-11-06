@@ -69,13 +69,14 @@ for (const cb of document.querySelectorAll('[data-layer]')) {
 function setView(v) {
   view = v; store.set('view', v);
   document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('active', x.dataset.view === v));
-  for (const id of ['today', 'trades', 'stocks', 'more']) $('#v-' + id).hidden = id !== v;
+  for (const id of ['today', 'trades', 'stocks', 'ai', 'more']) $('#v-' + id).hidden = id !== v;
   document.body.classList.remove('show-detail');
   if (v !== 'more') closeTool();
   else if (!tool && window.innerWidth > 900) openTool('calendar');
   if (v === 'stocks') renderScan();
   if (v === 'trades') renderTrades();
   if (v === 'today') renderToday();
+  if (v === 'ai') loadAi();
   $('.scanner').scrollTop = 0; window.scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll('[data-view]')) b.addEventListener('click', () => setView(b.dataset.view));
@@ -625,6 +626,53 @@ function renderNormal() {
     <p>Nedgångsregeln under Mitt konto halverar risken när kontot är 20 % under sin topp och ger en fjärdedel vid 30 %. Fyll i kontots högsta värde där.</p>`;
 }
 
+// AI-tradern: fiktivt konto på 30 000 kr som tar alla signaler och fattar egna beslut.
+let aiData = null;
+async function loadAi() {
+  try { aiData = await (await fetch('/api/ai-trader')).json(); } catch { $('#ai').innerHTML = '<div class="loading">Kunde inte hämta AI-tradern.</div>'; return; }
+  if (view === 'ai') renderAi();
+}
+const AI_ICON = { köper: '🟢', tp1: '🎯', tp2: '🎯', tp3: '🏁', stopp: '🛑', säljer: '💰', minskar: '✂️', 'flyttar stopp': '🔒', håller: '⏳', avstår: '⏸' };
+function aiCurve(c) {
+  if (!c?.length) return '';
+  const W = 600, H = 120, P = 6, lo = Math.min(...c.map(x => x.equity)), hi = Math.max(...c.map(x => x.equity)), span = hi - lo || 1;
+  const pts = c.map((x, i) => `${(P + (W - 2 * P) * (c.length === 1 ? 1 : i / (c.length - 1))).toFixed(1)},${(H - P - (H - 2 * P) * (x.equity - lo) / span).toFixed(1)}`).join(' ');
+  const up = c.at(-1).equity >= c[0].equity;
+  return `<svg class="ai-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Kontots värde över tid"><polyline points="${pts}" fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <div class="vticks"><span>${esc(c[0].date)}</span><span>${kr(lo)} – ${kr(hi)}</span><span>${esc(c.at(-1).date)}</span></div>`;
+}
+function renderAi() {
+  const el = $('#ai'), a = aiData;
+  if (!a) return;
+  const pnl = a.equity - a.start, cls = pnl > 0 ? 'pos' : pnl < 0 ? 'neg' : '';
+  const sign = v => `${v > 0 ? '+' : ''}${Math.round(v).toLocaleString('sv-SE')} kr`;
+  const pct = v => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
+  const pos = p => `<div class="trade-card" data-symbol="${esc(p.symbol)}">
+      <div class="tc-head"><div><b>${esc(p.name)}</b> <span class="tag">${esc(p.market)}</span></div><div class="tc-res ${p.pnl > 0 ? 'pos' : p.pnl < 0 ? 'neg' : ''}">${sign(p.pnl)}</div></div>
+      <div class="muted small">Köpt ${esc(p.opened)} för ${kr(p.amount)} · ${Math.round(p.left * 100)} % kvar · värde nu ${kr(p.value)} · ${pct(p.pnlPct)}</div>
+      ${tradeBar({ ...p, stop: p.stop < p.entry ? p.stop : p.entry - (p.tps[0] - p.entry) * 0.6 })}
+      <div class="tc-next">Stopp ${p.stop >= p.entry ? `flyttat till ${fmt(p.stop)}` : fmt(p.stop)}${p.trailing ? ' (glidande)' : ''}.</div>
+    </div>`;
+  el.innerHTML = `<div class="ai-head">
+      <div class="ai-top"><span class="ai-bot">🤖</span><div><b>AI-tradern</b><div class="muted small">Fiktivt konto · tar alla signaler · fattar egna beslut</div></div></div>
+      <div class="calc-tiles">
+        <div class="stat"><b class="num">${kr(a.equity)}</b><span>kontots värde</span></div>
+        <div class="stat"><b class="num ${cls}">${sign(pnl)}</b><span>${pct(a.returnPct)} sedan start (${kr(a.start)})</span></div>
+        <div class="stat"><b class="num">${a.open.length} av ${a.maxOpen}</b><span>affärer igång</span></div>
+        <div class="stat"><b class="num">${kr(a.cash)}</b><span>kontanter</span></div>
+      </div>
+      ${aiCurve(a.curve)}
+    </div>
+    <h2 class="v-title">Öppna affärer <span class="muted">(${a.open.length})</span></h2>
+    ${a.open.length ? a.open.map(pos).join('') : '<div class="empty small">Inga affärer igång. AI-tradern väntar på nästa signal.</div>'}
+    <h2 class="v-title">Beslut</h2>
+    <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
+    ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
+    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen. Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr) i en simulerad minifuture med ${a.leverage}x hävstång, 0,5 % i avgifter per affär. Räknat på dagsdata.
+      Besluten tas av en regelmodell som varje dag väger trend (EMA 20), RSI, mål, stopp, rapporter och tid i affären – inte av en språkmodell. Inte investeringsrådgivning.</p>`;
+  bindRows(el);
+}
+
 // Signalloggen: affärskort för öppna affärer och en lista över avslutade.
 let logData = null;
 // Målen med bock och grön färg när de är nådda.
@@ -756,6 +804,7 @@ async function loadLog() {
     $('#trades-count').hidden = !open; $('#trades-count').textContent = open;
     renderToday();
     if (view === 'trades') renderTrades();
+    if (view === 'ai') loadAi();
   } catch {
     $('#trades').innerHTML = '<div class="loading">Kunde inte läsa signalloggen.</div>';
   }

@@ -225,7 +225,7 @@ tr:last-child td { border-bottom: 0; }
 .plan-row.tp.hit td { background: var(--green-soft); }
 
 /* ---- Ny struktur: vyer ---- */
-.views { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.views { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); }
 .view-btn { position: relative; background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 4px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .view-btn .ico { font-size: 14px; opacity: .8; }
 .view-btn:hover { color: var(--text); background: var(--panel-2); }
@@ -530,3 +530,21 @@ ul.night-list li { display: flex; justify-content: space-between; gap: 8px; bord
 .coach-when { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); margin-bottom: 2px; }
 .coach-body .coach-msg p:first-of-type { color: var(--text); }
 .coach-body .coach-msg.old p:first-of-type { color: var(--text-2); }
+
+/* AI-tradern */
+.ai-head { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.ai-top { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.ai-bot { font-size: 28px; }
+.ai-head .calc-tiles .stat { background: var(--panel); }
+.ai-curve { width: 100%; height: 90px; display: block; margin-top: 10px; background: var(--panel); border-radius: 8px; }
+ul.ai-log { list-style: none; margin: 0; padding: 0; }
+ul.ai-log li { display: flex; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 13px; }
+ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
+.ai-ico { flex: none; width: 20px; text-align: center; }
+.ai-when { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.view-btn { font-size: 12px; }
+@media (min-width: 901px) {
+  .views { gap: 2px; padding: 10px 8px; }
+  .view-btn { padding: 8px 2px; white-space: nowrap; gap: 4px; }
+  .view-btn .ico { display: none; }
+}

@@ -20,6 +20,7 @@ import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
 import { coachTrade } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
+import { runAiTrader } from './lib/aitrader.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -464,6 +465,20 @@ async function morning({ publish = false } = {}) {
   return m;
 }
 
+// AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
+async function aiTrader() {
+  return cached('aitrader', async () => {
+    const list = await signalLog.entries();
+    const bars = new Map(), reports = new Map();
+    for (const e of list) if (!e.kind && !bars.has(e.symbol)) {
+      try { bars.set(e.symbol, await fetchBars(e.symbol)); } catch { /* hoppas över */ }
+      const meta = bySymbol.get(e.symbol);
+      if (meta && !meta.isUS && !meta.isIndex) { const r = await nextReport(e.symbol).catch(() => null); reports.set(e.symbol, [...reportDates(e.symbol), ...(r ? [r.date] : [])]); }
+    }
+    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || []) };
+  });
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -754,6 +769,7 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('shorts');
       return send(res, 200, await shortScan());
     }
+    if (url.pathname === '/api/ai-trader') return send(res, 200, await aiTrader());
     if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
     // Ljudfilen från GitHub-jobbet: sparas på dagens session.

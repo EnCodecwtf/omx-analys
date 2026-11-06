@@ -850,6 +850,15 @@ visas hur dagens handel fördelar sig per kvart i Stockholm (10 stora OMX-aktier
 senaste 60 handelsdagarna: stängningsauktionen står för cirka 40 % av volymen i Stockholm, och öppningen och USA:s öppning
 15.30 ger tydliga toppar. Helgdagar ingår inte.
 
+### AI-tradern
+Fliken **AI-trader** följer ett fiktivt konto som startade med 30 000 kr vid första signalen i loggen och tar alla OMX- och
+USA-signaler: högst 3 affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr), i en simulerad minifuture med 5x
+hävstång och 0,5 % i avgifter. Under affärens gång fattar en regelmodell egna beslut varje dag (`lib/aitrader.js`): vid TP1
+säljs 1/3 om trenden är stark (över EMA 20, RSI stiger) annars hälften, stoppet flyttas till köpkursen, vid TP2 säljs hälften
+av resten och stoppet flyttas till TP1, vid TP3 behålls sista delen med glidande stopp om trenden är stark, efter TP1 säljs
+resten om kursen faller under EMA 20 nära köpkursen, hälften säljs före en rapport om affären är i vinst, och en affär som
+inte nått TP1 på 20 handelsdagar avslutas. Varje beslut visas med motivering. Allt räknas om från början på dagsdata.
+
 ### Coachen
 Varje öppen affär har en coach som kommenterar läget med riktiga data: nådda mål, kursen mot köpet, om studsen från stödet
 håller, om kursen gjort nya bottnar sedan signalen, EMA 20, motstånd före nästa mål, överköpt RSI och kommande rapport. Den

@@ -32,6 +32,7 @@
         <button class="view-btn active" data-view="today"><span class="ico">◎</span>Idag</button>
         <button class="view-btn" data-view="trades"><span class="ico">⇅</span>Affärer<span id="trades-count" class="count" hidden></span></button>
         <button class="view-btn" data-view="stocks"><span class="ico">☰</span>Aktier</button>
+        <button class="view-btn" data-view="ai"><span class="ico">🤖</span>AI-trader</button>
         <button class="view-btn" data-view="more"><span class="ico">⋯</span>Mer</button>
       </nav>
 
@@ -46,6 +47,10 @@
 
       <section class="view" id="v-trades" hidden>
         <div id="trades"><div class="loading">Hämtar signalloggen…</div></div>
+      </section>
+
+      <section class="view" id="v-ai" hidden>
+        <div id="ai"><div class="loading">AI-tradern räknar igenom sina affärer…</div></div>
       </section>
 
       <section class="view" id="v-stocks" hidden>
