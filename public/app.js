@@ -654,6 +654,17 @@ function nextStep(e) {
   if (hit === 1) return `TP1 nådd – ${act} 1/3 om du inte gjort det. Nästa: ${act} 1/3 vid TP2 <b>${fmt(e.tps[1])}</b> och flytta stoppet till ${fmt(entry)}.`;
   return `Stoppet ligger på köpkursen ${fmt(entry)}. Nästa: ${act} resten vid TP3 <b>${fmt(e.tps[2])}</b>.`;
 }
+// Coachens meddelanden: ett per omgång (ungefär var tredje timme), senaste först.
+// Finns inga sparade än visas coachens läsning just nu.
+function coachBox(e) {
+  const msgs = e.coachLog?.length ? e.coachLog : e.coach?.lines?.length ? [{ lines: e.coach.lines, tone: e.coach.tone, now: true }] : [];
+  if (!msgs.length) return '';
+  const when = m => m.now ? 'just nu' : `${m.date === new Date().toLocaleDateString('sv-SE') ? 'i dag' : new Date(m.date + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })} ${m.slot}`;
+  const latest = msgs[0];
+  return `<details class="coach ${latest.tone}"><summary><span class="coach-ico" aria-hidden="true">🧭</span><b>Coachen</b><span class="coach-peek">${esc(when(latest))} · ${esc(latest.lines[0])}</span>${msgs.length > 1 ? `<span class="coach-count">${msgs.length}</span>` : ''}</summary>
+    <div class="coach-body">${msgs.map((m, k) => `<div class="coach-msg${k ? ' old' : ''}"><div class="coach-when">${esc(when(m))}</div>${m.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>`).join('')}
+    <p class="muted small">Coachen skriver ungefär var tredje timme: 09.30, 12.30, 15.30 och efter stängningen 18.00, när läget har ändrats.</p></div></details>`;
+}
 function tradeCard(e) {
   const days = e.kind === 'panic' || e.kind === 'crypto';
   return `<div class="trade-card" data-symbol="${esc(e.symbol)}">
@@ -662,8 +673,7 @@ function tradeCard(e) {
     <div class="muted small">Signal ${esc(e.date)}${e.entry ? ` · köp ${fmt(e.entry)}` : ''}${e.last != null ? ` · nu ${fmt(e.last)}` : ''}</div>
     ${!days && e.tps ? tradeBar(e) : ''}
     <div class="tc-next">${nextStep(e)}</div>
-    ${e.coach?.lines?.length ? `<details class="coach ${e.coach.tone}"><summary><span class="coach-ico" aria-hidden="true">🧭</span><b>Coachen</b><span class="coach-peek">${esc(e.coach.lines[0])}</span></summary>
-      <div class="coach-body">${e.coach.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div></details>` : ''}
+    ${coachBox(e)}
   </div>`;
 }
 

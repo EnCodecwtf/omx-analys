@@ -511,6 +511,8 @@ async function liveCheck({ force = false } = {}) {
       if (await signalLog.markWarning(`${s.date}|${r.symbol}`) && await notifyEvent({ name: r.name, symbol: r.symbol, close: r.price }, 'warn')) sent.push(`${r.symbol} warn`);
     }
   }
+  // Coachens omgång (09.30, 12.30, 15.30, 18.00) skapas här om ingen har öppnat appen.
+  if (!s.weekend) { try { await logView(); } catch (err) { console.error('Coachens omgång misslyckades:', err.message); } }
   return { ok: true, marketOpen: open, sent };
 }
 
@@ -543,6 +545,36 @@ async function summary() {
 }
 
 // Signalloggen med utfall räknat från kurserna efter signaldagen.
+// Coachens meddelanden sparas som separata meddelanden, ungefär var tredje timme under
+// handelsdagen: 09.30, 12.30, 15.30 och efter stängningen 18.00. Ett nytt meddelande
+// skapas bara om läget har ändrats sedan förra, och en notis skickas per omgång.
+const COACH_KEY = 'omx-analys:coach';
+const COACH_SLOTS = [9 * 60 + 30, 12 * 60 + 30, 15 * 60 + 30, 18 * 60];
+const slotLabel = m => `${String(Math.floor(m / 60)).padStart(2, '0')}.${String(m % 60).padStart(2, '0')}`;
+async function coachRound(entries) {
+  let saved;
+  try { saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] }; } catch { return { messages: [] }; }
+  const s = sthlm();
+  const slot = s.weekend ? null : [...COACH_SLOTS].reverse().find(m => s.min >= m);
+  if (slot == null) return saved;
+  const slotId = `${s.date}|${String(slot).padStart(4, '0')}`;
+  if ((saved.lastSlot || '') >= slotId) return saved;
+  const at = new Date().toISOString(), added = [];
+  for (const e of entries) {
+    if (!e.coach?.lines?.length || (e.state !== 'öppen' && e.state !== 'väntar på köp')) continue;
+    const trade = signalLog.idOf(e);
+    const prev = saved.messages.find(m => m.trade === trade);
+    if (prev && prev.lines.join('|') === e.coach.lines.join('|')) continue;
+    added.push({ id: `${slotId}|${trade}`, at, slot: slotLabel(slot), date: s.date, trade, symbol: e.symbol, name: e.name, tone: e.coach.tone, lines: e.coach.lines });
+  }
+  saved = { lastSlot: slotId, messages: [...added, ...saved.messages].slice(0, 300) };
+  try { await signalLog.kvSet(COACH_KEY, saved); } catch (err) { console.error('Coachens meddelanden kunde inte sparas:', err.message); return saved; }
+  if (added.length) {
+    try { await pushAll({ title: `🧭 Coachen ${slotLabel(slot)}`, body: added.map(m => m.lines[0]).join('\n').slice(0, 400), url: '/#affarer', tag: 'coach' }); } catch { /* notisen är inte avgörande */ }
+  }
+  return saved;
+}
+
 async function logView() {
   const out = await withOutcomes();
   // Coachens kommentarer för öppna affärer, byggda på riktiga data.
@@ -554,6 +586,11 @@ async function logView() {
       const rep = meta && !meta.isIndex && !meta.isUS && !meta.isCrypto ? await nextReport(e.symbol).catch(() => null) : null;
       e.coach = coachTrade(e, bars, evaluate(bars.slice(-CHART_BARS)), rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null);
     } catch (err) { console.error('Coachen kunde inte räkna', e.symbol, err.message); }
+  }
+  const coachLog = await coachRound(out);
+  for (const e of out) {
+    if (e.state !== 'öppen' && e.state !== 'väntar på köp') continue;
+    e.coachLog = coachLog.messages.filter(m => m.trade === signalLog.idOf(e)).slice(0, 12);
   }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.

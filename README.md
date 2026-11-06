@@ -853,7 +853,7 @@ senaste 60 handelsdagarna: stängningsauktionen står för cirka 40 % av volymen
 ### Coachen
 Varje öppen affär har en coach som kommenterar läget med riktiga data: nådda mål, kursen mot köpet, om studsen från stödet
 håller, om kursen gjort nya bottnar sedan signalen, EMA 20, motstånd före nästa mål, överköpt RSI och kommande rapport. Den
-peppar men lovar inget, och påminner om att planen gäller. Två rader från coachen följer med notisen när TP1 eller TP2 nås.
+peppar men lovar inget, och påminner om att planen gäller. Coachens kommentarer sparas som separata meddelanden ungefär var tredje timme (09.30, 12.30, 15.30 och 18.00 på vardagar), bara när läget har ändrats, med en notis per omgång. Meddelandena visas under varje affär, senaste först. Två rader från coachen följer med notisen när TP1 eller TP2 nås.
 
 ### Nyheter
 Rubriker från Google Nyheter visas för varje bolag, för börsen och för krig och geopolitik (högst 2 per källa). Varje rubrik märks med
