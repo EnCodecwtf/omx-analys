@@ -548,3 +548,7 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
   .view-btn { padding: 8px 2px; white-space: nowrap; gap: 4px; }
   .view-btn .ico { display: none; }
 }
+
+.ai-product { margin: 4px 0 2px; font-size: 13px; }
+.ai-product a { color: var(--text); font-weight: 600; text-decoration: none; }
+.ai-product a:hover { color: var(--accent); }

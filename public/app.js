@@ -649,6 +649,7 @@ function renderAi() {
   const pct = v => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
   const pos = p => `<div class="trade-card" data-symbol="${esc(p.symbol)}">
       <div class="tc-head"><div><b>${esc(p.name)}</b> <span class="tag">${esc(p.market)}</span></div><div class="tc-res ${p.pnl > 0 ? 'pos' : p.pnl < 0 ? 'neg' : ''}">${sign(p.pnl)}</div></div>
+      ${p.product ? `<div class="ai-product"><a href="${esc(p.product.url)}" target="_blank" rel="noopener">${esc(p.product.name)}</a> <span class="muted small">${p.product.type === 'mini' ? 'minifuture' : 'bull-certifikat'} · ${String(p.product.leverage).replace('.', ',')}x${p.product.knockout ? ` · knock-out ${fmt(p.product.knockout)}` : ''}${p.product.late ? ' · valt i efterhand' : ''}</span></div>` : '<div class="muted small">Simulerad minifuture 5x (inget papper hittades)</div>'}
       <div class="muted small">Köpt ${esc(p.opened)} för ${kr(p.amount)} · ${Math.round(p.left * 100)} % kvar · värde nu ${kr(p.value)} · ${pct(p.pnlPct)}</div>
       ${tradeBar({ ...p, stop: p.stop < p.entry ? p.stop : p.entry - (p.tps[0] - p.entry) * 0.6 })}
       <div class="tc-next">Stopp ${p.stop >= p.entry ? `flyttat till ${fmt(p.stop)}` : fmt(p.stop)}${p.trailing ? ' (glidande)' : ''}.</div>
@@ -668,7 +669,7 @@ function renderAi() {
     <h2 class="v-title">Beslut</h2>
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
     ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
-    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen. Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr) i en simulerad minifuture med ${a.leverage}x hävstång, 0,5 % i avgifter per affär. Räknat på dagsdata.
+    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen. Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
       Besluten tas av en regelmodell som varje dag väger trend (EMA 20), RSI, mål, stopp, rapporter och tid i affären – inte av en språkmodell. Inte investeringsrådgivning.</p>`;
   bindRows(el);
 }

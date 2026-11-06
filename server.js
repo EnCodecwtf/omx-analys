@@ -246,6 +246,7 @@ async function scan() {
         : { date: dayOf(r.t), symbol: r.symbol, name: r.name, close: r.price, stop: r.plan.stop,
           tps: r.plan.tps.map(x => x.price), size: r.size, avanzaUrl: avanzaUrl(bySymbol.get(r.symbol)), loggedAt: new Date().toISOString() }));
       for (const e of added) await notifySignal(e);
+      if (added.length) await ensureAiPicks(added);
     }
     await markInTrade(rows, r => r.isCrypto ? 'crypto' : undefined);
     return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), panic, rows };
@@ -465,17 +466,47 @@ async function morning({ publish = false } = {}) {
   return m;
 }
 
+// AI-tradern väljer (fiktivt) ett av papperen som appen föreslår för signalen, samma
+// regler som för köp: säker hävstång, knock-out minst 1 ATR under stoppet, låg spread.
+// Valet fryses vid signalen och sparas, så att uppföljningen gäller just det pappret.
+const AI_PICKS_KEY = 'omx-analys:ai-picks';
+async function ensureAiPicks(entries) {
+  let picks;
+  try { picks = (await signalLog.kvGet(AI_PICKS_KEY, null)) || {}; } catch { return {}; }
+  let changed = false;
+  for (const e of entries) {
+    const id = signalLog.idOf(e);
+    if (e.kind || e.stop == null || picks[id] !== undefined) continue;
+    const meta = bySymbol.get(e.symbol);
+    if (!meta?.avanzaId) { picks[id] = null; changed = true; continue; }
+    try {
+      const bars = await fetchBars(e.symbol);
+      const t = bars.findIndex(b => dayOf(b.t) === e.date);
+      const a = computeIndicators(bars.slice(0, t + 1 || bars.length)).atr.at(-1);
+      const r = recommend(await fetchProducts(meta.avanzaId), { plan: { entry: e.close, stop: e.stop, tps: e.tps.map(price => ({ price })) }, atr: a, isIndex: !!meta.isIndex });
+      const m = r.minis[0], b = r.bulls[0];
+      const late = today() > addTradingDays(e.date, 1);
+      picks[id] = m ? { type: 'mini', name: m.name, issuer: m.issuer, url: m.url, financing: m.financing, knockout: m.knockout, spreadPct: m.spreadPct, pickedAt: today(), late }
+        : b ? { type: 'bull', name: b.name, issuer: b.issuer, url: b.url, leverage: b.leverage, spreadPct: b.spreadPct, pickedAt: today(), late } : null;
+      changed = true;
+    } catch (err) { console.error('AI-tradern kunde inte välja papper för', e.symbol, err.message); }
+  }
+  if (changed) { try { await signalLog.kvSet(AI_PICKS_KEY, picks); } catch (err) { console.error('AI-tradern kunde inte spara val:', err.message); } }
+  return picks;
+}
+
 // AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
 async function aiTrader() {
   return cached('aitrader', async () => {
     const list = await signalLog.entries();
+    const picks = await ensureAiPicks(list);
     const bars = new Map(), reports = new Map();
     for (const e of list) if (!e.kind && !bars.has(e.symbol)) {
       try { bars.set(e.symbol, await fetchBars(e.symbol)); } catch { /* hoppas över */ }
       const meta = bySymbol.get(e.symbol);
       if (meta && !meta.isUS && !meta.isIndex) { const r = await nextReport(e.symbol).catch(() => null); reports.set(e.symbol, [...reportDates(e.symbol), ...(r ? [r.date] : [])]); }
     }
-    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || []) };
+    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], { productFor: e => picks[signalLog.idOf(e)] || null }) };
   });
 }
 
