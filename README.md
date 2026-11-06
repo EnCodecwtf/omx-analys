@@ -838,6 +838,11 @@ styckena med korta pauser och laddar upp en MP3 som release-fil (`morgon-ljud`, 
 filen via `/api/morning-audio/…` och markerar stycket som läses. Tjänsten är inofficiell: finns ingen ljudfil läser appen upp
 med enhetens egen röst.
 
+**Pålitlig tidsstyrning:** GitHubs schemalagda körningar kan släpa eller utebli (live-bevakningen var 15:e minut gick bara
+4 gånger på två dygn). Därför: Vercel Cron kör `/api/cron/morning` varje vardag (reserv), sessionen skrivs också vid första
+besöket efter 07.15, och appen startar ljudjobbet direkt via GitHubs API när sessionen är skriven om `GITHUB_DISPATCH_TOKEN`
+är satt. För exakta tider rekommenderas en extern schemaläggare som cron-job.org (se Publicera på Vercel).
+
 ### Börstider
 Under **Mer → Börstider** visas när Tokyo, Shanghai, Hongkong, Sydney, Stockholm, Frankfurt, London och New York öppnar och
 stänger i användarens egen tid (webbläsarens tidszon, sommar- och vintertid räknas om), med status och tidslinje. Bredvid

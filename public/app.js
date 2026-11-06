@@ -941,6 +941,12 @@ function renderMorning() {
   $('#say-stop').addEventListener('click', stopSpeech);
   $('#say-next').addEventListener('click', nextSection);
   setVoiceLabel();
+  // Dagens ljudfil skapas några minuter efter att sessionen skrivits: hämta igen tills den finns.
+  clearTimeout(renderMorning.wait);
+  if (!audioOk && m.date === new Date().toLocaleDateString('sv-SE') && Date.now() - Date.parse(m.createdAt) < 30 * 60000) {
+    $('#say-voice').textContent = 'Mattias röst läses in – klar inom några minuter. Tills dess används enhetens röst.';
+    renderMorning.wait = setTimeout(async () => { if (tool !== 'morning' || speech) return; await loadMorning(); renderMorning(); }, 60000);
+  }
 }
 function setVoiceLabel() {
   const el = $('#say-voice'); if (!el) return;

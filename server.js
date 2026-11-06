@@ -435,6 +435,22 @@ async function makeMorning() {
     news: { market: mk, geo: geo.filter(n => n.tags.includes('Geopolitik')) },
   });
 }
+// Startar GitHub-jobbet som läser in ljudet direkt när sessionen är skriven, i stället
+// för att vänta på GitHubs schema (som kan släpa eller utebli). Kräver GITHUB_DISPATCH_TOKEN
+// (finkornig token med Actions: läs och skriv för repot).
+async function startAudioJob() {
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  if (!token) return false;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPO || 'EnCodecwtf/omx-analys'}/actions/workflows/morning-audio.yml/dispatches`, {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'omx-analys', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: 'main' }),
+    });
+    if (!r.ok) console.error('Ljudjobbet kunde inte startas:', r.status);
+    return r.ok;
+  } catch (err) { console.error('Ljudjobbet kunde inte startas:', err.message); return false; }
+}
 async function morning({ publish = false } = {}) {
   const saved = await signalLog.kvGet(MORNING_KEY, null);
   const s = sthlm();
@@ -443,6 +459,7 @@ async function morning({ publish = false } = {}) {
   if ((saved?.latest?.date === s.date && saved.latest.talk) || (!publish && !due)) return saved?.latest || null;
   const m = await makeMorning();
   await signalLog.kvSet(MORNING_KEY, { latest: m, list: [m, ...(saved?.list || []).filter(x => x.date !== m.date)].slice(0, 10) });
+  await startAudioJob();
   if (publish) { try { await pushAll({ title: '☕ Morgonsoffan med Glen', body: m.summary || 'Dagens morgonsession är klar.', url: '/#morgon', tag: 'morgon' }); } catch { /* notisen är inte avgörande */ } }
   return m;
 }
