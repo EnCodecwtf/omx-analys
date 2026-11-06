@@ -104,6 +104,7 @@ function openTool(name) {
   if (name === 'loans') renderLoans();
   if (name === 'hours') { renderHours(); loadVolProfile(); }
   if (name === 'morning') renderMorning();
+  if (name === 'report') loadReport();
 }
 function closeTool() {
   if (tool === 'morning') stopSpeech();
@@ -947,6 +948,58 @@ async function loadNight() {
 }
 setInterval(() => { if (!document.hidden) loadNight(); }, 5 * 60 * 1000);
 loadNight();
+
+// Månadsrapport: alla signaler som släppts under månaden, med frysta nivåer och
+// ärliga nyckeltal. Inget räknas bort: förluster, break-even och öppna syns.
+async function loadReport(month) {
+  const el = $('#report');
+  el.innerHTML = '<div class="loading">Räknar ihop månaden…</div>';
+  let r;
+  try { r = await (await fetch('/api/report' + (month ? '?month=' + month : ''))).json(); } catch { el.innerHTML = '<p class="muted">Kunde inte hämta rapporten.</p>'; return; }
+  const sv = v => v == null ? '–' : String(v).replace('.', ',');
+  const sgn = (v, u) => v == null ? '–' : `${v > 0 ? '+' : ''}${sv(v)}${u ? ' ' + u : ''}`;
+  const monthName = m => new Date(m + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' });
+  const S = r.summary;
+  const badgeOf = x => ({ vinst: '<span class="rp-b win">VINST</span>', förlust: '<span class="rp-b loss">FÖRLUST</span>', 'break-even': '<span class="rp-b be">BREAK-EVEN</span>', öppen: '<span class="rp-b open">ÖPPEN</span>' }[x.result] || '<span class="rp-b">–</span>');
+  el.innerHTML = `<article class="card tool-card report">
+    <div class="rp-top"><label class="small muted">Månad <select id="rp-month">${r.months.map(m => `<option value="${m}"${m === r.month ? ' selected' : ''}>${monthName(m)}</option>`).join('')}</select></label>
+      <span class="muted small">Uppdaterad ${new Date(r.generated).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div>
+    <h2 class="rp-title">Tradingresultat ${monthName(r.month)}</h2>
+    <p class="rp-line"><b>${S.signals} signaler.</b> ${S.wins} vinster, ${S.losses} förluster, ${S.breakeven} break-even och ${S.open} öppna.</p>
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${S.winRate == null ? '–' : sv(S.winRate) + ' %'}</b><span>vinstandel av alla ${S.closed} avslutade<br><span class="muted">break-even räknas inte som vinst</span></span></div>
+      <div class="stat"><b class="num ${S.sumR > 0 ? 'pos' : S.sumR < 0 ? 'neg' : ''}">${sgn(S.sumR, 'R')}</b><span>summa för månaden<br><span class="muted">snitt ${sgn(S.avgR, 'R')} per affär</span></span></div>
+      <div class="stat"><b class="num">${sgn(S.worstR, 'R')}</b><span>största förlust<br><span class="muted">största vinst ${sgn(S.bestR, 'R')}</span></span></div>
+      <div class="stat"><b class="num">${sgn(S.maxDrawdownR, 'R')}</b><span>största nedgång i månaden</span></div>
+    </div>
+    <table class="rp-table"><tr><th>Datum</th><th>Signal</th><th class="r">Köp · stopp</th><th class="r">Utfall</th></tr>
+      ${r.rows.map(x => `<tr><td class="num">${esc(x.date.slice(5))}</td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.type)}${x.side === 'kort' ? ' · kort' : ''}</span>${x.hit ? ` <span class="tp-chip hit">TP${x.hit} ✓</span>` : ''}</td>
+        <td class="r num small">${x.entry != null ? fmt(x.entry) : fmt(x.close)}${x.stop != null ? ` · ${fmt(x.stop)}` : ''}</td>
+        <td class="r">${badgeOf(x)}<div class="num small">${x.result === 'öppen' ? (x.value != null ? `just nu ${sgn(x.value, x.unit)}` : '') : sgn(x.value, x.unit)}</div></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Inga signaler den här månaden. Det redovisas också.</td></tr>'}
+    </table>
+    <div class="rp-grid">
+      <div class="rp-box"><b>Jämförelse</b>
+        <p>OMXS30 under månaden: <b>${sgn(r.benchmark.changePct, '%')}</b>.</p>
+        <p>Förväntan från tioårstestet: cirka <b>+${sv(r.expected.avgR)} R</b> per affär och TP1 i ${r.expected.tp1Rate} % av affärerna. En enskild månad kan avvika mycket åt båda hållen.</p></div>
+      ${r.account ? `<div class="rp-box"><b>AI-traderns fiktiva konto</b>
+        <p>${kr(r.account.start)} → <b>${kr(r.account.end)}</b> (<span class="${r.account.changeKr >= 0 ? 'pos' : 'neg'}">${sgn(r.account.changePct, '%')}</span>, ${sgn(Math.round(r.account.changeKr))} kr).</p>
+        <p class="muted small">${r.account.decisions} beslut under månaden, varav ${r.account.skipped} gånger avstod den en signal.</p></div>` : ''}
+    </div>
+    <div class="rp-box rp-honest"><b>Så räknas rapporten</b>
+      <ul>
+        <li><b>Alla</b> signaler som släppts under månaden visas, också förluster och affärer som fortfarande är öppna. Inget räknas bort.</li>
+        <li>Nivåerna är de som frystes när signalen publicerades, med tidsstämpel. De ändras aldrig i efterhand.</li>
+        <li>Vinstandelen räknas på alla avslutade affärer. Break-even (under ±0,1 R) räknas inte som vinst. Räknat på alla signaler inklusive öppna är den ${S.winRateAll == null ? '–' : sv(S.winRateAll) + ' %'}.</li>
+        <li>Resultatet anges i R (1 R = förlusten om stoppet nås), så att små och stora affärer väger lika. Panikvecka och krypto anges i procent.</li>
+        <li>Utfallet räknas med samma regler som backtestet: köp på öppningen dagen efter signalen, en tredjedel vid varje mål, stoppet till köpkursen efter TP2. Courtage och spread ingår inte i R.</li>
+      </ul>
+      <p class="small">Kontrollsumma för månadens signaler (SHA-256): <code class="rp-hash">${esc(r.hash)}</code></p>
+      <p class="small muted">Varje kväll sparas en ögonblicksbild av det som publicerats på <a href="https://github.com/EnCodecwtf/omx-analys/releases/tag/signallogg" target="_blank" rel="noopener">GitHub</a>, där GitHub sätter tiden. Samma kontrollsumma i ögonblicksbilden visar att ingen signal har ändrats.</p>
+    </div>
+    <p class="muted small">Historiska resultat är ingen garanti för framtiden. Inte investeringsrådgivning.</p>
+  </article>`;
+  $('#rp-month').addEventListener('change', e => loadReport(e.target.value));
+}
 
 // Morgonsoffan med Glen: dagens morgonsession i text.
 let morningData = null;

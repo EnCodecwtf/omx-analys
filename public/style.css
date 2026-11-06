@@ -552,3 +552,22 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .ai-product { margin: 4px 0 2px; font-size: 13px; }
 .ai-product a { color: var(--text); font-weight: 600; text-decoration: none; }
 .ai-product a:hover { color: var(--accent); }
+
+/* Månadsrapport */
+.report .rp-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.report select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font: inherit; }
+.rp-title { font-size: 22px; margin: 12px 0 4px; }
+.rp-line { margin: 0 0 12px; color: var(--text-2); }
+.rp-table { margin-top: 14px; }
+.rp-table td { vertical-align: middle; }
+.rp-b { display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 2px 7px; border-radius: 5px; background: var(--panel-2); color: var(--muted); }
+.rp-b.win { background: var(--green-soft); color: var(--green); }
+.rp-b.loss { background: var(--red-soft); color: var(--red); }
+.rp-b.be { background: var(--surface-3); color: var(--text-2); }
+.rp-b.open { background: var(--blue-soft); color: #93c5fd; }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 14px; }
+.rp-box { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+.rp-box p { margin: 6px 0 0; }
+.rp-honest { margin-top: 12px; }
+.rp-honest ul { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text-2); }
+.rp-hash { font-size: 11px; word-break: break-all; color: var(--text-2); }

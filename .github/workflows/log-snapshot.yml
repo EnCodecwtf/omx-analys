@@ -1,0 +1,25 @@
+# Ögonblicksbild av signalloggen varje kväll: det som publicerades (frysta nivåer och
+# tid) sparas som release-fil på GitHub. GitHub sätter tiden, så ingen kan i efterhand
+# ändra en signal utan att det syns. Kontrollsummorna per månad visas i månadsrapporten.
+name: Signallogg ögonblicksbild
+on:
+  schedule:
+    - cron: '50 21 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Hämta och ladda upp
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          d=$(TZ=Europe/Stockholm date +%F)
+          curl -fsS -m 120 https://omx-analys.vercel.app/api/log-frozen -o "signallogg-$d.json"
+          sha256sum "signallogg-$d.json"
+          gh release view signallogg -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create signallogg -R "$GITHUB_REPOSITORY" --title "Signallogg – ögonblicksbilder" --notes "Varje kväll sparas det som publicerats i appens signallogg (frysta nivåer och tid). Jämför kontrollsumman per månad med månadsrapporten i appen."
+          gh release upload signallogg "signallogg-$d.json" -R "$GITHUB_REPOSITORY" --clobber

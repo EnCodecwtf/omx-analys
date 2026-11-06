@@ -860,6 +860,14 @@ av resten och stoppet flyttas till TP1, vid TP3 behålls sista delen med glidand
 resten om kursen faller under EMA 20 nära köpkursen, hälften säljs före en rapport om affären är i vinst, och en affär som
 inte nått TP1 på 20 handelsdagar avslutas. Varje beslut visas med motivering. Allt räknas om från början på dagsdata.
 
+### Månadsrapport
+Under **Mer → Månadsrapport** visas varje månad alla signaler som släppts, med de nivåer som frystes vid publiceringen:
+vinster, förluster, break-even och öppna. Vinstandelen räknas på alla avslutade affärer (break-even under ±0,1 R räknas inte
+som vinst), resultatet i R med summa, snitt, största förlust och största nedgång, jämfört med OMXS30 och med förväntan från
+tioårstestet, plus AI-traderns fiktiva konto. En kontrollsumma (SHA-256) över månadens frysta signaler visas, och varje kväll
+sparas en ögonblicksbild av det som publicerats som release-fil på GitHub (`signallogg`, `/api/log-frozen`), där GitHub sätter
+tiden – så att ingen signal kan ändras i efterhand utan att det syns.
+
 ### Coachen
 Varje öppen affär har en coach som kommenterar läget med riktiga data: nådda mål, kursen mot köpet, om studsen från stödet
 håller, om kursen gjort nya bottnar sedan signalen, EMA 20, motstånd före nästa mål, överköpt RSI och kommande rapport. Den

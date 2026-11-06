@@ -21,6 +21,7 @@ import { coachTrade } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
 import { runAiTrader } from './lib/aitrader.js';
+import { buildReport, frozenHash } from './lib/report.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -799,6 +800,22 @@ export default async function handler(req, res) {
     if (url.pathname === '/api/shorts') {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('shorts');
       return send(res, 200, await shortScan());
+    }
+    // Månadsrapport: alla signaler i månaden, ärligt räknat. ?month=ÅÅÅÅ-MM (standard: innevarande).
+    if (url.pathname === '/api/report') {
+      const out = await withOutcomes();
+      const months = [...new Set(out.map(e => e.date.slice(0, 7)))].sort().reverse();
+      const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : today().slice(0, 7);
+      const [ai, omx] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => [])]);
+      return send(res, 200, { months: months.includes(today().slice(0, 7)) ? months : [today().slice(0, 7), ...months], ...buildReport({ month, entries: out, ai, omx }) });
+    }
+    // Det som publicerades (frysta nivåer och tid), för ögonblicksbilderna på GitHub.
+    if (url.pathname === '/api/log-frozen') {
+      const list = await signalLog.entries();
+      const frozen = list.map(e => ({ date: e.date, symbol: e.symbol, name: e.name, kind: e.kind || null, market: e.market || null, close: e.close, stop: e.stop ?? null, tps: e.tps ?? null, exitDate: e.kind ? e.exitDate ?? null : null, loggedAt: e.loggedAt ?? null }));
+      const months = {};
+      for (const m of new Set(list.map(e => e.date.slice(0, 7)))) months[m] = frozenHash(list.filter(e => e.date.startsWith(m)));
+      return send(res, 200, { generated: new Date().toISOString(), count: frozen.length, monthHashes: months, entries: frozen });
     }
     if (url.pathname === '/api/ai-trader') return send(res, 200, await aiTrader());
     if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
