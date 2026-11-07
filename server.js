@@ -580,7 +580,7 @@ async function ensureMonthly() {
 
 async function monthlyMini(id, target, side) {
   if (!id) return null;
-  try { return monthly.pickMini((await fetchProducts(id, side)).minis, { target, side }); } catch { return null; }
+  try { return monthly.rankMinis((await fetchProducts(id, side)).minis, { target, side }); } catch { return []; }
 }
 
 async function monthlyView() {
@@ -595,7 +595,7 @@ async function monthlyView() {
     // Läget just nu för innehaven.
     const live = { prices: {}, gold: await closeOn(monthly.GOLD.yahoo), oil: await closeOn(monthly.OIL.yahoo) };
     for (const s of cur?.stocks || []) live.prices[s.symbol] = await closeOn(s.symbol);
-    const withProduct = async s => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, mini: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, L.stockLev, 'long') });
+    const withProduct = async s => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, minis: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, L.stockLev, 'long') });
     const current = cur && {
       ...cur,
       stocks: await Promise.all(cur.stocks.map(async s => ({ ...(await withProduct(s)), last: live.prices[s.symbol],
@@ -614,7 +614,7 @@ async function monthlyView() {
       return { month: h.month, decided: h.decided, to: end?.date ?? null, open: !h.end, backfilled: !!h.backfilled, mode: h.mode,
         names: h.stocks.map(s => s.name), retPct: r ? Math.round(r.lev * 1e4) / 100 : null, rawPct: r ? Math.round(r.raw * 1e4) / 100 : null };
     });
-    return { updated: Date.now(), rules: L, rebalance: rd, current, next, cash: { gold: goldMini, oil: oilMini, goldNow: live.gold, oilNow: live.oil },
+    return { updated: Date.now(), rules: { ...L, minOrder: monthly.MIN_ORDER }, rebalance: rd, current, next, cash: { gold: goldMini, oil: oilMini, goldNow: live.gold, oilNow: live.oil },
       periods, totalPct: Math.round((idx - 1) * 1e4) / 100, totalRawPct: Math.round((idxRaw - 1) * 1e4) / 100,
       changeText: next && !next.error ? monthly.changeText(cur, next) : null };
   });

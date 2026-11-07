@@ -46,10 +46,16 @@ test('mini med högre hävstång köps för en del av beloppet, AVA före andra'
     { orderbookId: '1', name: 'MINI L X NORDNET', issuer: 'N', subType: 'MINI_FUTURE', leverage: 1.7, buyPrice: 10, sellPrice: 10.01 },
     { orderbookId: '2', name: 'MINI L X AVA 1', issuer: 'MS', subType: 'MINI_FUTURE', leverage: 3.4, buyPrice: 10, sellPrice: 10.01 },
   ];
-  const p = pickMini(w, { target: 1.7 });
+  const p = pickMini(w, { target: 1.7, money: 3000 });
   assert.equal(p.id, '2');
   assert.equal(p.share, 0.5);
   assert.equal(p.exposure, 1.7);
+  assert.equal(p.order, 1500);
+  // 1 500 kr räcker inte för ett delköp på minst 1 000 kr – då väljs pappret med rätt hävstång.
+  const q = pickMini(w, { target: 1.7, money: 1500 });
+  assert.equal(q.id, '1');
+  assert.equal(q.order, 1500);
+  assert.equal(pickMini(w, { target: 1.7, money: 800 }), null);
 });
 
 test('minins värde, lång och kort', () => {

@@ -1612,91 +1612,147 @@ async function loadMonthly(refresh) {
   }
   renderMonthly();
 }
+// Samma val som lib/monthly.js (chooseMini): aldrig en order under minsta beloppet.
+function chooseMini(list, target, money, minOrder) {
+  if (!list?.length || !(money >= minOrder)) return null;
+  const make = (p, share, note = null) => ({ ...p, share, order: Math.round(money * share), cash: Math.round(money * (1 - share)), exposure: Math.round(share * p.leverage * 100) / 100, note });
+  for (const p of list) { const share = Math.min(1, target / p.leverage); if (money * share >= minOrder && p.leverage <= target * 2.5) return make(p, share); }
+  const near = list.filter(p => p.leverage <= target * 1.3).sort((a, b) => Math.abs(a.leverage - target) - Math.abs(b.leverage - target))[0];
+  if (near) return make(near, Math.min(1, target / near.leverage), near.ava ? null : 'Inget AVA-papper räcker för beloppet – courtage kan tillkomma.');
+  const low = list.slice().sort((a, b) => a.leverage - b.leverage)[0];
+  return make(low, 1, `Hävstången blir ${svx(low.leverage)}, högre än målet – höj startvärdet för lägre hävstång.`);
+}
+// Minins värde (samma modell som servern): lång (S−F)/(S0−F), kort (F−S)/(F−S0).
+function miniG(s0, s1, L, short) {
+  if (!(s0 > 0 && s1 > 0)) return 1;
+  const F = short ? s0 * (1 + 1 / L) : s0 * (1 - 1 / L);
+  return Math.max(0, short ? (F - s1) / (F - s0) : (s1 - F) / (s0 - F));
+}
+// Fördelningen av ett belopp på platserna: aktier, guld och olja kort, kontanter.
+function allocate(state, money, m) {
+  const R = m.rules, per = money / R.slots, legs = [];
+  for (const s of state.stocks) {
+    const pick = chooseMini(s.minis, R.stockLev, per, R.minOrder);
+    legs.push({ key: s.symbol, title: s.name, sub: `${s.symbol} · aktie lång`, kind: 'stock', s, money: per, pick, target: R.stockLev });
+  }
+  const cash = money * state.cashShare;
+  if (cash > 0) {
+    if (cash >= 2 * R.minOrder) {
+      legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', money: cash / 2, pick: chooseMini(m.cash.gold, R.cashLev, cash / 2, R.minOrder), target: R.cashLev });
+      legs.push({ key: 'oil', title: 'Olja (Brent)', sub: 'kassaläge · kort', kind: 'oil', money: cash / 2, pick: chooseMini(m.cash.oil, R.cashLev, cash / 2, R.minOrder), target: R.cashLev, short: true });
+    } else {
+      legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', money: cash, pick: chooseMini(m.cash.gold, R.cashLev, cash, R.minOrder), target: R.cashLev,
+        note: `Kassaläget är ${kr(cash)} – för lite för två order på minst ${kr(R.minOrder)}, så allt läggs i guld. Med ett startvärde på ${kr(4 * R.minOrder)} eller mer blir det hälften guld och hälften olja kort.` });
+    }
+  }
+  return legs;
+}
 function renderMonthly() {
   const m = monthlyData, el = $('#monthly'), rd = m.rebalance, R = m.rules, cur = m.current, nx = m.next;
-  const amount = Math.max(0, +store.get('momAmount', '2100') || 0), per = amount / R.slots;
-  // Ett papper: länk, hävstång, spread och hur stor del av beloppet som läggs i pappret.
-  const paper = (p, money, what) => !p ? `<div class="mo-paper none">Ingen minifuture på Avanza klarar kraven. ${what === 'stock' ? 'Köp aktien direkt (utan hävstång) eller låt platsen ligga i kassaläget.' : 'Hoppa över den här delen.'}</div>`
-    : `<div class="mo-paper"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.ava ? ' <span class="tag ava">AVA · inget courtage</span>' : ` <span class="tag">${esc(p.issuer || '')}</span>`}
-      <div class="muted small">Hävstång ${svx(p.leverage)} · spread ${String(p.spreadPct).replace('.', ',')} %${p.stopLoss ? ` · knock-out ${fmt(p.stopLoss)}` : ''}</div>
-      <div class="mo-buy">${p.share < 0.99 ? `Köp för <b>${kr(money * p.share)}</b> (${Math.round(p.share * 100)} %), låt <b>${kr(money * (1 - p.share))}</b> ligga kvar som kontanter – då blir hävstången totalt cirka ${svx(p.exposure)}.` : `Köp för <b>${kr(money)}</b> – hävstång cirka ${svx(p.exposure)}.`}</div></div>`;
-  const stockCard = (s, money, isNow) => `<div class="mo-slot">
-      <div class="mo-head"><div><b>${esc(s.name)}</b> <span class="muted small">${esc(s.symbol)} · nr ${s.rank} på listan · ${svp(Math.round(s.mom * 1000) / 10)} på elva månader</span></div>
-        ${isNow && s.changePct != null ? `<div class="mo-res ${s.miniPct >= 0 ? 'pos' : 'neg'}">${svp(s.miniPct)}<small>aktien ${svp(s.changePct)}</small></div>` : ''}</div>
-      ${isNow ? `<div class="muted small">Köpt ${esc(s.since)} för ${fmt(s.entry)} USD · nu ${fmt(s.last)} USD${s.kept ? ' · behållen från förra månaden' : ''}</div>` : ''}
-      ${paper(s.mini, money, 'stock')}</div>`;
-  // Minins värde (samma modell som i servern): lång (S−F)/(S0−F), kort (F−S)/(F−S0).
-  const miniPct = (s0, s1, L, short) => { if (!(s0 > 0 && s1 > 0)) return null; const F = short ? s0 * (1 + 1 / L) : s0 * (1 - 1 / L);
-    return Math.round((Math.max(0, short ? (F - s1) / (F - s0) : (s1 - F) / (s0 - F)) - 1) * 1000) / 10; };
-  const pctOf = (a, b) => a > 0 && b > 0 ? Math.round((b / a - 1) * 1000) / 10 : null;
-  const cashCard = (share, isNow) => {
-    const money = amount * share;
-    const live = isNow && cur.gold && m.cash.goldNow && cur.oil && m.cash.oilNow;
-    const g = live ? { raw: pctOf(cur.gold, m.cash.goldNow), mini: miniPct(cur.gold, m.cash.goldNow, R.cashLev, false) } : null;
-    const o = live ? { raw: pctOf(cur.oil, m.cash.oilNow), mini: miniPct(cur.oil, m.cash.oilNow, R.cashLev, true) } : null;
-    const both = live ? Math.round((g.mini + o.mini) / 2 * 10) / 10 : null;
-    const leg = (title, x, from, to, short) => `<div class="muted small">${title}, ${svx(R.cashLev)}</div>
-      ${x ? `<div class="mo-leg"><b class="${x.mini >= 0 ? 'pos' : 'neg'}">${svp(x.mini)}</b> <span class="muted small">i minin · ${short ? 'oljan' : 'guldet'} ${svp(x.raw)} (${fmt(from)} → ${fmt(to)} USD)</span></div>` : ''}`;
-    return `<div class="mo-slot cash"><div class="mo-head"><div><b>Kassaläge</b> <span class="muted small">${Math.round(share * 100)} % av beloppet · hälften guld lång, hälften olja kort</span></div>
-        ${live ? `<div class="mo-res ${both >= 0 ? 'pos' : 'neg'}">${svp(both)}<small>guld och olja tillsammans</small></div>` : ''}</div>
-      ${isNow ? `<div class="muted small">Sedan ${esc(cur.decided)}${live ? '' : ' · kurserna saknas just nu'}</div>` : ''}
-      <div class="mo-two"><div>${leg('Guld lång', g, cur?.gold, m.cash.goldNow, false)}${paper(m.cash.gold, money / 2, 'cash')}</div>
-      <div>${leg('Olja kort', o, cur?.oil, m.cash.oilNow, true)}${paper(m.cash.oil, money / 2, 'cash')}</div></div></div>`;
-  };
-  const modeText = c => c.mode === 'aktier' ? 'Två aktier' : c.mode === 'delvis' ? 'En aktie + kassaläge' : 'Kassaläge';
+  const start = Math.max(0, +store.get('momStart', '3000') || 0);
+  // Portföljens värde: startvärdet genom alla avslutade perioder, sedan innehaven i den pågående.
+  const closed = m.periods.filter(p => !p.open && p.retPct != null);
+  const v0 = closed.reduce((v, p) => v * (1 + p.retPct / 100), start);
+  const legs = cur ? allocate(cur, v0, m) : [];
+  const growth = l => l.kind === 'stock' ? (l.s.last ? miniG(l.s.entry, l.s.last, R.stockLev) / miniG(l.s.entry, l.s.price, R.stockLev) : 1)
+    : l.kind === 'gold' ? miniG(cur.gold, m.cash.goldNow, R.cashLev) : miniG(cur.oil, m.cash.oilNow, R.cashLev, true);
+  let cashLeft = v0 - legs.reduce((a, l) => a + l.money, 0);
+  const rows = legs.map(l => {
+    const inMini = l.pick ? l.pick.order : 0;
+    cashLeft += l.money - inMini;
+    // Värdet räknas med målhävstången på hela platsen (minin plus det som ligger kvar som kontanter).
+    const now = l.money * growth(l) - (l.money - inMini);
+    return { ...l, inMini, now, chg: now - inMini };
+  });
+  const total = rows.reduce((a, r) => a + r.now, 0) + cashLeft;
+  const sgnKr = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${kr(Math.abs(v))}`;
+  const cls = v => v > 0.5 ? 'pos' : v < -0.5 ? 'neg' : '';
+  const paperLine = l => l.pick ? `<a href="${esc(l.pick.url)}" target="_blank" rel="noopener">${esc(l.pick.name)}</a> · ${svx(l.pick.leverage)}${l.pick.ava ? ' · <span class="ava-txt">AVA</span>' : ''}`
+    : l.kind === 'stock' && !l.s.minis?.length ? 'Ingen minifuture på Avanza – köp aktien utan hävstång' : `Under ${kr(R.minOrder)} – ligger som kontanter`;
+  // Ordrar för en fördelning (att börja nu eller bytet).
+  const orderRows = (ls, verb = 'Köp') => ls.map(l => `<div class="mo-order"><div class="mo-order-top"><span><b class="${verb === 'Sälj' ? 'neg' : 'pos'}">${verb}</b> <b>${esc(l.title)}</b></span>
+      <b class="num">${verb === 'Sälj' ? 'allt' : l.pick ? kr(l.pick.order) : l.kind === 'stock' && !l.s.minis?.length ? kr(l.money) : '–'}</b></div>
+      <div class="small muted">${paperLine(l)}${l.pick?.spreadPct != null ? ` · spread ${String(l.pick.spreadPct).replace('.', ',')} %` : ''}${verb !== 'Sälj' && l.pick?.cash > 0 ? ` · ${kr(l.pick.cash)} ligger kvar som kontanter` : ''}</div>
+      ${l.pick?.note ? `<div class="small warn-txt">${esc(l.pick.note)}</div>` : ''}${l.note && verb !== 'Sälj' ? `<div class="small muted">${esc(l.note)}</div>` : ''}</div>`).join('');
+  const startLegs = cur ? allocate(cur, start, m) : [];
   const held = new Set((cur?.stocks || []).map(s => s.symbol));
-  const nextList = nx && !nx.error ? nx.top.map((x, i) => {
+  // Bytet: det som säljs och det som köps (det som behålls rörs inte).
+  let swap = '';
+  if (nx && !nx.error) {
+    const nxLegs = allocate({ stocks: nx.stocks, cashShare: nx.cashShare }, total, m);
+    const sells = rows.filter(r => r.kind === 'stock' ? !nx.stocks.some(s => s.symbol === r.s.symbol) : !(nx.cashShare > 0));
+    const buys = nxLegs.filter(l => l.kind === 'stock' ? !held.has(l.s.symbol) : !(cur?.cashShare > 0));
+    swap = sells.length || buys.length
+      ? `${orderRows(sells, 'Sälj')}${orderRows(buys)}`
+      : '<p>Inget byte – allt behålls.</p>';
+  }
+  const top10 = nx && !nx.error ? nx.top.map((x, i) => {
     const pick = nx.stocks.find(s => s.symbol === x.symbol), skip = nx.skipped.find(s => s.symbol === x.symbol);
     return `<tr class="${pick ? 'pick' : ''}"><td class="num">${i + 1}</td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.symbol)}</span></td><td class="r num">${svp(Math.round(x.mom * 1000) / 10)}</td>
       <td class="r small">${pick ? (held.has(x.symbol) ? '<span class="tag">behålls</span>' : '<span class="tag go">köps</span>') : skip ? `<span class="tag bad">${svp(Math.round(skip.fromHigh * 1000) / 10)} från toppen</span>` : held.has(x.symbol) ? '<span class="tag bad">säljs</span>' : ''}</td></tr>`;
   }).join('') : '';
+  const modeText = c => c.mode === 'aktier' ? 'Två aktier' : c.mode === 'delvis' ? 'En aktie och kassaläge' : 'Kassaläge (guld och olja kort)';
+  const firstDate = m.periods[0]?.decided;
+  let run = start;
+  // Den pågående månaden räknas som innehaven ovan (samma fördelning som portföljen).
+  const hist = m.periods.map(p => { const r = p.open ? Math.round((total / v0 - 1) * 1000) / 10 : p.retPct; if (r != null) run *= 1 + r / 100; return { ...p, retPct: r, value: run }; });
+
   el.innerHTML = `<article class="card tool-card monthly">
-    <div class="calc-tiles">
-      <div class="stat"><b class="num">${cur ? modeText(cur) : '–'}</b><span>läget den här månaden</span></div>
-      <div class="stat"><b class="num ${rd.isToday ? 'pos' : ''}">${rd.isToday ? 'Idag' : `${daysTo(rd.next)} dagar`}</b><span>nästa byte: ${esc(moDay(rd.next))}, strax före 22.00</span></div>
-      <div class="stat"><b class="num ${m.totalPct >= 0 ? 'pos' : 'neg'}">${svp(m.totalPct)}</b><span>beräknat sedan start med hävstång<br><span class="muted">utan hävstång ${svp(m.totalRawPct)}</span></span></div>
-      <div class="stat"><b class="num ${cur?.spy?.below ? 'neg' : 'pos'}">${cur?.spy ? (cur.spy.below ? 'Under' : 'Över') : '–'}</b><span>S&amp;P 500 mot 200-dagars snitt${cur?.spy ? ` (${fmt(cur.spy.close)} / ${fmt(cur.spy.sma200)})` : ''}</span></div>
+    <div class="pf-head">
+      <div><div class="muted small">Portföljens värde</div><div class="pf-value num">${kr(total)}</div>
+        <div class="num ${cls(total - start)}">${sgnKr(total - start)} (${svp(Math.round((total / start - 1) * 1000) / 10)}) sedan start ${firstDate ? esc(firstDate) : ''}</div></div>
+      <label class="pf-start small">Startvärde <input id="mo-start" type="number" min="${2 * R.minOrder}" step="500" value="${start}"> kr</label>
     </div>
-    <label class="mo-amount small">Belopp totalt <input id="mo-amount" type="number" min="0" step="100" value="${amount}"> kr <span class="muted">· ${kr(per)} per plats</span></label>
+    <div class="pf-facts small">
+      <span>Läge: <b>${cur ? modeText(cur) : '–'}</b></span>
+      <span>Nästa byte: <b>${esc(moDay(rd.next))}</b>${rd.isToday ? ' <b class="pos">– idag före 22.00</b>' : ` (om ${daysTo(rd.next)} dagar)`}</span>
+      <span>S&amp;P 500 ${cur?.spy?.below ? '<b class="neg">under</b>' : '<b class="pos">över</b>'} 200-dagars snitt</span>
+    </div>
+    ${start < 2 * R.minOrder ? `<div class="status"><b>För lågt startvärde</b><span>Varje order måste vara minst ${kr(R.minOrder)} för att slippa courtage, så startvärdet behöver vara minst ${kr(2 * R.minOrder)} (helst ${kr(3 * R.minOrder)}).</span></div>` : ''}
 
-    ${rd.isToday && m.changeText ? `<div class="status go"><b>Bytesdag idag</b><span>${esc(m.changeText)} Handla strax före 22.00 svensk tid (stängningen i New York).</span></div>` : ''}
+    <h2 class="v-title">Innehav</h2>
+    <table class="pf-table">
+      <tr><th>Innehav</th><th class="r">Värde</th><th class="r">Sedan ${esc(cur?.decided?.slice(5) || 'byte')}</th></tr>
+      ${rows.map(r => `<tr><td><b>${esc(r.title)}</b> <span class="muted small">${esc(r.sub)}</span><div class="small muted">${paperLine(r)}</div>
+          ${r.kind === 'stock' && r.s.kept ? `<div class="small muted">Köpt ${esc(r.s.since)} · aktien ${svp(r.s.changePct)} sedan köp</div>` : ''}</td>
+        <td class="r num"><b>${kr(r.now)}</b><div class="small muted">${kr(r.inMini)}</div></td>
+        <td class="r num ${cls(r.chg)}"><b>${r.inMini ? svp(Math.round(r.chg / r.inMini * 1000) / 10) : '–'}</b><div class="small">${sgnKr(r.chg)}</div></td></tr>`).join('')}
+      <tr><td><b>Kontanter</b><div class="small muted">Den del som inte behövs i papperen för rätt hävstång</div></td><td class="r num"><b>${kr(cashLeft)}</b></td><td></td></tr>
+      <tr class="pf-sum"><td><b>Totalt</b></td><td class="r num"><b>${kr(total)}</b></td><td class="r num ${cls(total - v0)}"><b>${svp(Math.round((total / v0 - 1) * 1000) / 10)}</b><div class="small">${sgnKr(total - v0)}</div></td></tr>
+    </table>
+    <p class="muted small">Värdet är beräknat från kurserna (minin med ${svx(R.stockLev)} på aktier och ${svx(R.cashLev)} på guld och olja), utan ränta och spread. Den lilla siffran under värdet är vad som köptes för vid senaste bytet.</p>
 
-    <h2 class="v-title">Det här gäller nu <span class="muted">(${cur ? esc(new Date(cur.month + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })) : '–'})</span></h2>
-    ${cur ? `${cur.stocks.map(s => stockCard(s, per, true)).join('')}${cur.cashShare > 0 ? cashCard(cur.cashShare, true) : ''}
-      ${cur.skipped?.length ? `<p class="muted small">${cur.skipped.map(x => `${esc(x.name)} (nr ${x.rank}) köptes inte: ${svp(Math.round(x.fromHigh * 1000) / 10)} från sitt högsta det senaste året`).join('. ')}. Den platsen går till kassaläget.</p>` : ''}
-      ${cur.backfilled ? '<p class="muted small">Startpunkten räknades fram i efterhand när fliken lades till (beslutet gäller stängningen ' + esc(cur.decided) + '). Från och med nästa byte fryses besluten samma kväll.</p>' : ''}` : '<div class="empty small">Inget beslut ännu.</div>'}
+    ${rd.isToday ? `<div class="mo-todo today"><h3>Byt idag – strax före 22.00</h3>${swap}</div>` : ''}
 
-    <h2 class="v-title">Nästa byte: ${esc(moDay(rd.next))} <span class="muted">(preliminärt)</span></h2>
-    ${nx?.error ? `<p class="muted">Kunde inte räkna fram nästa byte: ${esc(nx.error)}</p>` : `
-      <div class="rp-box"><b>${esc(m.changeText || '')}</b>
-        <p class="muted small">Listan för ${esc(new Date(nx.target + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long' }))} bygger på kurserna till och med förra månadsskiftet och ändras inte. Det som kan ändras fram till bytesdagen är S&amp;P 500 mot 200-dagars snitt och om en aktie har fallit mer än 25 % från toppen. Du får en notis på bytesdagen.</p></div>
-      ${nx.stocks.filter(s => !held.has(s.symbol)).map(s => stockCard(s, per, false)).join('')}
-      ${nx.cashShare > 0 && !(cur?.cashShare > 0) ? cashCard(nx.cashShare, false) : ''}
-      <table class="rp-table mo-rank"><tr><th>#</th><th>Topp 10 på momentum</th><th class="r">11 mån</th><th class="r"></th></tr>${nextList}</table>
-      <p class="muted small">Rangordnat bland ${nx.fetched} av ${nx.universe} bolag i S&amp;P 500.</p>`}
+    <div class="mo-todo"><h3>Vill du börja nu? Lägg de här orderna</h3>
+      <p class="small muted">Med startvärdet ${kr(start)}. Varje order är minst ${kr(R.minOrder)} (AVA-papper har inget courtage från ${kr(R.minOrder)}). Köp när USA-börsen är öppen (15.30–22.00) med en limitorder på säljkursen.</p>
+      ${orderRows(startLegs)}
+      ${(() => { const c = start - startLegs.reduce((a, l) => a + (l.pick ? l.pick.order : l.kind === 'stock' && !l.s.minis?.length ? l.money : 0), 0); return c > 0.5 ? `<p class="small">Resten, <b>${kr(c)}</b>, ligger kvar som kontanter på kontot.</p>` : ''; })()}
+    </div>
 
-    <div class="rp-box mo-steps"><b>Så gör du på bytesdagen</b>
-      <ol><li>Sista handelsdagen i månaden, cirka 21.30–21.50: öppna den här sidan (du får en notis).</li>
-        <li>Sälj det som inte längre är med. Det du behåller rör du inte.</li>
-        <li>Köp de nya papperen via länkarna, för beloppen som står. AVA-papper har inget courtage – lägg en limitorder på säljkursen.</li>
-        <li>Klart till nästa månad. Inga stopp, inga mål – bytet sker bara vid månadsskiftet.</li></ol></div>
+    ${!rd.isToday ? `<div class="mo-todo"><h3>Nästa byte ${esc(moDay(rd.next))} <span class="muted small">(preliminärt)</span></h3>
+      ${nx?.error ? `<p class="muted">Kunde inte räkna fram: ${esc(nx.error)}</p>` : `${swap}<p class="small muted">Listan kan ändras fram till bytesdagen om S&amp;P 500 hamnar under sitt 200-dagars snitt eller en aktie faller mer än 25 % från toppen. Du får en notis på bytesdagen.</p>`}</div>` : ''}
 
-    ${m.periods.length ? `<h2 class="v-title">Historik</h2><table class="rp-table"><tr><th>Månad</th><th>Innehav</th><th class="r">Med hävstång</th><th class="r">Utan</th></tr>
-      ${m.periods.slice().reverse().map(p => `<tr><td class="num">${esc(p.month)}${p.open ? ' <span class="tag">pågår</span>' : ''}</td><td>${esc([...p.names, ...(p.mode !== 'aktier' ? ['kassaläge'] : [])].join(', '))}${p.backfilled ? ' <span class="muted small">(i efterhand)</span>' : ''}</td>
-        <td class="r num ${p.retPct >= 0 ? 'pos' : 'neg'}">${svp(p.retPct)}</td><td class="r num">${svp(p.rawPct)}</td></tr>`).join('')}</table>` : ''}
+    ${top10 ? `<details class="mo-more"><summary>Topp 10 på momentum just nu</summary><table class="rp-table mo-rank"><tr><th>#</th><th>Bolag</th><th class="r">11 mån</th><th class="r"></th></tr>${top10}</table>
+      <p class="muted small">Rangordnat bland ${nx.fetched} av ${nx.universe} bolag i S&amp;P 500. Listan bygger på kurserna till och med förra månadsskiftet.</p></details>` : ''}
 
-    <div class="rp-box rp-honest"><b>Reglerna</b>
+    ${hist.length ? `<details class="mo-more" open><summary>Historik</summary><table class="rp-table"><tr><th>Månad</th><th>Innehav</th><th class="r">Resultat</th><th class="r">Värde</th></tr>
+      ${hist.slice().reverse().map(p => `<tr><td class="num">${esc(p.month)}${p.open ? ' <span class="tag">pågår</span>' : ''}</td><td>${esc([...p.names, ...(p.mode !== 'aktier' ? ['kassaläge'] : [])].join(', '))}${p.backfilled ? ' <span class="muted small">(i efterhand)</span>' : ''}</td>
+        <td class="r num ${cls(p.retPct)}">${svp(p.retPct)}</td><td class="r num">${p.open ? kr(total) : kr(p.value)}</td></tr>`).join('')}</table></details>` : ''}
+
+    <details class="mo-more"><summary>Så fungerar strategin</summary><div class="rp-box rp-honest">
       <ul><li>Alla bolag i S&amp;P 500 rangordnas på hur mycket kursen har stigit på elva månader, där den senaste månaden hoppas över.</li>
         <li>De två bästa köps med lika vikt. En aktie behålls så länge den är bland de fyra bästa.</li>
         <li>Ligger S&amp;P 500 under sitt 200-dagars snitt köps inga aktier. Ligger en aktie mer än 25 % under sitt högsta det senaste året köps den inte.</li>
-        <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort.</li>
-        <li>Hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Minin behålls så länge aktien är kvar.</li></ul>
+        <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort (allt i guld om beloppet är för litet för två order).</li>
+        <li>Låg hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Har minin högre hävstång köps den för en del av beloppet och resten ligger som kontanter. Ingen order under ${kr(R.minOrder)}.</li>
+        <li>Byte en gång i månaden, strax före stängningen sista handelsdagen. Inga stopp, inga mål.</li></ul>
       <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med hävstång (25 % utan) mot 11 % för S&amp;P 500. Största nedgång cirka −51 % med hävstång (−32 % utan).
         Testet saknar en del bolag som avnoterats och resultatet bygger på ett fåtal stora vinnare, så verkligheten blir troligen sämre. Valutan (dollarn) påverkar också.</p>
-      <p class="small muted">"Beräknat sedan start" räknar papperen som minifutures utan ränta och spread. Startpunkten är räknad i efterhand. Inte investeringsrådgivning – varje affär är ditt eget beslut.</p></div>
-    <button class="btn small" id="mo-refresh">Uppdatera</button>
+      <p class="small muted">Startpunkten är räknad i efterhand. Inte investeringsrådgivning – varje affär är ditt eget beslut.</p></div></details>
+    <button class="btn small" id="mo-refresh">Uppdatera kurserna</button>
   </article>`;
-  $('#mo-amount').addEventListener('change', e => { store.set('momAmount', e.target.value); renderMonthly(); });
+  $('#mo-start').addEventListener('change', e => { store.set('momStart', e.target.value); renderMonthly(); });
   $('#mo-refresh').addEventListener('click', () => loadMonthly(true));
 }
 
