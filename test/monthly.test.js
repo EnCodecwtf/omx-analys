@@ -41,20 +41,19 @@ test('beslutet: behåll inom topp 4, hoppa över raserade aktier, kassa under SM
   assert.match(changeText({ stocks: [{ symbol: 'B', name: 'B' }], cashShare: 0.5 }, d3), /Sälj B/);
 });
 
-test('mini med högre hävstång köps för en del av beloppet, AVA före andra', () => {
+test('hela beloppet i pappret med hävstång närmast målet, AVA först', () => {
   const w = [
     { orderbookId: '1', name: 'MINI L X NORDNET', issuer: 'N', subType: 'MINI_FUTURE', leverage: 1.7, buyPrice: 10, sellPrice: 10.01 },
-    { orderbookId: '2', name: 'MINI L X AVA 1', issuer: 'MS', subType: 'MINI_FUTURE', leverage: 3.4, buyPrice: 10, sellPrice: 10.01 },
+    { orderbookId: '2', name: 'MINI L X AVA 1', issuer: 'MS', subType: 'MINI_FUTURE', leverage: 1.9, buyPrice: 10, sellPrice: 10.01 },
+    { orderbookId: '3', name: 'MINI L X AVA 2', issuer: 'MS', subType: 'MINI_FUTURE', leverage: 3.4, buyPrice: 10, sellPrice: 10.01 },
   ];
-  const p = pickMini(w, { target: 1.7, money: 3000 });
+  const p = pickMini(w, { target: 1.7, money: 1500 });
   assert.equal(p.id, '2');
-  assert.equal(p.share, 0.5);
-  assert.equal(p.exposure, 1.7);
   assert.equal(p.order, 1500);
-  // 1 500 kr räcker inte för ett delköp på minst 1 000 kr – då väljs pappret med rätt hävstång.
-  const q = pickMini(w, { target: 1.7, money: 1500 });
+  // Inget AVA-papper med låg hävstång: närmast målet, med varning om courtage.
+  const q = pickMini(w.filter(x => x.orderbookId !== '2'), { target: 1.7, money: 1500 });
   assert.equal(q.id, '1');
-  assert.equal(q.order, 1500);
+  assert.match(q.note, /courtage/);
   assert.equal(pickMini(w, { target: 1.7, money: 800 }), null);
 });
 

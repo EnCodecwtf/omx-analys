@@ -1612,15 +1612,19 @@ async function loadMonthly(refresh) {
   }
   renderMonthly();
 }
-// Samma val som lib/monthly.js (chooseMini): aldrig en order under minsta beloppet.
+// Samma val som lib/monthly.js (chooseMini): hela beloppet i pappret med hävstång
+// närmast målet, AVA först, aldrig en order under minsta beloppet.
 function chooseMini(list, target, money, minOrder) {
   if (!list?.length || !(money >= minOrder)) return null;
-  const make = (p, share, note = null) => ({ ...p, share, order: Math.round(money * share), cash: Math.round(money * (1 - share)), exposure: Math.round(share * p.leverage * 100) / 100, note });
-  for (const p of list) { const share = Math.min(1, target / p.leverage); if (money * share >= minOrder && p.leverage <= target * 2.5) return make(p, share); }
-  const near = list.filter(p => p.leverage <= target * 1.3).sort((a, b) => Math.abs(a.leverage - target) - Math.abs(b.leverage - target))[0];
-  if (near) return make(near, Math.min(1, target / near.leverage), near.ava ? null : 'Inget AVA-papper räcker för beloppet – courtage kan tillkomma.');
+  const make = (p, note = null) => ({ ...p, order: Math.round(money), note });
+  const closest = (a, b) => Math.abs(a.leverage - target) + a.spreadPct * 0.5 - (Math.abs(b.leverage - target) + b.spreadPct * 0.5);
+  const ok = list.filter(p => p.leverage <= target * 1.35);
+  const ava = ok.filter(p => p.ava).sort(closest)[0];
+  if (ava) return make(ava);
+  const any = ok.sort(closest)[0];
+  if (any) return make(any, 'Det finns inget AVA-papper med så låg hävstång – courtage kan tillkomma.');
   const low = list.slice().sort((a, b) => a.leverage - b.leverage)[0];
-  return make(low, 1, `Hävstången blir ${svx(low.leverage)}, högre än målet – höj startvärdet för lägre hävstång.`);
+  return make(low, `Lägsta hävstången som finns är ${svx(low.leverage)}.`);
 }
 // Minins värde (samma modell som servern): lång (S−F)/(S0−F), kort (F−S)/(F−S0).
 function miniG(s0, s1, L, short) {
@@ -1660,7 +1664,7 @@ function renderMonthly() {
   const rows = legs.map(l => {
     const inMini = l.pick ? l.pick.order : 0;
     cashLeft += l.money - inMini;
-    // Värdet räknas med målhävstången på hela platsen (minin plus det som ligger kvar som kontanter).
+    // Värdet räknas med ungefär den hävstång papperen har (målhävstången).
     const now = l.money * growth(l) - (l.money - inMini);
     return { ...l, inMini, now, chg: now - inMini };
   });
@@ -1672,7 +1676,7 @@ function renderMonthly() {
   // Ordrar för en fördelning (att börja nu eller bytet).
   const orderRows = (ls, verb = 'Köp') => ls.map(l => `<div class="mo-order"><div class="mo-order-top"><span><b class="${verb === 'Sälj' ? 'neg' : 'pos'}">${verb}</b> <b>${esc(l.title)}</b></span>
       <b class="num">${verb === 'Sälj' ? 'allt' : l.pick ? kr(l.pick.order) : l.kind === 'stock' && !l.s.minis?.length ? kr(l.money) : '–'}</b></div>
-      <div class="small muted">${paperLine(l)}${l.pick?.spreadPct != null ? ` · spread ${String(l.pick.spreadPct).replace('.', ',')} %` : ''}${verb !== 'Sälj' && l.pick?.cash > 0 ? ` · ${kr(l.pick.cash)} ligger kvar som kontanter` : ''}</div>
+      <div class="small muted">${paperLine(l)}${l.pick?.spreadPct != null ? ` · spread ${String(l.pick.spreadPct).replace('.', ',')} %` : ''}</div>
       ${l.pick?.note ? `<div class="small warn-txt">${esc(l.pick.note)}</div>` : ''}${l.note && verb !== 'Sälj' ? `<div class="small muted">${esc(l.note)}</div>` : ''}</div>`).join('');
   const startLegs = cur ? allocate(cur, start, m) : [];
   const held = new Set((cur?.stocks || []).map(s => s.symbol));
@@ -1717,7 +1721,7 @@ function renderMonthly() {
           ${r.kind === 'stock' && r.s.kept ? `<div class="small muted">Köpt ${esc(r.s.since)} · aktien ${svp(r.s.changePct)} sedan köp</div>` : ''}</td>
         <td class="r num"><b>${kr(r.now)}</b><div class="small muted">${kr(r.inMini)}</div></td>
         <td class="r num ${cls(r.chg)}"><b>${r.inMini ? svp(Math.round(r.chg / r.inMini * 1000) / 10) : '–'}</b><div class="small">${sgnKr(r.chg)}</div></td></tr>`).join('')}
-      <tr><td><b>Kontanter</b><div class="small muted">Den del som inte behövs i papperen för rätt hävstång</div></td><td class="r num"><b>${kr(cashLeft)}</b></td><td></td></tr>
+      ${cashLeft >= 1 ? `<tr><td><b>Kontanter</b><div class="small muted">Belopp som inte räcker till en order på minst ${kr(R.minOrder)}</div></td><td class="r num"><b>${kr(cashLeft)}</b></td><td></td></tr>` : ''}
       <tr class="pf-sum"><td><b>Totalt</b></td><td class="r num"><b>${kr(total)}</b></td><td class="r num ${cls(total - v0)}"><b>${svp(Math.round((total / v0 - 1) * 1000) / 10)}</b><div class="small">${sgnKr(total - v0)}</div></td></tr>
     </table>
     <p class="muted small">Värdet är beräknat från kurserna (minin med ${svx(R.stockLev)} på aktier och ${svx(R.cashLev)} på guld och olja), utan ränta och spread. Den lilla siffran under värdet är vad som köptes för vid senaste bytet.</p>
@@ -1745,7 +1749,7 @@ function renderMonthly() {
         <li>De två bästa köps med lika vikt. En aktie behålls så länge den är bland de fyra bästa.</li>
         <li>Ligger S&amp;P 500 under sitt 200-dagars snitt köps inga aktier. Ligger en aktie mer än 25 % under sitt högsta det senaste året köps den inte.</li>
         <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort (allt i guld om beloppet är för litet för två order).</li>
-        <li>Låg hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Har minin högre hävstång köps den för en del av beloppet och resten ligger som kontanter. Ingen order under ${kr(R.minOrder)}.</li>
+        <li>Låg hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Hela platsens belopp läggs i det papper som har hävstång närmast målet, AVA-papper först. Ingen order under ${kr(R.minOrder)}.</li>
         <li>Byte en gång i månaden, strax före stängningen sista handelsdagen. Inga stopp, inga mål.</li></ul>
       <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med hävstång (25 % utan) mot 11 % för S&amp;P 500. Största nedgång cirka −51 % med hävstång (−32 % utan).
         Testet saknar en del bolag som avnoterats och resultatet bygger på ett fåtal stora vinnare, så verkligheten blir troligen sämre. Valutan (dollarn) påverkar också.</p>
