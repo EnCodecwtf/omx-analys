@@ -105,6 +105,7 @@ function openTool(name) {
   if (name === 'hours') { renderHours(); loadVolProfile(); }
   if (name === 'morning') renderMorning();
   if (name === 'report') loadReport();
+  if (name === 'monthly') loadMonthly();
 }
 function closeTool() {
   if (tool === 'morning') stopSpeech();
@@ -204,7 +205,8 @@ async function loadScan(refresh, auto = false) {
     renderPanic(scanData.panic);
     renderToday();
     // På datorn visas först en signal, annars en öppen affär, annars index.
-    const fromHash = decodeURIComponent(location.hash.slice(1));
+    // Bara en aktie i adressen öppnar aktien (inte t.ex. #manadens-aktier).
+    const fromHash = scanData.rows.some(r => r.symbol === decodeURIComponent(location.hash.slice(1))) ? decodeURIComponent(location.hash.slice(1)) : '';
     const pick = scanData.rows.find(r => r.symbol === fromHash) || (refresh && current && scanData.rows.find(r => r.symbol === current))
       || scanData.rows.find(isSignal) || scanData.rows.find(r => r.inTrade) || scanData.rows[0];
     // Vid automatisk uppdatering stannar vyn där den är (listan eller aktien).
@@ -1579,3 +1581,113 @@ $('#push').addEventListener('click', async () => {
   }
 });
 pushInit();
+
+// Månadens aktier: två S&P 500-aktier med störst momentum, byte sista handelsdagen i månaden.
+let monthlyData = null;
+const svp = v => v == null ? '–' : `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
+const svx = v => String(v).replace('.', ',') + 'x';
+const moDay = d => new Date(d + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' });
+const daysTo = d => Math.round((new Date(d + 'T12:00:00Z') - new Date(new Date().toLocaleDateString('sv-SE') + 'T12:00:00Z')) / 864e5);
+async function fetchMonthly(refresh) {
+  monthlyData = await (await fetch('/api/monthly' + (refresh ? '?refresh=1' : ''))).json();
+  return monthlyData;
+}
+async function loadMonthlyTeaser() {
+  const el = $('#monthly-teaser');
+  try { await fetchMonthly(); } catch { el.innerHTML = ''; return; }
+  const m = monthlyData, rd = m.rebalance;
+  if (!m.current) { el.innerHTML = ''; return; }
+  const names = m.current.stocks.map(s => s.name);
+  const hold = [...names, ...(m.current.cashShare > 0 ? ['guld och olja kort'] : [])].join(', ');
+  const when = rd.isToday ? '<b class="pos">Byte idag före 22.00</b>' : `nästa byte ${moDay(rd.next)} (om ${daysTo(rd.next)} dagar)`;
+  el.innerHTML = `<button class="morning-teaser monthly-teaser${rd.isToday ? ' today' : ''}" id="monthly-open"><span class="mt-ico">🗓</span><span><b>Månadens aktier</b>
+    <small>Nu: ${esc(hold)} · ${when}</small></span></button>`;
+  $('#monthly-open').addEventListener('click', () => { setView('more'); openTool('monthly'); });
+}
+async function loadMonthly(refresh) {
+  const el = $('#monthly');
+  if (!monthlyData || refresh) {
+    el.innerHTML = '<div class="loading">Rangordnar 500 bolag i S&amp;P 500…</div>';
+    try { await fetchMonthly(refresh); } catch (e) { el.innerHTML = `<p class="muted">Kunde inte hämta: ${esc(e.message)}</p>`; return; }
+  }
+  renderMonthly();
+}
+function renderMonthly() {
+  const m = monthlyData, el = $('#monthly'), rd = m.rebalance, R = m.rules, cur = m.current, nx = m.next;
+  const amount = Math.max(0, +store.get('momAmount', '2100') || 0), per = amount / R.slots;
+  // Ett papper: länk, hävstång, spread och hur stor del av beloppet som läggs i pappret.
+  const paper = (p, money, what) => !p ? `<div class="mo-paper none">Ingen minifuture på Avanza klarar kraven. ${what === 'stock' ? 'Köp aktien direkt (utan hävstång) eller låt platsen ligga i kassaläget.' : 'Hoppa över den här delen.'}</div>`
+    : `<div class="mo-paper"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>${p.ava ? ' <span class="tag ava">AVA · inget courtage</span>' : ` <span class="tag">${esc(p.issuer || '')}</span>`}
+      <div class="muted small">Hävstång ${svx(p.leverage)} · spread ${String(p.spreadPct).replace('.', ',')} %${p.stopLoss ? ` · knock-out ${fmt(p.stopLoss)}` : ''}</div>
+      <div class="mo-buy">${p.share < 0.99 ? `Köp för <b>${kr(money * p.share)}</b> (${Math.round(p.share * 100)} %), låt <b>${kr(money * (1 - p.share))}</b> ligga kvar som kontanter – då blir hävstången totalt cirka ${svx(p.exposure)}.` : `Köp för <b>${kr(money)}</b> – hävstång cirka ${svx(p.exposure)}.`}</div></div>`;
+  const stockCard = (s, money, isNow) => `<div class="mo-slot">
+      <div class="mo-head"><div><b>${esc(s.name)}</b> <span class="muted small">${esc(s.symbol)} · nr ${s.rank} på listan · ${svp(Math.round(s.mom * 1000) / 10)} på elva månader</span></div>
+        ${isNow && s.changePct != null ? `<div class="mo-res ${s.miniPct >= 0 ? 'pos' : 'neg'}">${svp(s.miniPct)}<small>aktien ${svp(s.changePct)}</small></div>` : ''}</div>
+      ${isNow ? `<div class="muted small">Köpt ${esc(s.since)} för ${fmt(s.entry)} USD · nu ${fmt(s.last)} USD${s.kept ? ' · behållen från förra månaden' : ''}</div>` : ''}
+      ${paper(s.mini, money, 'stock')}</div>`;
+  const cashCard = (share, isNow) => {
+    const money = amount * share;
+    return `<div class="mo-slot cash"><div class="mo-head"><div><b>Kassaläge</b> <span class="muted small">${Math.round(share * 100)} % av beloppet · hälften guld lång, hälften olja kort</span></div></div>
+      ${isNow && cur.gold && m.cash.goldNow ? `<div class="muted small">Guld ${fmt(cur.gold)} → ${fmt(m.cash.goldNow)} · olja ${fmt(cur.oil)} → ${fmt(m.cash.oilNow)}</div>` : ''}
+      <div class="mo-two"><div><div class="muted small">Guld lång, ${svx(R.cashLev)}</div>${paper(m.cash.gold, money / 2, 'cash')}</div>
+      <div><div class="muted small">Olja kort, ${svx(R.cashLev)}</div>${paper(m.cash.oil, money / 2, 'cash')}</div></div></div>`;
+  };
+  const modeText = c => c.mode === 'aktier' ? 'Två aktier' : c.mode === 'delvis' ? 'En aktie + kassaläge' : 'Kassaläge';
+  const held = new Set((cur?.stocks || []).map(s => s.symbol));
+  const nextList = nx && !nx.error ? nx.top.map((x, i) => {
+    const pick = nx.stocks.find(s => s.symbol === x.symbol), skip = nx.skipped.find(s => s.symbol === x.symbol);
+    return `<tr class="${pick ? 'pick' : ''}"><td class="num">${i + 1}</td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.symbol)}</span></td><td class="r num">${svp(Math.round(x.mom * 1000) / 10)}</td>
+      <td class="r small">${pick ? (held.has(x.symbol) ? '<span class="tag">behålls</span>' : '<span class="tag go">köps</span>') : skip ? `<span class="tag bad">${svp(Math.round(skip.fromHigh * 1000) / 10)} från toppen</span>` : held.has(x.symbol) ? '<span class="tag bad">säljs</span>' : ''}</td></tr>`;
+  }).join('') : '';
+  el.innerHTML = `<article class="card tool-card monthly">
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${cur ? modeText(cur) : '–'}</b><span>läget den här månaden</span></div>
+      <div class="stat"><b class="num ${rd.isToday ? 'pos' : ''}">${rd.isToday ? 'Idag' : `${daysTo(rd.next)} dagar`}</b><span>nästa byte: ${esc(moDay(rd.next))}, strax före 22.00</span></div>
+      <div class="stat"><b class="num ${m.totalPct >= 0 ? 'pos' : 'neg'}">${svp(m.totalPct)}</b><span>beräknat sedan start med hävstång<br><span class="muted">utan hävstång ${svp(m.totalRawPct)}</span></span></div>
+      <div class="stat"><b class="num ${cur?.spy?.below ? 'neg' : 'pos'}">${cur?.spy ? (cur.spy.below ? 'Under' : 'Över') : '–'}</b><span>S&amp;P 500 mot 200-dagars snitt${cur?.spy ? ` (${fmt(cur.spy.close)} / ${fmt(cur.spy.sma200)})` : ''}</span></div>
+    </div>
+    <label class="mo-amount small">Belopp totalt <input id="mo-amount" type="number" min="0" step="100" value="${amount}"> kr <span class="muted">· ${kr(per)} per plats</span></label>
+
+    ${rd.isToday && m.changeText ? `<div class="status go"><b>Bytesdag idag</b><span>${esc(m.changeText)} Handla strax före 22.00 svensk tid (stängningen i New York).</span></div>` : ''}
+
+    <h2 class="v-title">Det här gäller nu <span class="muted">(${cur ? esc(new Date(cur.month + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })) : '–'})</span></h2>
+    ${cur ? `${cur.stocks.map(s => stockCard(s, per, true)).join('')}${cur.cashShare > 0 ? cashCard(cur.cashShare, true) : ''}
+      ${cur.skipped?.length ? `<p class="muted small">${cur.skipped.map(x => `${esc(x.name)} (nr ${x.rank}) köptes inte: ${svp(Math.round(x.fromHigh * 1000) / 10)} från sitt högsta det senaste året`).join('. ')}. Den platsen går till kassaläget.</p>` : ''}
+      ${cur.backfilled ? '<p class="muted small">Startpunkten räknades fram i efterhand när fliken lades till (beslutet gäller stängningen ' + esc(cur.decided) + '). Från och med nästa byte fryses besluten samma kväll.</p>' : ''}` : '<div class="empty small">Inget beslut ännu.</div>'}
+
+    <h2 class="v-title">Nästa byte: ${esc(moDay(rd.next))} <span class="muted">(preliminärt)</span></h2>
+    ${nx?.error ? `<p class="muted">Kunde inte räkna fram nästa byte: ${esc(nx.error)}</p>` : `
+      <div class="rp-box"><b>${esc(m.changeText || '')}</b>
+        <p class="muted small">Listan för ${esc(new Date(nx.target + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long' }))} bygger på kurserna till och med förra månadsskiftet och ändras inte. Det som kan ändras fram till bytesdagen är S&amp;P 500 mot 200-dagars snitt och om en aktie har fallit mer än 25 % från toppen. Du får en notis på bytesdagen.</p></div>
+      ${nx.stocks.filter(s => !held.has(s.symbol)).map(s => stockCard(s, per, false)).join('')}
+      ${nx.cashShare > 0 && !(cur?.cashShare > 0) ? cashCard(nx.cashShare, false) : ''}
+      <table class="rp-table mo-rank"><tr><th>#</th><th>Topp 10 på momentum</th><th class="r">11 mån</th><th class="r"></th></tr>${nextList}</table>
+      <p class="muted small">Rangordnat bland ${nx.fetched} av ${nx.universe} bolag i S&amp;P 500.</p>`}
+
+    <div class="rp-box mo-steps"><b>Så gör du på bytesdagen</b>
+      <ol><li>Sista handelsdagen i månaden, cirka 21.30–21.50: öppna den här sidan (du får en notis).</li>
+        <li>Sälj det som inte längre är med. Det du behåller rör du inte.</li>
+        <li>Köp de nya papperen via länkarna, för beloppen som står. AVA-papper har inget courtage – lägg en limitorder på säljkursen.</li>
+        <li>Klart till nästa månad. Inga stopp, inga mål – bytet sker bara vid månadsskiftet.</li></ol></div>
+
+    ${m.periods.length ? `<h2 class="v-title">Historik</h2><table class="rp-table"><tr><th>Månad</th><th>Innehav</th><th class="r">Med hävstång</th><th class="r">Utan</th></tr>
+      ${m.periods.slice().reverse().map(p => `<tr><td class="num">${esc(p.month)}${p.open ? ' <span class="tag">pågår</span>' : ''}</td><td>${esc([...p.names, ...(p.mode !== 'aktier' ? ['kassaläge'] : [])].join(', '))}${p.backfilled ? ' <span class="muted small">(i efterhand)</span>' : ''}</td>
+        <td class="r num ${p.retPct >= 0 ? 'pos' : 'neg'}">${svp(p.retPct)}</td><td class="r num">${svp(p.rawPct)}</td></tr>`).join('')}</table>` : ''}
+
+    <div class="rp-box rp-honest"><b>Reglerna</b>
+      <ul><li>Alla bolag i S&amp;P 500 rangordnas på hur mycket kursen har stigit på elva månader, där den senaste månaden hoppas över.</li>
+        <li>De två bästa köps med lika vikt. En aktie behålls så länge den är bland de fyra bästa.</li>
+        <li>Ligger S&amp;P 500 under sitt 200-dagars snitt köps inga aktier. Ligger en aktie mer än 25 % under sitt högsta det senaste året köps den inte.</li>
+        <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort.</li>
+        <li>Hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Minin behålls så länge aktien är kvar.</li></ul>
+      <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med hävstång (25 % utan) mot 11 % för S&amp;P 500. Största nedgång cirka −51 % med hävstång (−32 % utan).
+        Testet saknar en del bolag som avnoterats och resultatet bygger på ett fåtal stora vinnare, så verkligheten blir troligen sämre. Valutan (dollarn) påverkar också.</p>
+      <p class="small muted">"Beräknat sedan start" räknar papperen som minifutures utan ränta och spread. Startpunkten är räknad i efterhand. Inte investeringsrådgivning – varje affär är ditt eget beslut.</p></div>
+    <button class="btn small" id="mo-refresh">Uppdatera</button>
+  </article>`;
+  $('#mo-amount').addEventListener('change', e => { store.set('momAmount', e.target.value); renderMonthly(); });
+  $('#mo-refresh').addEventListener('click', () => loadMonthly(true));
+}
+
+if (location.hash === '#manadens-aktier') { setView('more'); openTool('monthly'); }
+loadMonthlyTeaser();

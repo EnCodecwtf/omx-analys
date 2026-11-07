@@ -571,3 +571,27 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .rp-honest { margin-top: 12px; }
 .rp-honest ul { margin: 6px 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text-2); }
 .rp-hash { font-size: 11px; word-break: break-all; color: var(--text-2); }
+
+/* Månadens aktier */
+.monthly-teaser { border-color: rgba(59,130,246,.45); background: linear-gradient(90deg, rgba(59,130,246,.14), transparent 70%), var(--panel-2); }
+.monthly-teaser.today { border-color: var(--green); }
+.mo-amount { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
+.mo-amount input { width: 110px; }
+.mo-slot { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent, #3b82f6); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.mo-slot.cash { border-left-color: #c98500; }
+.mo-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.mo-res { font-weight: 700; text-align: right; white-space: nowrap; }
+.mo-res small { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+.mo-paper { margin-top: 8px; font-size: 13px; }
+.mo-paper a { color: var(--text); font-weight: 600; text-decoration: none; }
+.mo-paper a:hover { color: var(--accent); }
+.mo-paper.none { color: var(--text-2); }
+.mo-buy { margin-top: 4px; }
+.mo-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+@media (max-width: 600px) { .mo-two { grid-template-columns: 1fr; } }
+.tag.ava { background: rgba(34,197,94,.15); color: var(--green); }
+.tag.go { background: rgba(34,197,94,.15); color: var(--green); }
+.tag.bad { background: rgba(239,68,68,.12); color: var(--red, #ef4444); }
+.mo-rank tr.pick td { background: rgba(34,197,94,.06); }
+.mo-steps ol { margin: 6px 0 0; padding-left: 20px; }
+.mo-steps li { margin: 3px 0; }

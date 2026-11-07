@@ -39,6 +39,7 @@
       <section class="view" id="v-today">
         <div id="morning-teaser"></div>
         <div id="night"></div>
+        <div id="monthly-teaser"></div>
         <div id="today"><div class="loading">Hämtar och analyserar…</div></div>
         <div id="panic" class="panic" hidden></div>
         <div id="today-cal"></div>
@@ -66,6 +67,7 @@
         <nav class="menu" aria-label="Verktyg och inställningar">
           <div class="menu-head">Verktyg</div>
           <button class="menu-item" data-tool="morning"><span class="mi-ico">☕</span><span><b>Morgonsoffan med Glen</b><small>Dagens morgonsession, varje vardag kl 07.30</small></span></button>
+          <button class="menu-item" data-tool="monthly"><span class="mi-ico">🗓</span><span><b>Månadens aktier</b><small>Två S&amp;P 500-aktier i månaden, ett byte sista handelsdagen</small></span></button>
           <button class="menu-item" data-tool="report"><span class="mi-ico">📊</span><span><b>Månadsrapport</b><small>Alla signaler, ärligt räknat – också förlusterna</small></span></button>
           <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
           <button class="menu-item" data-tool="hours"><span class="mi-ico">🕘</span><span><b>Börstider</b><small>Öppet och stängt i din tid, och när handeln är störst</small></span></button>
@@ -142,6 +144,10 @@
 
       <div class="tool" data-tool="morning" data-title="Morgonsoffan med Glen" hidden>
         <article class="card tool-card morning" id="morning"><div class="loading">Glen brygger kaffe…</div></article>
+      </div>
+
+      <div class="tool" data-tool="monthly" data-title="Månadens aktier" hidden>
+        <div id="monthly"><div class="loading">Rangordnar S&amp;P 500…</div></div>
       </div>
 
       <div class="tool" data-tool="report" data-title="Månadsrapport" hidden>

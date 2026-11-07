@@ -7,7 +7,8 @@ import { evaluate, backtest, applyGuards, equityStats, REPORT_BLOCK_DAYS } from 
 import { reportDates, nextReport, tradingDaysBetween, upcomingMacro } from './lib/events.js';
 import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
-import { notifySignal, notifyEvent } from './lib/notify.js';
+import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
+import * as monthly from './lib/monthly.js';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
@@ -36,6 +37,9 @@ const cryptos = (symbols.crypto || []).map(s => ({ ...s, isCrypto: true }));
 // USA: S&P 500-bolag med minst tre långa hävstångspapper på Avanza (data/sp500.json).
 const usStocks = JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'sp500.json'), 'utf8')).stocks.map(s => ({ ...s, isUS: true }));
 const bySymbol = new Map([...universe, ...cryptos, ...usStocks].map(s => [s.symbol, s]));
+// Månadens aktier: alla S&P 500-bolag (data/momentum-universe.json), med Avanzas id där det finns minifutures.
+const momUniverse = JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'momentum-universe.json'), 'utf8')).stocks;
+const momBySymbol = new Map(momUniverse.map(s => [s.symbol, s]));
 
 const r4 = x => Math.round(x * 1e4) / 1e4;
 const cache = new Map();
@@ -496,6 +500,145 @@ async function ensureAiPicks(entries) {
   return picks;
 }
 
+// ---------------------------------------------------------------------------
+// Månadens aktier (se lib/monthly.js för reglerna).
+const MONTHLY_KEY = 'omx-analys:monthly';
+
+// Månadsstänging (justerad för utdelningar) för de senaste två åren.
+async function fetchMonthlyCloses(symbol) {
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1mo`, { headers: { 'User-Agent': 'Mozilla/5.0 (omx-analys)' }, signal: AbortSignal.timeout(12000) });
+  if (!res.ok) throw new Error(`Yahoo svarade ${res.status} för ${symbol}`);
+  const r = (await res.json()).chart?.result?.[0];
+  if (!r?.timestamp) throw new Error(`Ingen data för ${symbol}`);
+  const adj = r.indicators.adjclose?.[0]?.adjclose || r.indicators.quote[0].close;
+  const by = new Map();
+  r.timestamp.forEach((t, i) => { if (adj[i] != null) by.set(new Date(t * 1000).toISOString().slice(0, 7), adj[i]); });
+  return [...by].map(([m, c]) => ({ m, c }));
+}
+
+// Rangordningen för en målmånad. Den ändras inte under månaden och sparas därför.
+async function monthlyRanks(target) {
+  const key = `${MONTHLY_KEY}:ranks:${target}`;
+  const hit = await signalLog.kvGet(key, null).catch(() => null);
+  if (hit?.top?.length >= 10) return hit;
+  const series = (await mapLimit(momUniverse, 16, async s => { try { return { ...s, monthly: await fetchMonthlyCloses(s.symbol) }; } catch { return null; } })).filter(Boolean);
+  const ranked = monthly.rank(series, target);
+  const value = { target, computed: new Date().toISOString(), universe: momUniverse.length, fetched: series.length,
+    top: ranked.slice(0, 40).map(x => ({ ...x, mom: Math.round(x.mom * 1e4) / 1e4 })) };
+  // Sparas bara när underlaget är komplett och den sista månaden i beräkningen är slut.
+  const done = monthly.addMonths(target, -2) < monthly.nyNow().date.slice(0, 7);
+  if (done && series.length >= momUniverse.length * 0.9) await signalLog.kvSet(key, value).catch(() => {});
+  return value;
+}
+
+// Beslutet för målmånaden med kurser till och med day (null = senaste).
+async function monthlyDecision(target, held, day = null) {
+  const r = await monthlyRanks(target);
+  const want = [...new Set(['SPY', ...held, ...r.top.slice(0, 12).map(x => x.symbol)])];
+  const closes = new Map();
+  await mapLimit(want, 6, async s => { try { const b = await fetchBars(s, { range: '2y' }); closes.set(s, (day ? b.filter(x => dayOf(x.t) <= day) : b).map(x => x.c)); } catch { /* saknas */ } });
+  const spy = closes.get('SPY');
+  if (!spy?.length) throw new Error('Kurser för S&P 500 saknas');
+  const d = monthly.decide({ ranked: r.top, held, spy, closes: s => closes.get(s) });
+  return { target, ...d, top: r.top.slice(0, 10), rankedAt: r.computed, fetched: r.fetched, universe: r.universe };
+}
+
+async function closeOn(symbol, day) {
+  try { const b = (await fetchBars(symbol, { range: '1y' })).filter(x => !day || dayOf(x.t) <= day); return b.at(-1)?.c ?? null; } catch { return null; }
+}
+
+// Fryser bytet när sista handelsdagen i månaden har stängt. Körs av kvällsjobbet och när fliken öppnas.
+async function ensureMonthly() {
+  const state = (await signalLog.kvGet(MONTHLY_KEY, null)) || { history: [], pushed: {} };
+  state.pushed ||= {};
+  const rd = monthly.rebalanceDays();
+  const target = monthly.addMonths(rd.last.slice(0, 7), 1);
+  if (state.history.some(h => h.month === target)) return state;
+  const spyBars = await fetchBars('SPY', { range: '2y' });
+  if (!spyBars.some(b => dayOf(b.t) === rd.last)) return state;
+  const prev = state.history.at(-1);
+  const held = prev && prev.month === monthly.addMonths(target, -1) ? prev.stocks.map(s => s.symbol) : [];
+  const d = await monthlyDecision(target, held, rd.last);
+  const [gold, oil] = await Promise.all([closeOn(monthly.GOLD.yahoo, rd.last), closeOn(monthly.OIL.yahoo, rd.last)]);
+  if (prev && !prev.end) {
+    prev.end = { date: rd.last, gold, oil, prices: {} };
+    for (const s of prev.stocks) prev.end.prices[s.symbol] = d.stocks.find(x => x.symbol === s.symbol)?.price ?? await closeOn(s.symbol, rd.last);
+  }
+  state.history.push({
+    month: target, decided: rd.last, frozenAt: new Date().toISOString(),
+    // Beslut som räknats fram i efterhand (t.ex. startpunkten) märks, de publicerades inte i förväg.
+    backfilled: rd.today > monthly.nextNyseDay(rd.last),
+    mode: d.mode, cashShare: d.cashShare, spy: d.spy, skipped: d.skipped.map(x => ({ symbol: x.symbol, name: x.name, rank: x.rank, fromHigh: x.fromHigh })),
+    stocks: d.stocks.map(s => { const old = prev?.stocks.find(x => x.symbol === s.symbol);
+      return { symbol: s.symbol, name: s.name, rank: s.rank, mom: s.mom, fromHigh: s.fromHigh, price: s.price, entry: old?.entry ?? s.price, since: old?.since ?? rd.last, kept: !!old }; }),
+    gold, oil, top: d.top.map(x => ({ symbol: x.symbol, name: x.name, mom: x.mom })),
+  });
+  await signalLog.kvSet(MONTHLY_KEY, state);
+  cache.delete('monthly');
+  return state;
+}
+
+async function monthlyMini(id, target, side) {
+  if (!id) return null;
+  try { return monthly.pickMini((await fetchProducts(id, side)).minis, { target, side }); } catch { return null; }
+}
+
+async function monthlyView() {
+  return cached('monthly', async () => {
+    const state = await ensureMonthly();
+    const rd = monthly.rebalanceDays();
+    const cur = state.history.at(-1) || null;
+    const nextTarget = monthly.addMonths(rd.next.slice(0, 7), 1);
+    let next;
+    try { next = await monthlyDecision(nextTarget, cur?.stocks.map(s => s.symbol) || [], null); } catch (err) { next = { error: err.message }; }
+    const L = monthly.RULES;
+    // Läget just nu för innehaven.
+    const live = { prices: {}, gold: await closeOn(monthly.GOLD.yahoo), oil: await closeOn(monthly.OIL.yahoo) };
+    for (const s of cur?.stocks || []) live.prices[s.symbol] = await closeOn(s.symbol);
+    const withProduct = async s => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, mini: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, L.stockLev, 'long') });
+    const current = cur && {
+      ...cur,
+      stocks: await Promise.all(cur.stocks.map(async s => ({ ...(await withProduct(s)), last: live.prices[s.symbol],
+        changePct: live.prices[s.symbol] ? Math.round((live.prices[s.symbol] / s.entry - 1) * 1e4) / 100 : null,
+        miniPct: live.prices[s.symbol] ? Math.round((monthly.miniGrowth(s.entry, live.prices[s.symbol], L.stockLev) - 1) * 1e4) / 100 : null }))),
+      goldNow: live.gold, oilNow: live.oil,
+    };
+    if (next && !next.error) next.stocks = await Promise.all(next.stocks.map(withProduct));
+    const [goldMini, oilMini] = await Promise.all([monthlyMini(monthly.GOLD.id, L.cashLev, 'long'), monthlyMini(monthly.OIL.id, L.cashLev, 'short')]);
+    // Beräknat resultat period för period.
+    let idx = 1, idxRaw = 1;
+    const periods = state.history.map((h, i) => {
+      const end = h.end || (i === state.history.length - 1 ? { date: 'nu', prices: live.prices, gold: live.gold, oil: live.oil } : null);
+      const r = monthly.periodReturn(h, end);
+      if (r) { idx *= 1 + r.lev; idxRaw *= 1 + r.raw; }
+      return { month: h.month, decided: h.decided, to: end?.date ?? null, open: !h.end, backfilled: !!h.backfilled, mode: h.mode,
+        names: h.stocks.map(s => s.name), retPct: r ? Math.round(r.lev * 1e4) / 100 : null, rawPct: r ? Math.round(r.raw * 1e4) / 100 : null };
+    });
+    return { updated: Date.now(), rules: L, rebalance: rd, current, next, cash: { gold: goldMini, oil: oilMini, goldNow: live.gold, oilNow: live.oil },
+      periods, totalPct: Math.round((idx - 1) * 1e4) / 100, totalRawPct: Math.round((idxRaw - 1) * 1e4) / 100,
+      changeText: next && !next.error ? monthly.changeText(cur, next) : null };
+  });
+}
+
+// Påminnelser på bytesdagen: en under eftermiddagen och en strax före stängningen.
+async function monthlyNotify(kind) {
+  const rd = monthly.rebalanceDays();
+  if (!rd.isToday) return null;
+  if (kind === 'final' && rd.nyMin < 15 * 60) return null;
+  const state = await ensureMonthly();
+  const nextTarget = monthly.addMonths(rd.next.slice(0, 7), 1);
+  const done = state.pushed[nextTarget];
+  if (done === 'final' || (kind === 'reminder' && done)) return null;
+  const v = await monthlyView();
+  if (!v.changeText) return null;
+  const title = kind === 'final' ? 'Månadens aktier: dags att byta nu' : 'Månadens aktier: byte ikväll';
+  const body = `${v.changeText}\n${kind === 'final' ? 'Handla före 22.00 svensk tid.' : 'Bytet görs strax före stängningen 22.00 svensk tid. Slutligt besked kommer cirka 21.00.'}`;
+  const ok = await notifyText(title, body);
+  state.pushed[nextTarget] = kind;
+  await signalLog.kvSet(MONTHLY_KEY, state);
+  return ok ? kind : null;
+}
+
 // AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
 async function aiTrader() {
   return cached('aitrader', async () => {
@@ -563,6 +706,8 @@ async function liveCheck({ force = false } = {}) {
   }
   // Coachens omgång (09.30, 12.30, 15.30, 18.00) skapas här om ingen har öppnat appen.
   if (!s.weekend) { try { await logView(); } catch (err) { console.error('Coachens omgång misslyckades:', err.message); } }
+  // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
+  try { for (const kind of ['reminder', 'final']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   return { ok: true, marketOpen: open, sent };
 }
 
@@ -792,6 +937,7 @@ export default async function handler(req, res) {
       cache.delete('usscan'); cache.delete('usmacro');
       const s = await usScan();
       const live = await liveCheck({ force: true });
+      await ensureMonthly().catch(err => console.error('Månadens aktier:', err.message));
       return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), alerts: live.sent });
     }
     // Egen kvällskörning för blankningsanalytikern (hämtar mycket data per bolag).
@@ -821,6 +967,17 @@ export default async function handler(req, res) {
       return send(res, 200, { generated: new Date().toISOString(), count: frozen.length, monthHashes: months, entries: frozen });
     }
     if (url.pathname === '/api/ai-trader') return send(res, 200, await aiTrader());
+    if (url.pathname === '/api/monthly') {
+      if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('monthly');
+      return send(res, 200, await monthlyView());
+    }
+    // Eftermiddag (svensk tid): räknar fram nästa månads rangordning och påminner på bytesdagen.
+    if (url.pathname === '/api/cron/monthly') {
+      await ensureMonthly();
+      const rd = monthly.rebalanceDays();
+      await monthlyRanks(monthly.addMonths(rd.next.slice(0, 7), 1));
+      return send(res, 200, { ok: true, rebalance: rd, sent: await monthlyNotify('reminder') });
+    }
     if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });
     // Ljudfilen från GitHub-jobbet: sparas på dagens session.
