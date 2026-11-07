@@ -1625,12 +1625,23 @@ function renderMonthly() {
         ${isNow && s.changePct != null ? `<div class="mo-res ${s.miniPct >= 0 ? 'pos' : 'neg'}">${svp(s.miniPct)}<small>aktien ${svp(s.changePct)}</small></div>` : ''}</div>
       ${isNow ? `<div class="muted small">Köpt ${esc(s.since)} för ${fmt(s.entry)} USD · nu ${fmt(s.last)} USD${s.kept ? ' · behållen från förra månaden' : ''}</div>` : ''}
       ${paper(s.mini, money, 'stock')}</div>`;
+  // Minins värde (samma modell som i servern): lång (S−F)/(S0−F), kort (F−S)/(F−S0).
+  const miniPct = (s0, s1, L, short) => { if (!(s0 > 0 && s1 > 0)) return null; const F = short ? s0 * (1 + 1 / L) : s0 * (1 - 1 / L);
+    return Math.round((Math.max(0, short ? (F - s1) / (F - s0) : (s1 - F) / (s0 - F)) - 1) * 1000) / 10; };
+  const pctOf = (a, b) => a > 0 && b > 0 ? Math.round((b / a - 1) * 1000) / 10 : null;
   const cashCard = (share, isNow) => {
     const money = amount * share;
-    return `<div class="mo-slot cash"><div class="mo-head"><div><b>Kassaläge</b> <span class="muted small">${Math.round(share * 100)} % av beloppet · hälften guld lång, hälften olja kort</span></div></div>
-      ${isNow && cur.gold && m.cash.goldNow ? `<div class="muted small">Guld ${fmt(cur.gold)} → ${fmt(m.cash.goldNow)} · olja ${fmt(cur.oil)} → ${fmt(m.cash.oilNow)}</div>` : ''}
-      <div class="mo-two"><div><div class="muted small">Guld lång, ${svx(R.cashLev)}</div>${paper(m.cash.gold, money / 2, 'cash')}</div>
-      <div><div class="muted small">Olja kort, ${svx(R.cashLev)}</div>${paper(m.cash.oil, money / 2, 'cash')}</div></div></div>`;
+    const live = isNow && cur.gold && m.cash.goldNow && cur.oil && m.cash.oilNow;
+    const g = live ? { raw: pctOf(cur.gold, m.cash.goldNow), mini: miniPct(cur.gold, m.cash.goldNow, R.cashLev, false) } : null;
+    const o = live ? { raw: pctOf(cur.oil, m.cash.oilNow), mini: miniPct(cur.oil, m.cash.oilNow, R.cashLev, true) } : null;
+    const both = live ? Math.round((g.mini + o.mini) / 2 * 10) / 10 : null;
+    const leg = (title, x, from, to, short) => `<div class="muted small">${title}, ${svx(R.cashLev)}</div>
+      ${x ? `<div class="mo-leg"><b class="${x.mini >= 0 ? 'pos' : 'neg'}">${svp(x.mini)}</b> <span class="muted small">i minin · ${short ? 'oljan' : 'guldet'} ${svp(x.raw)} (${fmt(from)} → ${fmt(to)} USD)</span></div>` : ''}`;
+    return `<div class="mo-slot cash"><div class="mo-head"><div><b>Kassaläge</b> <span class="muted small">${Math.round(share * 100)} % av beloppet · hälften guld lång, hälften olja kort</span></div>
+        ${live ? `<div class="mo-res ${both >= 0 ? 'pos' : 'neg'}">${svp(both)}<small>guld och olja tillsammans</small></div>` : ''}</div>
+      ${isNow ? `<div class="muted small">Sedan ${esc(cur.decided)}${live ? '' : ' · kurserna saknas just nu'}</div>` : ''}
+      <div class="mo-two"><div>${leg('Guld lång', g, cur?.gold, m.cash.goldNow, false)}${paper(m.cash.gold, money / 2, 'cash')}</div>
+      <div>${leg('Olja kort', o, cur?.oil, m.cash.oilNow, true)}${paper(m.cash.oil, money / 2, 'cash')}</div></div></div>`;
   };
   const modeText = c => c.mode === 'aktier' ? 'Två aktier' : c.mode === 'delvis' ? 'En aktie + kassaläge' : 'Kassaläge';
   const held = new Set((cur?.stocks || []).map(s => s.symbol));

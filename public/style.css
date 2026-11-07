@@ -595,3 +595,5 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .mo-rank tr.pick td { background: rgba(34,197,94,.06); }
 .mo-steps ol { margin: 6px 0 0; padding-left: 20px; }
 .mo-steps li { margin: 3px 0; }
+.mo-leg { margin: 2px 0 2px; }
+.mo-leg b { font-size: 15px; }
