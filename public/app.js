@@ -1633,23 +1633,26 @@ function miniG(s0, s1, L, short) {
   return Math.max(0, short ? (F - s1) / (F - s0) : (s1 - F) / (s0 - F));
 }
 // Fördelningen av ett belopp på platserna: aktier, guld och olja kort, kontanter.
+// Strategins vikter: varje aktieplats lika mycket, kassaplatsen delas lika på guld och olja kort.
+// Blir någon order under minsta beloppet delas pengarna i stället lika på alla papper
+// (t.ex. 3 300 kr = 3 × 1 100 kr). Räcker inte heller det tas olja kort bort först.
 function allocate(state, money, m) {
-  const R = m.rules, per = money / R.slots, legs = [];
-  for (const s of state.stocks) {
-    const pick = chooseMini(s.minis, R.stockLev, per, R.minOrder);
-    legs.push({ key: s.symbol, title: s.name, sub: `${s.symbol} · aktie lång`, kind: 'stock', s, money: per, pick, target: R.stockLev });
-  }
-  const cash = money * state.cashShare;
+  const R = m.rules, cash = money * state.cashShare;
+  const legs = state.stocks.map(s => ({ key: s.symbol, title: s.name, sub: `${s.symbol} · aktie lång`, kind: 'stock', s, list: s.minis, target: R.stockLev, w: 1 / R.slots }));
   if (cash > 0) {
-    if (cash >= 2 * R.minOrder) {
-      legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', money: cash / 2, pick: chooseMini(m.cash.gold, R.cashLev, cash / 2, R.minOrder), target: R.cashLev });
-      legs.push({ key: 'oil', title: 'Olja (Brent)', sub: 'kassaläge · kort', kind: 'oil', money: cash / 2, pick: chooseMini(m.cash.oil, R.cashLev, cash / 2, R.minOrder), target: R.cashLev, short: true });
-    } else {
-      legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', money: cash, pick: chooseMini(m.cash.gold, R.cashLev, cash, R.minOrder), target: R.cashLev,
-        note: `Kassaläget är ${kr(cash)} – för lite för två order på minst ${kr(R.minOrder)}, så allt läggs i guld. Med ett startvärde på ${kr(4 * R.minOrder)} eller mer blir det hälften guld och hälften olja kort.` });
-    }
+    legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', list: m.cash.gold, target: R.cashLev, w: state.cashShare / 2 });
+    legs.push({ key: 'oil', title: 'Olja (Brent)', sub: 'kassaläge · kort', kind: 'oil', list: m.cash.oil, target: R.cashLev, short: true, w: state.cashShare / 2 });
   }
-  return legs;
+  let use = legs, note = null;
+  if (use.some(l => money * l.w < R.minOrder)) {
+    while (use.length > 1 && money / use.length < R.minOrder) use = use.filter(l => l !== (use.find(x => x.kind === 'oil') || use.at(-1)));
+    use = use.map(l => ({ ...l, w: 1 / use.length }));
+    note = use.length === legs.length ? `Lika delar på alla ${use.length} papper, så att varje order blir minst ${kr(R.minOrder)}.` : null;
+  }
+  return use.map((l, i) => {
+    const amt = money * l.w;
+    return { ...l, money: amt, pick: chooseMini(l.list, l.target, amt, R.minOrder), note: i === 0 ? note : null };
+  });
 }
 function renderMonthly() {
   const m = monthlyData, el = $('#monthly'), rd = m.rebalance, R = m.rules, cur = m.current, nx = m.next;
