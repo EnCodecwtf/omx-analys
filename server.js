@@ -624,7 +624,8 @@ async function monthlyView() {
 async function monthlyNotify(kind) {
   const rd = monthly.rebalanceDays();
   if (!rd.isToday) return null;
-  if (kind === 'final' && rd.nyMin < 15 * 60) return null;
+  // Slutligt besked från 13.00 i New York (19.00 svensk tid), handel före 22.00 svensk tid.
+  if (kind === 'final' && rd.nyMin < 13 * 60) return null;
   const state = await ensureMonthly();
   const nextTarget = monthly.addMonths(rd.next.slice(0, 7), 1);
   const done = state.pushed[nextTarget];
@@ -808,7 +809,7 @@ async function liveCheck({ force = false } = {}) {
   // Coachens omgång (09.30, 12.30, 15.30, 18.00) skapas här om ingen har öppnat appen.
   if (!s.weekend) { try { await logView(); } catch (err) { console.error('Coachens omgång misslyckades:', err.message); } }
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
-  try { for (const kind of ['reminder', 'final']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
+  try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   return { ok: true, marketOpen: open, sent };
 }
 
@@ -1072,12 +1073,14 @@ export default async function handler(req, res) {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('monthly');
       return send(res, 200, await monthlyView());
     }
-    // Eftermiddag (svensk tid): räknar fram nästa månads rangordning och påminner på bytesdagen.
+    // Körs två gånger per vardag av Vercel (cirka 15–16 och 20–21 svensk tid): räknar fram nästa
+    // månads rangordning och skickar påminnelsen och det slutliga beskedet på bytesdagen.
     if (url.pathname === '/api/cron/monthly') {
       await ensureMonthly();
       const rd = monthly.rebalanceDays();
       await monthlyRanks(monthly.addMonths(rd.next.slice(0, 7), 1));
-      return send(res, 200, { ok: true, rebalance: rd, sent: await monthlyNotify('reminder') });
+      const sent = [await monthlyNotify('final'), await monthlyNotify('reminder')].filter(Boolean);
+      return send(res, 200, { ok: true, rebalance: rd, sent });
     }
     if (url.pathname === '/api/overnight') return send(res, 200, await overnight());
     if (url.pathname === '/api/morning') return send(res, 200, { morning: await morning() });

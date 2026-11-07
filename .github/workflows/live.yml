@@ -1,15 +1,40 @@
-# Live-bevakning under dagen: anropar appens live-kontroll var 15:e minut
-# vardagar 09.00–22.15 svensk tid (mål, stopp, säljdagar och förvarningar).
-# Vercels gratisplan kör bara en schemalagd körning per dag, därför görs det här.
-# Lägg samma nyckel som CRON_SECRET i Vercel som hemlighet CRON_SECRET här om den används.
+# Live-bevakning under börsdagen: anropar appens live-kontroll var 10:e minut
+# (mål, stopp, säljdagar, förvarningar, coachen och Månadens aktier).
+# GitHubs schemaläggning hoppar ofta över körningar, så jobbet är självgående:
+# varje omgång kör i upp till 5 timmar och startar sedan nästa omgång själv.
+# De schemalagda starterna nedan är bara reserv om kedjan skulle brytas.
+# Vardagar 06.45–21.15 UTC (07.45/08.45–22.15/23.15 svensk tid).
 name: Live-bevakning
 on:
   schedule:
-    - cron: '*/15 7-21 * * 1-5'
+    - cron: '7 7,10,13,16,19 * * 1-5'
   workflow_dispatch:
+concurrency:
+  group: live
+  cancel-in-progress: false
+permissions:
+  actions: write
+  contents: read
 jobs:
   live:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 320
     steps:
-      - run: curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${{ secrets.CRON_SECRET }}"
+      - name: Anropa live-kontrollen var 10:e minut
+        env:
+          KEY: ${{ secrets.CRON_SECRET }}
+        run: |
+          inside() { d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 645 ] && [ "$t" -le 2115 ]; }
+          end=$(( $(date +%s) + 5 * 3600 ))
+          while [ "$(date +%s)" -lt "$end" ] && inside; do
+            curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${KEY}" || echo "Anropet misslyckades, försöker igen om 10 minuter"
+            echo
+            sleep 600
+          done
+      - name: Starta nästa omgång
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          d=$(date -u +%u); t=$((10#$(date -u +%H%M)))
+          if [ "$d" -le 5 ] && [ "$t" -lt 2105 ]; then gh workflow run live.yml --repo "${{ github.repository }}" && echo "Nästa omgång startad"; else echo "Börsdagen är slut"; fi

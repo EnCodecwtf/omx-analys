@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/monthly",
       "schedule": "10 14 * * 1-5"
+    },
+    {
+      "path": "/api/cron/monthly?final=1",
+      "schedule": "0 19 * * 1-5"
     }
   ]
 }
