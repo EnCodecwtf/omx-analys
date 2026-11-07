@@ -644,6 +644,20 @@ function aiCurve(c) {
   return `<svg class="ai-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Kontots värde över tid"><polyline points="${pts}" fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
     <div class="vticks"><span>${esc(c[0].date)}</span><span>${kr(lo)} – ${kr(hi)}</span><span>${esc(c.at(-1).date)}</span></div>`;
 }
+// AI-traderns del i Månadens aktier (10 % av kontot).
+function aiMonthlyBox(m) {
+  const sgn = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v)).toLocaleString('sv-SE')} kr`;
+  const pc = v => v == null ? '–' : `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
+  return `<h2 class="v-title">Månadens aktier <span class="muted">(10 % av kontot)</span></h2>
+    <div class="trade-card ai-monthly">
+      <div class="tc-head"><div><b>${kr(m.value)}</b> <span class="muted small">startade ${esc(m.started)} med ${kr(m.amount)}</span></div><div class="tc-res ${m.pnl > 0 ? 'pos' : m.pnl < 0 ? 'neg' : ''}">${sgn(m.pnl)} · ${pc(m.pnlPct)}</div></div>
+      <table class="pf-table">${m.positions.map(p => `<tr><td><b>${esc(p.name)}</b> <span class="muted small">${p.side === 'short' ? 'kort' : 'lång'}</span><div class="small muted"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.paper)}</a> · ${svx(p.lev)}</div></td>
+        <td class="r num"><b>${kr(p.value)}</b><div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.pct > 0 ? 'pos' : p.pct < 0 ? 'neg' : ''}"><b>${pc(p.pct)}</b><div class="small muted">kursen ${pc(p.rawPct)}</div></td></tr>`).join('')}
+        ${m.cash >= 1 ? `<tr><td><b>Kontanter</b></td><td class="r num">${kr(m.cash)}</td><td></td></tr>` : ''}</table>
+      <div class="tc-next">Nästa byte ${esc(moDay(m.next))}. AI-tradern handlar bara vid bytet – mitt i månaden bevakar den och skriver ner varför den håller.</div>
+    </div>
+    <ul class="ai-log">${m.log.slice(0, 8).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '🗓'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('')}</ul>`;
+}
 function renderAi() {
   const el = $('#ai'), a = aiData;
   if (!a) return;
@@ -669,10 +683,11 @@ function renderAi() {
     </div>
     <h2 class="v-title">Öppna affärer <span class="muted">(${a.open.length})</span></h2>
     ${a.open.length ? a.open.map(pos).join('') : '<div class="empty small">Inga affärer igång. AI-tradern väntar på nästa signal.</div>'}
+    ${a.monthly ? aiMonthlyBox(a.monthly) : ''}
     <h2 class="v-title">Beslut</h2>
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
     ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
-    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen. Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
+    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
       Vid TP1 avgör en maskininlärningsmodell (tränad på 2017–2021, testad på 2022–2026) om resten ska få löpa eller säljas. Övriga beslut följer regler som väger trend (EMA 20), mål, stopp, rapporter och tid i affären. Inte investeringsrådgivning.</p>`;
   bindRows(el);
 }

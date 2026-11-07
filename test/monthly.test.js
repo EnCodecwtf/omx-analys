@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lastTradingDay, rebalanceDays, momentum, decide, pickMini, miniGrowth, changeText } from '../lib/monthly.js';
+import { lastTradingDay, rebalanceDays, momentum, decide, pickMini, miniGrowth, changeText, allocate } from '../lib/monthly.js';
 
 test('sista handelsdagen tar hänsyn till helger och NYSE-helgdagar', () => {
   assert.equal(lastTradingDay('2026-11'), '2026-11-30');
@@ -60,4 +60,13 @@ test('hela beloppet i pappret med hävstång närmast målet, AVA först', () =>
 test('minins värde, lång och kort', () => {
   assert.ok(Math.abs(miniGrowth(100, 110, 2) - 1.2) < 1e-9);
   assert.ok(Math.abs(miniGrowth(100, 90, 2, 'short') - 1.2) < 1e-9);
+});
+
+test('fördelningen: 3 300 kr blir tre order på 1 100 kr, 2 500 kr tar bort olja kort', () => {
+  const p = (lev, ava = true) => [{ id: 'x', name: ava ? 'MINI AVA' : 'MINI', ava, leverage: lev, spreadPct: 0.1 }];
+  const lists = { stockLists: { A: p(1.8) }, gold: p(1.6), oil: p(1.5) };
+  const st = { stocks: [{ symbol: 'A', name: 'A' }], cashShare: 0.5 };
+  assert.deepEqual(allocate(st, 3300, lists).map(l => [l.kind, Math.round(l.money)]), [['stock', 1100], ['gold', 1100], ['oil', 1100]]);
+  assert.deepEqual(allocate(st, 2500, lists).map(l => [l.kind, Math.round(l.money)]), [['stock', 1250], ['gold', 1250]]);
+  assert.deepEqual(allocate(st, 4000, lists).map(l => [l.kind, Math.round(l.money)]), [['stock', 2000], ['gold', 1000], ['oil', 1000]]);
 });

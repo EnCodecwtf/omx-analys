@@ -639,6 +639,82 @@ async function monthlyNotify(kind) {
   return ok ? kind : null;
 }
 
+// AI-tradern förvaltar 10 % av sitt konto enligt Månadens aktier. Den handlar bara vid
+// månadsskiftet (bytet), men bevakar innehaven varje dag och skriver ner sina överväganden.
+// Beslut mitt i månaden har sänkt resultatet i testet, så den säljer inte i förtid.
+const AI_MONTHLY_KEY = 'omx-analys:ai-monthly';
+const AI_MONTHLY_SHARE = 0.1;
+async function aiMonthly(aiStart) {
+  const v = await monthlyView();
+  const cur = v.current;
+  if (!cur) return null;
+  let st = await signalLog.kvGet(AI_MONTHLY_KEY, null);
+  const now = today();
+  const px = (l, day) => closeOn(l.symbol, day);
+  const open = async (state, money, day, why) => {
+    const legs = monthly.allocate({ stocks: cur.stocks, cashShare: cur.cashShare }, money, { gold: v.cash.gold || [], oil: v.cash.oil || [] });
+    const pos = [];
+    let cash = money;
+    for (const l of legs) {
+      if (!l.pick) continue;
+      const entry = await px(l, day);
+      if (!entry) continue;
+      pos.push({ kind: l.kind, symbol: l.symbol, name: l.name, side: l.side, money: Math.round(l.money), entry, lev: l.pick.leverage, paper: l.pick.name, url: l.pick.url, ava: l.pick.ava });
+      cash -= l.money;
+    }
+    const names = pos.map(p => `${p.name} (${p.paper}, ${String(p.lev).replace('.', ',')}x, ${Math.round(p.money).toLocaleString('sv-SE')} kr)`).join(', ');
+    return { ...state, month: cur.month, positions: pos, cash: Math.max(0, cash), log: [{ date: day === null ? now : (day || now), action: 'köper', name: 'Månadens aktier', text: `${why} Köper ${names}.` }, ...(state.log || [])] };
+  };
+  const valueAt = async (state, day = null) => {
+    let val = state.cash || 0;
+    const rows = [];
+    for (const p of state.positions) {
+      const last = await closeOn(p.symbol, day);
+      const g = last ? monthly.miniGrowth(p.entry, last, p.lev, p.side) : 1;
+      rows.push({ ...p, last, value: p.money * g, pct: Math.round((g - 1) * 1000) / 10, rawPct: last ? Math.round((last / p.entry - 1) * 1000) / 10 : null });
+      val += p.money * g;
+    }
+    return { val, rows };
+  };
+  let changed = false;
+  if (!st) {
+    const amount = Math.round(aiStart * AI_MONTHLY_SHARE);
+    st = await open({ started: now, amount, log: [] }, amount, null, `Startar med ${amount.toLocaleString('sv-SE')} kr (10 % av kontot) i Månadens aktier, på dagens kurser.`);
+    changed = true;
+  } else if (st.month !== cur.month) {
+    // Månadsbyte: allt säljs på bytesdagens stängning och den nya fördelningen köps.
+    const { val } = await valueAt(st, cur.decided);
+    const sold = st.positions.map(p => p.name).join(', ');
+    st.log = [{ date: cur.decided, action: 'säljer', name: 'Månadens aktier', text: `Månadsbyte. Säljer ${sold || 'inget'}; värdet är ${Math.round(val).toLocaleString('sv-SE')} kr.` }, ...(st.log || [])];
+    st = await open(st, val, cur.decided, 'Ny månad enligt reglerna.');
+    changed = true;
+  }
+  // Daglig bevakning: varje händelse vägs mot testet och skrivs ner en gång per månad.
+  st.seen ||= {};
+  const T = monthly.INTRAMONTH_TEST;
+  const think = (key, text) => { const k = `${cur.month}|${key}`; if (st.seen[k]) return; st.seen[k] = now; st.log.unshift({ date: now, action: 'håller', name: 'Månadens aktier', text }); changed = true; };
+  const { val, rows } = await valueAt(st);
+  try {
+    const spy = (await fetchBars('SPY', { range: '2y' })).map(b => b.c);
+    const sma200 = spy.slice(-200).reduce((a, x) => a + x, 0) / 200;
+    if (spy.at(-1) < sma200) think('spy', `S&P 500 har gått under sitt 200-dagars snitt. Jag säljer inte mitt i månaden: i testet sänkte det resultatet från ${T.none.cagr} % till ${T.spyBelow.cagr} % per år och gav djupare nedgång (${T.spyBelow.dd} %). Det avgörs vid nästa byte.`);
+  } catch { /* hoppas över */ }
+  for (const r of rows) {
+    if (r.kind === 'stock') {
+      try {
+        const c = (await fetchBars(r.symbol, { range: '2y' })).map(b => b.c).slice(-252);
+        const fromHigh = c.at(-1) / Math.max(...c) - 1;
+        if (fromHigh < -0.25) think(`hi-${r.symbol}`, `${r.name} ligger ${Math.round(-fromHigh * 100)} % under sitt årshögsta. Regeln gäller bara vid bytet – att sälja direkt sänkte resultatet i testet till ${T.fromHigh25.cagr} % per år mot ${T.none.cagr} %. Jag behåller till månadsskiftet.`);
+      } catch { /* hoppas över */ }
+    }
+    if (r.pct <= -10) think(`down-${r.symbol}`, `${r.name} är ${r.pct.toString().replace('.', ',')} % i pappret. Ett stopp inom månaden har i testet gett sämre resultat (${T.stop15.cagr} % per år och ${T.stop15.dd} % nedgång), så jag håller fast vid planen.`);
+    if (r.pct >= 20) think(`up-${r.symbol}`, `${r.name} är upp ${r.pct.toString().replace('.', ',')} % i pappret. Strategin har inga mål – några få stora vinnare står för det mesta av avkastningen – så jag låter den löpa till bytet.`);
+  }
+  if (changed) { st.log = st.log.slice(0, 60); await signalLog.kvSet(AI_MONTHLY_KEY, st); }
+  return { started: st.started, amount: st.amount, value: Math.round(val), pnl: Math.round(val - st.amount), pnlPct: Math.round((val / st.amount - 1) * 1000) / 10,
+    month: st.month, next: v.rebalance.next, positions: rows.map(r => ({ ...r, value: Math.round(r.value) })), cash: Math.round(st.cash || 0), log: st.log };
+}
+
 // AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
 async function aiTrader() {
   return cached('aitrader', async () => {
@@ -652,8 +728,13 @@ async function aiTrader() {
     }
     const [macroAt, vix] = await Promise.all([macro(), fetchBars('^VIX').catch(() => [])]);
     const vixAt = new Map(vix.map(b => [dayOf(b.t), b.c]));
-    return { updated: Date.now(), ...runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
-      productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20 }) };
+    const a = runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
+      productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20 });
+    // 10 % av kontot ligger i Månadens aktier (tas från kontanterna när delen startar).
+    let m = null;
+    try { m = await aiMonthly(a.start); } catch (err) { console.error('AI-tradern, Månadens aktier:', err.message); }
+    if (m) { a.equity = Math.round((a.equity - m.amount + m.value) * 100) / 100; a.cash = Math.round((a.cash - m.amount) * 100) / 100; a.returnPct = Math.round((a.equity / a.start - 1) * 1e4) / 100; }
+    return { updated: Date.now(), ...a, monthly: m };
   });
 }
 
