@@ -651,10 +651,12 @@ function aiMonthlyBox(m) {
   return `<h2 class="v-title">Månadens aktier <span class="muted">(10 % av kontot)</span></h2>
     <div class="trade-card ai-monthly">
       <div class="tc-head"><div><b>${kr(m.value)}</b> <span class="muted small">startade ${esc(m.started)} med ${kr(m.amount)}</span></div><div class="tc-res ${m.pnl > 0 ? 'pos' : m.pnl < 0 ? 'neg' : ''}">${sgn(m.pnl)} · ${pc(m.pnlPct)}</div></div>
-      <table class="pf-table">${m.positions.map(p => `<tr><td><b>${esc(p.name)}</b> <span class="muted small">${p.side === 'short' ? 'kort' : 'lång'}</span><div class="small muted"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.paper)}</a> · ${svx(p.lev)}</div></td>
+      <table class="pf-table">${m.positions.map(p => p.sold ? `<tr class="sold"><td><b>${esc(p.name)}</b> <span class="tag bad">såld ${esc(p.sold.date)}</span><div class="small muted">${esc(p.sold.why)}</div></td>
+        <td class="r num">${kr(p.sold.value)}<div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.sold.pct > 0 ? 'pos' : 'neg'}">${pc(p.sold.pct)}</td></tr>` : `<tr><td><b>${esc(p.name)}</b> <span class="muted small">${p.side === 'short' ? 'kort' : 'lång'}</span><div class="small muted"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.paper)}</a> · ${svx(p.lev)}</div></td>
         <td class="r num"><b>${kr(p.value)}</b><div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.pct > 0 ? 'pos' : p.pct < 0 ? 'neg' : ''}"><b>${pc(p.pct)}</b><div class="small muted">kursen ${pc(p.rawPct)}</div></td></tr>`).join('')}
         ${m.cash >= 1 ? `<tr><td><b>Kontanter</b></td><td class="r num">${kr(m.cash)}</td><td></td></tr>` : ''}</table>
-      <div class="tc-next">Nästa byte ${esc(moDay(m.next))}. AI-tradern handlar bara vid bytet – mitt i månaden bevakar den och skriver ner varför den håller.</div>
+      <div class="tc-next">Nästa byte ${esc(moDay(m.next))}. AI-tradern får sälja när den vill under månaden, men gör det bara på kraftiga varningar (nödbroms) – vanliga säljregler sänkte resultatet i testet.</div>
+      <div class="small ${m.edge > 0 ? 'pos' : m.edge < 0 ? 'neg' : 'muted'}" style="margin-top:6px">AI:ns egna beslut: ${m.edge === 0 ? 'inga än – värdet är detsamma som att bara följa reglerna' : `${sgn(m.edge)} jämfört med att bara följa reglerna (${kr(m.shadowValue)})`}.</div>
     </div>
     <ul class="ai-log">${m.log.slice(0, 8).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '🗓'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('')}</ul>`;
 }

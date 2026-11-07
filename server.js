@@ -659,22 +659,25 @@ async function aiMonthly(aiStart) {
       if (!l.pick) continue;
       const entry = await px(l, day);
       if (!entry) continue;
-      pos.push({ kind: l.kind, symbol: l.symbol, name: l.name, side: l.side, money: Math.round(l.money), entry, lev: l.pick.leverage, paper: l.pick.name, url: l.pick.url, ava: l.pick.ava });
+      pos.push({ kind: l.kind, symbol: l.symbol, name: l.name, side: l.side, money: Math.round(l.money), entry, lev: l.pick.leverage, paper: l.pick.name, url: l.pick.url, ava: l.pick.ava, stopLoss: l.pick.stopLoss ?? null });
       cash -= l.money;
     }
     const names = pos.map(p => `${p.name} (${p.paper}, ${String(p.lev).replace('.', ',')}x, ${Math.round(p.money).toLocaleString('sv-SE')} kr)`).join(', ');
-    return { ...state, month: cur.month, positions: pos, cash: Math.max(0, cash), log: [{ date: day === null ? now : (day || now), action: 'köper', name: 'Månadens aktier', text: `${why} Köper ${names}.` }, ...(state.log || [])] };
+    return { ...state, month: cur.month, positions: pos, cash: Math.max(0, cash), shadowCash: Math.max(0, cash), log: [{ date: day === null ? now : (day || now), action: 'köper', name: 'Månadens aktier', text: `${why} Köper ${names}.` }, ...(state.log || [])] };
   };
+  // Värde med AI:ns egna försäljningar, och "skuggvärdet" om allt hade legat kvar till bytet.
   const valueAt = async (state, day = null) => {
-    let val = state.cash || 0;
+    let val = state.cash || 0, shadow = state.shadowCash ?? state.cash ?? 0;
     const rows = [];
     for (const p of state.positions) {
       const last = await closeOn(p.symbol, day);
       const g = last ? monthly.miniGrowth(p.entry, last, p.lev, p.side) : 1;
+      shadow += p.money * g;
+      if (p.sold) { rows.push({ ...p, last: p.sold.price, value: 0, pct: p.sold.pct, rawPct: p.sold.rawPct }); continue; }
       rows.push({ ...p, last, value: p.money * g, pct: Math.round((g - 1) * 1000) / 10, rawPct: last ? Math.round((last / p.entry - 1) * 1000) / 10 : null });
       val += p.money * g;
     }
-    return { val, rows };
+    return { val, shadow, rows };
   };
   let changed = false;
   if (!st) {
@@ -683,36 +686,53 @@ async function aiMonthly(aiStart) {
     changed = true;
   } else if (st.month !== cur.month) {
     // Månadsbyte: allt säljs på bytesdagens stängning och den nya fördelningen köps.
-    const { val } = await valueAt(st, cur.decided);
-    const sold = st.positions.map(p => p.name).join(', ');
+    const { val, shadow } = await valueAt(st, cur.decided);
+    st.edge = (st.edge || 0) + (val - shadow);
+    const sold = st.positions.filter(p => !p.sold).map(p => p.name).join(', ');
     st.log = [{ date: cur.decided, action: 'säljer', name: 'Månadens aktier', text: `Månadsbyte. Säljer ${sold || 'inget'}; värdet är ${Math.round(val).toLocaleString('sv-SE')} kr.` }, ...(st.log || [])];
     st = await open(st, val, cur.decided, 'Ny månad enligt reglerna.');
     changed = true;
   }
-  // Daglig bevakning: varje händelse vägs mot testet och skrivs ner en gång per månad.
+  // Daglig bevakning. AI:n får sälja när den vill, men bara på kraftiga varningssignaler:
+  // i testet sänkte vanliga säljregler mitt i månaden resultatet, medan sällsynta
+  // nödbromsar (−30 % på en månad, 35 % från toppen under 50-dagars snitt) låg kvar på samma nivå.
+  // Varje beslut jämförs med att bara följa reglerna till bytet (skuggvärdet).
   st.seen ||= {};
   const T = monthly.INTRAMONTH_TEST;
-  const think = (key, text) => { const k = `${cur.month}|${key}`; if (st.seen[k]) return; st.seen[k] = now; st.log.unshift({ date: now, action: 'håller', name: 'Månadens aktier', text }); changed = true; };
-  const { val, rows } = await valueAt(st);
-  try {
-    const spy = (await fetchBars('SPY', { range: '2y' })).map(b => b.c);
-    const sma200 = spy.slice(-200).reduce((a, x) => a + x, 0) / 200;
-    if (spy.at(-1) < sma200) think('spy', `S&P 500 har gått under sitt 200-dagars snitt. Jag säljer inte mitt i månaden: i testet sänkte det resultatet från ${T.none.cagr} % till ${T.spyBelow.cagr} % per år och gav djupare nedgång (${T.spyBelow.dd} %). Det avgörs vid nästa byte.`);
-  } catch { /* hoppas över */ }
-  for (const r of rows) {
-    if (r.kind === 'stock') {
-      try {
-        const c = (await fetchBars(r.symbol, { range: '2y' })).map(b => b.c).slice(-252);
-        const fromHigh = c.at(-1) / Math.max(...c) - 1;
-        if (fromHigh < -0.25) think(`hi-${r.symbol}`, `${r.name} ligger ${Math.round(-fromHigh * 100)} % under sitt årshögsta. Regeln gäller bara vid bytet – att sälja direkt sänkte resultatet i testet till ${T.fromHigh25.cagr} % per år mot ${T.none.cagr} %. Jag behåller till månadsskiftet.`);
-      } catch { /* hoppas över */ }
-    }
-    if (r.pct <= -10) think(`down-${r.symbol}`, `${r.name} är ${r.pct.toString().replace('.', ',')} % i pappret. Ett stopp inom månaden har i testet gett sämre resultat (${T.stop15.cagr} % per år och ${T.stop15.dd} % nedgång), så jag håller fast vid planen.`);
-    if (r.pct >= 20) think(`up-${r.symbol}`, `${r.name} är upp ${r.pct.toString().replace('.', ',')} % i pappret. Strategin har inga mål – några få stora vinnare står för det mesta av avkastningen – så jag låter den löpa till bytet.`);
+  const think = (key, text, action = 'håller') => { const k = `${cur.month}|${key}`; if (st.seen[k]) return; st.seen[k] = now; st.log.unshift({ date: now, action, name: 'Månadens aktier', text }); changed = true; };
+  const sell = (p, last, why) => {
+    const g = monthly.miniGrowth(p.entry, last, p.lev, p.side), value = p.money * g;
+    p.sold = { date: now, price: last, value, pct: Math.round((g - 1) * 1000) / 10, rawPct: Math.round((last / p.entry - 1) * 1000) / 10, why };
+    st.cash = (st.cash || 0) + value;
+    st.log.unshift({ date: now, action: 'säljer', name: 'Månadens aktier', text: `Säljer ${p.name} (${p.paper}) för ${Math.round(value).toLocaleString('sv-SE')} kr (${p.sold.pct > 0 ? '+' : ''}${String(p.sold.pct).replace('.', ',')} %). ${why} Pengarna ligger som kontanter till nästa byte.` });
+    changed = true;
+  };
+  let spyBelow = false;
+  try { const spy = (await fetchBars('SPY', { range: '2y' })).map(b => b.c); spyBelow = spy.at(-1) < spy.slice(-200).reduce((a, x) => a + x, 0) / 200; } catch { /* hoppas över */ }
+  if (spyBelow) think('spy', `S&P 500 har gått under sitt 200-dagars snitt. Jag säljer inte på det: i testet sänkte det resultatet från ${T.none.cagr} % till ${T.spyBelow.cagr} % per år. Jag säljer bara på kraftigare varningar.`);
+  for (const p of st.positions) {
+    if (p.sold) continue;
+    let c;
+    try { c = (await fetchBars(p.symbol, { range: '2y' })).map(b => b.c); } catch { continue; }
+    const last = c.at(-1), raw = last / p.entry - 1, dir = p.side === 'short' ? -1 : 1;
+    const yr = c.slice(-252), fromHigh = last / Math.max(...yr) - 1, sma50 = c.slice(-50).reduce((a, x) => a + x, 0) / 50;
+    const pct = Math.round((monthly.miniGrowth(p.entry, last, p.lev, p.side) - 1) * 1000) / 10;
+    // Nära pappers knock-out: sälj hellre än att pappret löses ut.
+    if (p.stopLoss && dir * (last - p.stopLoss) / last < 0.1) { sell(p, last, `Kursen är mindre än 10 % från pappers knock-out (${p.stopLoss}).`); continue; }
+    if (p.kind === 'stock' && raw <= -0.3) { sell(p, last, 'Aktien har fallit mer än 30 % sedan köpet – nödbroms.'); continue; }
+    if (p.kind === 'stock' && fromHigh <= -0.35 && last < sma50) { sell(p, last, `Aktien ligger ${Math.round(-fromHigh * 100)} % under årshögsta och under sitt 50-dagars snitt – trenden är bruten.`); continue; }
+    if (p.kind === 'oil' && raw >= 0.2) { sell(p, last, `Oljan har stigit ${Math.round(raw * 100)} % sedan köpet – en kort position kan förlora mycket snabbt, så jag stänger.`); continue; }
+    if (p.kind === 'gold' && raw <= -0.15) { sell(p, last, 'Guldet har fallit mer än 15 % sedan köpet – nödbroms.'); continue; }
+    if (p.kind === 'stock' && fromHigh < -0.25) think(`hi-${p.symbol}`, `${p.name} ligger ${Math.round(-fromHigh * 100)} % under sitt årshögsta. Jag håller: att sälja vid 25 % sänkte resultatet i testet till ${T.fromHigh25.cagr} % per år mot ${T.none.cagr} %. Jag säljer om den når 35 % och går under sitt 50-dagars snitt.`);
+    if (pct <= -10) think(`down-${p.symbol}`, `${p.name} är ${String(pct).replace('.', ',')} % i pappret. Jag håller – vanliga stopp gav sämre resultat i testet. Nödbromsen går vid ${p.kind === 'stock' ? '−30 % i aktien' : p.kind === 'gold' ? '−15 % i guldet' : '+20 % i oljan'}.`);
+    if (pct >= 20) think(`up-${p.symbol}`, `${p.name} är upp ${String(pct).replace('.', ',')} % i pappret. Jag låter den löpa – några få stora vinnare står för det mesta av avkastningen.`);
   }
+  const { val, shadow, rows } = await valueAt(st);
   if (changed) { st.log = st.log.slice(0, 60); await signalLog.kvSet(AI_MONTHLY_KEY, st); }
+  const edge = (st.edge || 0) + (val - shadow);
   return { started: st.started, amount: st.amount, value: Math.round(val), pnl: Math.round(val - st.amount), pnlPct: Math.round((val / st.amount - 1) * 1000) / 10,
-    month: st.month, next: v.rebalance.next, positions: rows.map(r => ({ ...r, value: Math.round(r.value) })), cash: Math.round(st.cash || 0), log: st.log };
+    month: st.month, next: v.rebalance.next, positions: rows.map(r => ({ ...r, value: Math.round(r.value) })), cash: Math.round(st.cash || 0), log: st.log,
+    edge: Math.round(edge), shadowValue: Math.round(val - edge) };
 }
 
 // AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
