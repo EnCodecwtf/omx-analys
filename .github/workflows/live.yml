@@ -1,9 +1,11 @@
 # Live-bevakning under börsdagen: anropar appens live-kontroll var 10:e minut
 # (mål, stopp, säljdagar, förvarningar, coachen och Månadens aktier).
 # GitHubs schemaläggning hoppar ofta över körningar, så jobbet är självgående:
-# varje omgång kör i upp till 5 timmar och startar sedan nästa omgång själv.
+# varje omgång kör i upp till 5 timmar och startar sedan nästa omgång själv, dygnet
+# runt, så att kedjan aldrig behöver startas om. Appen anropas bara vardagar
+# 06.45–21.15 UTC (07.45/08.45–22.15/23.15 svensk tid); övrig tid väntar jobbet.
 # De schemalagda starterna nedan är bara reserv om kedjan skulle brytas.
-# Vardagar 06.45–21.15 UTC (07.45/08.45–22.15/23.15 svensk tid).
+# Stoppa kedjan genom att stänga av arbetsflödet under Actions (Disable workflow).
 name: Live-bevakning
 on:
   schedule:
@@ -26,9 +28,11 @@ jobs:
         run: |
           inside() { d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 645 ] && [ "$t" -le 2115 ]; }
           end=$(( $(date +%s) + 5 * 3600 ))
-          while [ "$(date +%s)" -lt "$end" ] && inside; do
-            curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${KEY}" || echo "Anropet misslyckades, försöker igen om 10 minuter"
-            echo
+          while [ "$(date +%s)" -lt "$end" ]; do
+            if inside; then
+              curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${KEY}" || echo "Anropet misslyckades, försöker igen om 10 minuter"
+              echo
+            fi
             sleep 600
           done
       - name: Starta nästa omgång
@@ -36,5 +40,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          d=$(date -u +%u); t=$((10#$(date -u +%H%M)))
-          if [ "$d" -le 5 ] && [ "$t" -lt 2105 ]; then gh workflow run live.yml --repo "${{ github.repository }}" && echo "Nästa omgång startad"; else echo "Börsdagen är slut"; fi
+          gh workflow run live.yml --repo "${{ github.repository }}" && echo "Nästa omgång startad"
