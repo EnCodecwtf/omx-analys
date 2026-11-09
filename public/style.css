@@ -620,3 +620,6 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .mo-order:last-of-type { border-bottom: none; }
 .mo-order-top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 2px; }
 .mo-todo h3 { text-transform: none; letter-spacing: 0; color: var(--text); }
+.panic.held { border-color: var(--border); background: var(--panel-2); }
+.today-panic { margin: 0 0 8px; }
+.own-note { margin: -4px 0 10px; padding: 8px 12px; font-size: 12px; color: var(--text-2); background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }

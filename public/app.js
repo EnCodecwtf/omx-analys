@@ -538,19 +538,29 @@ async function loadProducts(symbol, status) {
 }
 
 // Panikvecka: tre mest fallna OMXS30-aktier när VIX är minst 25, säljs efter 5 handelsdagar.
+const wd = d => new Date(d + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' });
 function renderPanic(p) {
   const el = $('#panic');
-  el.hidden = !p?.active;
+  el.hidden = !p;
   if (!p) { el.innerHTML = ''; return; }
   const list = p.picks.map(x => `<a href="#${encodeURIComponent(x.symbol)}" data-open="${esc(x.symbol)}">${esc(x.name)}</a> <span class="neg">${String(x.ret5).replace('.', ',')} %</span>`).join(', ');
   const v = p.vix == null ? '–' : String(p.vix).replace('.', ',');
-  el.className = 'panic' + (p.active ? ' on' : '');
-  el.innerHTML = p.active
-    ? `<b>Panikvecka: ${p.holding ? 'pågår' : 'köp'}</b> <span class="muted">(VIX ${v}, minst ${p.need})</span>
-      <div>${p.holding ? 'En panikvecka är redan öppen, se signalloggen.' : `Köp på öppningen: ${list}. Sälj efter ${p.days} handelsdagar (cirka ${esc(p.exitDate)}).`}</div>
-      <div class="muted" style="font-size:12px">${Math.round(p.size * 100)} % av kontot per aktie, utan hävstång och utan stopp. Sämsta veckan i testet var −20 %.</div>`
-    : `<b>Panikvecka:</b> inaktiv <span class="muted">(VIX ${v}, krävs ${p.need})</span>
+  const mine = (logData?.entries || []).filter(e => e.kind === 'panic' && isLive(e));
+  if (p.active && !p.holding) {
+    el.className = 'panic on';
+    el.innerHTML = `<b>Panikvecka: KÖPSIGNAL</b> <span class="muted">(VIX ${v}, krävs ${p.need})</span>
+      <div>Köp på öppningen nästa handelsdag: ${list}. Sälj på stängningen ${esc(wd(p.exitDate))}, oavsett kurs.</div>
+      <div class="muted" style="font-size:12px">${Math.round(p.size * 100)} % av kontot per aktie, utan hävstång och utan stopp. Sämsta veckan i testet var −20 %.</div>`;
+  } else if (mine.length || p.holding) {
+    el.className = 'panic held';
+    el.innerHTML = `<b>Panikvecka: köpt – ingen ny signal</b> <span class="muted">(VIX ${v})</span>
+      <div>${mine.length ? `Du äger ${mine.map(e => esc(e.name)).join(', ')} sedan ${esc(mine[0].buyDate || mine[0].date)}. Sälj på stängningen <b>${esc(wd(mine[0].exitDate))}</b>.` : 'En panikvecka är redan köpt.'}</div>
+      <div class="muted" style="font-size:12px">Ingen ny panikvecka förrän den här är såld, även om VIX är över ${p.need}.</div>`;
+  } else {
+    el.className = 'panic';
+    el.innerHTML = `<b>Panikvecka: ingen signal</b> <span class="muted">(VIX ${v}, krävs ${p.need})</span>
       <div class="muted" style="font-size:12px">När VIX är minst ${p.need} köps de tre OMXS30-aktier som fallit mest på 5 dagar, i en vecka. Mest fallna just nu: ${list}.</div>`;
+  }
   for (const a of el.querySelectorAll('[data-open]')) a.addEventListener('click', ev => { ev.preventDefault(); openSymbol(a.dataset.open); });
 }
 
@@ -717,7 +727,7 @@ function tradeBar(e) {
 // Nästa steg i klartext.
 function nextStep(e) {
   const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
-  if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt på öppningen ${esc(e.buyDate)}. ` : ''}Sälj på stängningen ${esc(e.exitDate)}, oavsett kurs.`;
+  if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt ${esc(e.buyDate)}. ` : ''}Inget att göra förrän säljdagen: sälj på stängningen <b>${esc(wd(e.exitDate))}</b>, oavsett kurs.`;
   if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
   if (hit === 0) return `Nästa: ${act} 1/3 vid TP1 <b>${fmt(e.tps[0])}</b>. Stopp ${fmt(e.stop)}.`;
   if (hit === 1) return `TP1 nådd – ${act} 1/3 om du inte gjort det. Nästa: ${act} 1/3 vid TP2 <b>${fmt(e.tps[1])}</b> och flytta stoppet till ${fmt(entry)}.`;
@@ -811,7 +821,10 @@ function renderToday() {
     ? `<div class="status go"><b>${n} ${n === 1 ? 'ny signal' : 'nya signaler'}</b><span>${signals.some(r => r.preliminary) ? 'Preliminärt – bekräftas vid stängningen 17:30, köp på öppningen.' : 'Köp på öppningen. Se planen för stopp och mål.'}</span></div>`
     : `<div class="status"><b>Inget nytt att köpa</b><span>${open.length ? `Du har ${open.length} öppna ${open.length === 1 ? 'affär' : 'affärer'}. ` : ''}${m && m.score < m.need ? `Marknadsläget räcker inte (poäng ${m.score}, kräver ${m.need}). ` : ''}Nästa bedömning vid stängningen 17:30.</span></div>`;
   el.innerHTML = status
-    + (signals.length ? `<h2 class="v-title">Nya signaler</h2>${signals.map(stockRow).join('')}` : '')
+    + (signals.length || panicOn ? `<h2 class="v-title">Nya signaler</h2>${panicOn ? `<div class="panic on today-panic"><b>Panikvecka: KÖPSIGNAL</b><div>Köp på öppningen nästa handelsdag: ${p.picks.map(x => esc(x.name)).join(', ')}. Sälj på stängningen ${esc(wd(p.exitDate))}, oavsett kurs. ${Math.round(p.size * 100)} % av kontot per aktie, utan hävstång.</div></div>` : ''}${signals.map(r => {
+        const other = open.find(e => e.symbol === r.symbol);
+        return stockRow(r) + (other ? `<div class="own-note">Du äger redan ${esc(r.name)} via ${esc(KIND(other))} (säljs ${other.exitDate ? esc(wd(other.exitDate)) : 'enligt planen'}). Det här är en separat ${r.isUS ? 'USA' : 'OMX'}-signal med egen plan – stopp och mål.</div>` : '');
+      }).join('')}` : '')
     + (open.length ? `<h2 class="v-title">Öppna affärer</h2>${open.map(tradeCard).join('')}` : '')
     + (near.length ? `<h2 class="v-title">Nära signal <span class="muted">(1 krav kvar)</span></h2>${near.map(stockRow).join('')}` : '');
   bindRows(el);
@@ -824,6 +837,7 @@ async function loadLog() {
     const open = logData.entries.filter(isLive).length;
     $('#trades-count').hidden = !open; $('#trades-count').textContent = open;
     renderToday();
+    if (scanData) renderPanic(scanData.panic);
     if (view === 'trades') renderTrades();
     if (view === 'ai') loadAi();
   } catch {
