@@ -10,6 +10,7 @@ import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
 import { freeView } from './lib/freeview.js';
+import { igStatus, igEnabled } from './lib/ig.js';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
@@ -259,7 +260,7 @@ async function scan() {
       if (added.length) await ensureAiPicks(added);
     }
     await markInTrade(rows, r => r.isCrypto ? 'crypto' : undefined);
-    return { updated: Date.now(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), panic, rows };
+    return { updated: Date.now(), realtimeIndex: igEnabled(), macro: (await macro())(today()), calendar: upcomingMacro(today()), stress: await stress(), cycle: btcCycle(today()), panic, rows };
   });
 }
 
@@ -1199,6 +1200,8 @@ export default async function handler(req, res) {
       const products = await fetchProducts(meta.avanzaId);
       return send(res, 200, { status: ev.status, stop: ev.plan.stop, size: ev.guards.size, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
     }
+    // Status för IG-kopplingen (realtid). Visar inga hemligheter.
+    if (url.pathname === '/api/ig/status') return send(res, 200, await igStatus());
     if (url.pathname === '/api/search') {
       const q = (url.searchParams.get('q') || '').slice(0, 60);
       return send(res, 200, { results: q.trim().length >= 2 ? await searchAssets(q) : [] });

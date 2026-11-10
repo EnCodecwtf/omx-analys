@@ -204,7 +204,7 @@ async function loadScan(refresh, auto = false) {
   try {
     const res = await fetch('/api/scan' + (refresh ? '?refresh=1' : ''));
     scanData = await res.json();
-    $('#updated').textContent = (marketOpen() ? 'Live · ' : 'Analys ') + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) + (marketOpen() ? ' · kurser cirka 15 min fördröjda' : '');
+    $('#updated').textContent = (marketOpen() ? 'Live · ' : 'Analys ') + new Date(scanData.updated).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) + (marketOpen() ? (scanData.realtimeIndex ? ' · index i realtid (IG), aktier cirka 15 min fördröjda' : ' · kurser cirka 15 min fördröjda') : '');
     renderScan();
     renderMacro(scanData.macro, scanData.stress, scanData.cycle, scanData.calendar);
     renderPanic(scanData.panic);
