@@ -623,3 +623,13 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .panic.held { border-color: var(--border); background: var(--panel-2); }
 .today-panic { margin: 0 0 8px; }
 .own-note { margin: -4px 0 10px; padding: 8px 12px; font-size: 12px; color: var(--text-2); background: var(--panel-2); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }
+
+/* Analysera valfri tillgång */
+.lookup-q { width: 100%; font-size: 16px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }
+.lookup-results { margin-top: 8px; }
+.lookup-hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer; }
+.lookup-hit:hover { border-color: var(--accent); }
+.free-head { margin-bottom: 12px; }
+.verdict.short { border-left-color: var(--red); }
+.free-ma { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
+.free-note { color: #f59e0b; margin: 6px 0 0; }

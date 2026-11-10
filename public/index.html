@@ -67,6 +67,7 @@
         <nav class="menu" aria-label="Verktyg och inställningar">
           <div class="menu-head">Verktyg</div>
           <button class="menu-item" data-tool="morning"><span class="mi-ico">☕</span><span><b>Morgonsoffan med Glen</b><small>Dagens morgonsession, varje vardag kl 07.30</small></span></button>
+          <button class="menu-item" data-tool="lookup"><span class="mi-ico">🔎</span><span><b>Analysera valfri tillgång</b><small>Aktie, råvara, index eller krypto: riktning, stopp och mål</small></span></button>
           <button class="menu-item" data-tool="monthly"><span class="mi-ico">🗓</span><span><b>Månadens aktier</b><small>Två S&amp;P 500-aktier i månaden, ett byte sista handelsdagen</small></span></button>
           <button class="menu-item" data-tool="report"><span class="mi-ico">📊</span><span><b>Månadsrapport</b><small>Alla signaler, ärligt räknat – också förlusterna</small></span></button>
           <button class="menu-item" data-tool="calendar"><span class="mi-ico">📅</span><span><b>Kalender</b><small>Rapporter, makrobesked och senaste utfall</small></span></button>
@@ -144,6 +145,15 @@
 
       <div class="tool" data-tool="morning" data-title="Morgonsoffan med Glen" hidden>
         <article class="card tool-card morning" id="morning"><div class="loading">Glen brygger kaffe…</div></article>
+      </div>
+
+      <div class="tool" data-tool="lookup" data-title="Analysera valfri tillgång" hidden>
+        <article class="card tool-card">
+          <input id="lookup-q" class="lookup-q" type="search" placeholder="Sök: Tesla, Volvo, guld, olja, bitcoin, DAX…" autocomplete="off" enterkeyhint="search">
+          <div id="lookup-results" class="lookup-results"></div>
+          <div id="lookup-recent"></div>
+          <p class="muted small" style="margin-top:12px">Analysen använder samma metod som appens signaler: trend, stöd och motstånd, RSI, MACD och Elliottvågor, plus MA 44/332. I upptrend visas en plan för köp, i nedtrend en plan för blankning. Reglerna är bara testade på OMXS30- och S&amp;P 500-aktier, så för andra tillgångar är analysen ett underlag, inte en signal. Inga signaler loggas härifrån.</p>
+        </article>
       </div>
 
       <div class="tool" data-tool="monthly" data-title="Månadens aktier" hidden>

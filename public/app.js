@@ -110,6 +110,7 @@ function openTool(name) {
   if (name === 'morning') renderMorning();
   if (name === 'report') loadReport();
   if (name === 'monthly') loadMonthly();
+  if (name === 'lookup') { renderLookupRecent(); setTimeout(() => $('#lookup-q').focus(), 50); }
 }
 function closeTool() {
   if (tool === 'morning') stopSpeech();
@@ -290,14 +291,15 @@ function renderScan() {
   bindRows(list);
 }
 
-async function openSymbol(symbol, { keepView, refresh } = {}) {
+async function openSymbol(symbol, { keepView, refresh, name } = {}) {
   current = symbol;
   if (!keepView) closeTool();
   document.querySelectorAll('.row').forEach(r => r.classList.toggle('active', r.dataset.symbol === symbol));
   if (!keepView) { document.body.classList.add('show-detail'); history.replaceState(null, '', '#' + encodeURIComponent(symbol)); }
-  $('#d-name').textContent = scanData?.rows.find(r => r.symbol === symbol)?.name || symbol;
+  $('#d-name').textContent = name || scanData?.rows.find(r => r.symbol === symbol)?.name || symbol;
   $('#d-sub').textContent = 'Laddar analys…';
-  const res = await fetch('/api/analysis?symbol=' + encodeURIComponent(symbol) + (refresh ? '&r=' + Date.now() : ''));
+  const res = await fetch('/api/analysis?symbol=' + encodeURIComponent(symbol) + (name ? '&name=' + encodeURIComponent(name) : '') + (refresh ? '&r=' + Date.now() : ''));
+  if (!res.ok) { $('#d-sub').textContent = 'Kunde inte analysera: det finns ingen kursdata för ' + symbol + '.'; return; }
   const d = await res.json();
   if (current !== symbol) return;
   renderDetail(d);
@@ -377,6 +379,7 @@ function renderDetail(d) {
 
   if (d.isCrypto) renderCryptoCards(d);
   else renderSignalCards(d);
+  if (d.free && !d.inTrade) renderFreeCards(d);
   loadCompanyNews(d.symbol, d.name);
 
   // Elliott
@@ -436,7 +439,8 @@ function renderSignalCards(d) {
     : `<h3>Handelsplan</h3><p class="muted small">Ingen signal, så ingen plan att följa. Planen och linjerna i grafen visas när en signal kommer.</p>
       <details class="fold-in"><summary>Visa möjlig plan om en signal skulle komma idag</summary>${planTable}</details>`;
 
-  loadProducts(d.symbol, d.inTrade ? 'trade' : A.status);
+  if (d.free && !d.free.tested && !d.free.hasProducts) $('#c-products').innerHTML = '<h3>Hävstång på Avanza</h3><p class="muted">Inga minifutures på Avanza hittades för den här tillgången.</p>';
+  else loadProducts(d.symbol, d.inTrade ? 'trade' : d.free?.direction.side === 'short' ? 'strong' : A.status);
 }
 
 function renderElliott(d) {
@@ -528,7 +532,7 @@ async function loadProducts(symbol, status) {
     </div>`;
   const inner = `<p style="font-size:13px">Positionsstorlek: risk ${String(riskPct).replace('.', ',')} % av ${acct.toLocaleString('sv-SE')} kr × makrofaktor ${String(size).replace('.', ',')}
     ${dd < 1 ? ` × nedgångsregeln ${String(dd).replace('.', ',')}` : ''} = <b>${Math.round(riskKr).toLocaleString('sv-SE')} kr</b> i förlust om stoppet nås.${size === 0 ? ' Makroläget är ogynnsamt, så positionsstorleken är 0.' : ''}</p>
-    ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut.</p>
+    ${r.minis.length ? `<p style="font-size:13px">Minifutures och turbos med säker hävstång. ${r.side === "short" ? "Papper för en kort position (minifutures kort). Knock-out ligger långt över stoppet, så stoppet nås långt innan pappret kan slås ut." : "Knock-out ligger långt under signalens stopp, så stoppet nås långt innan pappret kan slås ut."}</p>
     <div class="prod">${r.minis.map((p, k) => item(p, k, true)).join('')}</div>`
     : '<p class="muted">Inget minifuture-papper klarar säkerhetskraven just nu.</p>'}
     ${r.bulls.length ? `<p style="font-size:13px;margin-top:14px">Alternativ: bull-certifikat med daglig hävstång. De har ingen knock-out, men värdet kan minska när kursen svänger mycket under längre innehav.</p>
@@ -1800,3 +1804,68 @@ function renderMonthly() {
 
 if (location.hash === '#manadens-aktier') { setView('more'); openTool('monthly'); }
 loadMonthlyTeaser();
+
+// Fri analys av valfri tillgång: riktning, MA 44/332 och plan för kort position i nedtrend.
+function renderFreeCards(d) {
+  const F = d.free, A = d.analysis, dir = F.direction, ma = F.ma;
+  const cls = dir.side === 'long' ? 'go' : dir.side === 'short' ? 'short' : '';
+  // Aktier i appens testade listor: signalen gäller, riktningen är bara ett komplement.
+  if (F.tested) {
+    $('#c-signal').insertAdjacentHTML('beforeend', `<details class="fold-in"><summary>Riktning och MA 44/332</summary><p class="small"><b>${esc(dir.label)}:</b> ${esc(dir.text)}</p>${ma ? `<p class="small">MA 44 ${ma.above ? 'över' : 'under'} MA 332${ma.cross ? `, senaste korsningen ${esc(ma.cross.date)}` : ''}.</p>` : ''}</details>`);
+    return;
+  }
+  $('#d-badge').innerHTML = `<span class="badge ${dir.side === 'long' ? 'buy' : dir.side === 'short' ? 'avoid' : 'neutral'} big">${esc(dir.label.toUpperCase())}</span>`;
+  const maBox = ma ? `<div class="free-ma"><b>MA 44 / MA 332:</b> ${ma.above ? '<span class="pos">44 över 332 (köpläge)</span>' : '<span class="neg">44 under 332 (säljläge)</span>'}
+      <span class="muted small">· MA 44 ${fmt(ma.maFast)}, MA 332 ${fmt(ma.maSlow)}${ma.cross ? ` · senaste korsningen ${esc(ma.cross.date)} (${ma.cross.up ? 'uppåt' : 'nedåt'}) vid ${fmt(ma.cross.price)}, kursen ${ma.cross.changePct >= 0 ? '+' : ''}${String(ma.cross.changePct).replace('.', ',')} % sedan dess` : ''}</span>
+      <div class="muted small">Testat 1928–2026 på åtta index och OMXS30-aktierna: färre stora ras, men lägre avkastning än att bara äga i nästan alla fall. Paret 44/332 var inte bättre än närliggande värden.</div></div>`
+    : '<div class="free-ma muted small">MA 44 / MA 332: för lite historik (kräver 332 handelsdagar).</div>';
+  // Appens köpkriterier (lång) fälls ihop: för en fri tillgång är riktningen huvudsaken.
+  $('#c-signal').innerHTML = `<details class="fold-in"><summary>Appens köpkriterier för en lång position (signalstyrka ${A.score} av 100)</summary>${$('#c-signal').innerHTML.replace('<h3>Signal</h3>', '')}</details>`;
+  $('#c-signal').insertAdjacentHTML('afterbegin', `<h3>Analys</h3><div class="free-head">
+      <div class="verdict ${cls}"><b>Riktning: ${esc(dir.label)}</b><span>${esc(dir.text)}</span></div>
+      ${maBox}
+      <p class="free-note small">${esc(F.note)}</p></div>`);
+  if (F.shortPlan) {
+    const P = F.shortPlan, dist = p => `${((P.entry / p - 1) * 100).toFixed(1).replace('.', ',')} %`;
+    $('#c-plan').innerHTML = `<h3>Handelsplan – kort position</h3>
+      <table><tr><th></th><th class="r">Nivå</th><th class="r">Avstånd</th><th class="r">R</th></tr>
+        <tr><td>Blanka runt</td><td class="r num">${fmt(P.entry)}</td><td></td><td></td></tr>
+        <tr><td class="neg">Stopp</td><td class="r num">${fmt(P.stop)}</td><td class="r num">${String(P.riskPct).replace('.', ',')} %</td><td class="r num">−1</td></tr>
+        ${P.tps.map((t, k) => `<tr><td class="pos">TP${k + 1} <span class="muted small">(${esc(t.why)})</span></td><td class="r num">${fmt(t.price)}</td><td class="r num">${dist(t.price)}</td><td class="r num">${String(t.r).replace('.', ',')}</td></tr>`).join('')}
+      </table>
+      <p class="muted small">Stoppet ligger ovanför närmaste motstånd (annars 2 ATR över kursen) och målen vid stöden under. Samma upplägg som signalerna: en tredjedel vid varje mål, stoppet till ingången efter TP2. Otestat för den här tillgången.</p>`;
+  }
+}
+
+// Verktyget: sök valfri aktie, råvara, index eller kryptovaluta.
+const recentKey = 'lookupRecent';
+function renderLookupRecent() {
+  let list = [];
+  try { list = JSON.parse(store.get(recentKey, '[]')); } catch { list = []; }
+  $('#lookup-recent').innerHTML = list.length ? `<div class="muted small" style="margin:12px 0 6px">Senast analyserade</div>${list.map(x => `<button class="lookup-hit" data-sym="${esc(x.symbol)}" data-name="${esc(x.name)}"><b>${esc(x.name)}</b><span class="muted small">${esc(x.symbol)}${x.type ? ' · ' + esc(x.type) : ''}</span></button>`).join('')}` : '';
+  bindLookupHits($('#lookup-recent'));
+}
+function bindLookupHits(el) {
+  for (const b of el.querySelectorAll('.lookup-hit')) b.addEventListener('click', () => {
+    let list = [];
+    try { list = JSON.parse(store.get(recentKey, '[]')); } catch { list = []; }
+    const item = { symbol: b.dataset.sym, name: b.dataset.name, type: b.dataset.type || '' };
+    store.set(recentKey, JSON.stringify([item, ...list.filter(x => x.symbol !== item.symbol)].slice(0, 8)));
+    renderLookupRecent();
+    openSymbol(item.symbol, { name: item.name });
+  });
+}
+let lookupTimer = null;
+async function runLookup() {
+  const q = $('#lookup-q').value.trim(), el = $('#lookup-results');
+  if (q.length < 2) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="muted small">Söker…</div>';
+  let r;
+  try { r = await (await fetch('/api/search?q=' + encodeURIComponent(q))).json(); } catch { el.innerHTML = '<div class="muted small">Sökningen misslyckades.</div>'; return; }
+  if ($('#lookup-q').value.trim() !== q) return;
+  el.innerHTML = r.results.length ? r.results.map(x => `<button class="lookup-hit" data-sym="${esc(x.symbol)}" data-name="${esc(x.name)}" data-type="${esc(x.type)}"><b>${esc(x.name)}</b><span class="muted small">${esc(x.symbol)} · ${esc(x.type)}${x.exchange ? ' · ' + esc(x.exchange) : ''}</span></button>`).join('')
+    : '<div class="muted small">Inga träffar. Prova företagsnamnet, en ticker (t.ex. TSLA, VOLV-B.ST) eller guld, silver, olja.</div>';
+  bindLookupHits(el);
+}
+$('#lookup-q').addEventListener('input', () => { clearTimeout(lookupTimer); lookupTimer = setTimeout(runLookup, 350); });
+$('#lookup-q').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(lookupTimer); runLookup(); } });

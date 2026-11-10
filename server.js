@@ -9,6 +9,7 @@ import { buildMacro } from './lib/macro.js';
 import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
+import { freeView } from './lib/freeview.js';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
@@ -107,6 +108,8 @@ async function stress() {
 }
 
 async function guards(s) {
+  // Fri tillgång: ingen rapportspärr; marknadsläget för Stockholm eller USA.
+  if (s.isFree) return { report: null, reportDays: null, macro: (/\.ST$/.test(s.symbol) ? await macro() : await usMacro())(today()), stress: await stress() };
   if (s.isUS) return { report: null, reportDays: null, macro: (await usMacro())(today()), stress: await stress() };
   const macroAt = await macro();
   const st = await stress();
@@ -501,6 +504,49 @@ async function ensureAiPicks(entries) {
   if (changed) { try { await signalLog.kvSet(AI_PICKS_KEY, picks); } catch (err) { console.error('AI-tradern kunde inte spara val:', err.message); } }
   return picks;
 }
+
+// ---------------------------------------------------------------------------
+// Analysera valfri tillgång: sök via Yahoo, analysera med samma metod som signalerna.
+const ALIASES = [
+  [/^(guld|gold)$/i, 'GC=F', 'Guld'], [/^silver$/i, 'SI=F', 'Silver'], [/^(olja|brent|oil)$/i, 'BZ=F', 'Olja (Brent)'], [/^wti$/i, 'CL=F', 'Olja (WTI)'],
+  [/^koppar|copper$/i, 'HG=F', 'Koppar'], [/^(naturgas|gas)$/i, 'NG=F', 'Naturgas'], [/^(bitcoin|btc)$/i, 'BTC-USD', 'Bitcoin'], [/^(ethereum|eth)$/i, 'ETH-USD', 'Ethereum'],
+  [/^(omx|omxs30)$/i, '^OMX', 'OMX Stockholm 30'], [/^dax$/i, '^GDAXI', 'DAX'], [/^(s&p|s&p 500|sp500|spx)$/i, '^GSPC', 'S&P 500'], [/^nasdaq$/i, '^IXIC', 'Nasdaq'],
+  [/^(platina|platinum)$/i, 'PL=F', 'Platina'], [/^vete|wheat$/i, 'ZW=F', 'Vete'], [/^(kronan|usdsek)$/i, 'SEK=X', 'Dollarn mot kronan'],
+];
+// Avanzas id för underliggande råvaror (minifutures finns på dem).
+const AVANZA_COMMODITY = { 'GC=F': '18986', 'SI=F': '18991', 'BZ=F': '155722', 'CL=F': '155497' };
+const freeMeta = new Map();
+async function searchAssets(q) {
+  const out = [];
+  for (const [re, symbol, name] of ALIASES) if (re.test(q.trim())) out.push({ symbol, name, type: 'Råvara/index', exchange: '' });
+  try {
+    const r = await fetch(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=10&newsCount=0`, { headers: { 'User-Agent': 'Mozilla/5.0 (omx-analys)' }, signal: AbortSignal.timeout(10000) });
+    const TYPES = { EQUITY: 'Aktie', ETF: 'Fond (ETF)', FUTURE: 'Råvara (termin)', INDEX: 'Index', CRYPTOCURRENCY: 'Krypto', CURRENCY: 'Valuta' };
+    for (const x of (await r.json()).quotes || []) if (TYPES[x.quoteType] && !out.some(o => o.symbol === x.symbol))
+      out.push({ symbol: x.symbol, name: x.shortname || x.longname || x.symbol, type: TYPES[x.quoteType], exchange: x.exchDisp || x.exchange || '' });
+  } catch { /* bara alias */ }
+  for (const o of out) if (!bySymbol.has(o.symbol)) { const m = freeMeta.get(o.symbol); if (m) { m.name = o.name; m.type = o.type; } else freeMeta.set(o.symbol, { symbol: o.symbol, name: o.name, isFree: true, type: o.type }); }
+  return out.slice(0, 10);
+}
+// Avanzas underliggande (namn → id) för att hitta minifutures på en fri tillgång.
+let avanzaUnderlyings = null;
+async function avanzaIdFor(meta) {
+  if (AVANZA_COMMODITY[meta.symbol]) return AVANZA_COMMODITY[meta.symbol];
+  const known = momBySymbol.get(meta.symbol)?.avanzaId;
+  if (known) return known;
+  try {
+    if (!avanzaUnderlyings || Date.now() - avanzaUnderlyings.at > 864e5) {
+      const r = await fetch('https://www.avanza.se/_api/market-warrant-filter/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (omx-analys)' },
+        body: JSON.stringify({ filter: { directions: [], underlyingInstruments: [], subTypes: ['mini_future'], issuers: [], endDates: [], categories: [], exposures: [] }, offset: 0, limit: 1, sortBy: { field: 'totalValueTraded', order: 'desc' } }), signal: AbortSignal.timeout(10000) });
+      avanzaUnderlyings = { at: Date.now(), list: ((await r.json()).filterOptions?.underlyingInstruments || []).map(u => ({ id: u.value, n: normName(u.displayName) })) };
+    }
+    const n = normName(meta.name);
+    const hit = avanzaUnderlyings.list.filter(u => u.n && n && (u.n === n || n.startsWith(u.n + ' ') || u.n.startsWith(n + ' ')));
+    return hit.length === 1 ? hit[0].id : null;
+  } catch { return null; }
+}
+const normName = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9 ]/g, ' ')
+  .replace(/\b(inc|corp|corporation|co|ltd|plc|the|holdings?|group|ab|ser|publ|sa|nv|ag|se|class|a|b|c)\b/g, ' ').replace(/\s+/g, ' ').trim();
 
 // ---------------------------------------------------------------------------
 // Månadens aktier (se lib/monthly.js för reglerna).
@@ -912,7 +958,7 @@ async function logView() {
 
 async function analysis(symbol) {
   return cached(`a:${symbol}`, async () => {
-    const meta = bySymbol.get(symbol);
+    const meta = bySymbol.get(symbol) || freeMeta.get(symbol);
     if (meta.isCrypto) return cryptoAnalysis(meta);
     const all = await fetchBars(symbol);
     const bars = all.slice(-CHART_BARS);
@@ -930,8 +976,11 @@ async function analysis(symbol) {
       ev.plan = { ...ev.plan, entry, stop: e.hit >= 2 ? entry : e.stop, riskPct: e.hit >= 2 ? 0 : rd((entry - e.stop) / entry * 100), frozen: e.date, hit: e.hit,
         tps: e.tps.map((p, k) => ({ price: p, r: rd((p - entry) / R), why: [k < e.hit ? 'Nådd' : `Fryst från signalen ${e.date}`] })) };
     }
+    if (meta.isFree) meta.avanzaId ??= await avanzaIdFor(meta);
     return {
       inTrade: it.inTrade || null,
+      // Riktning och MA 44/332 visas för alla; tested = aktien ingår i appens testade listor.
+      free: { ...freeView(ev, all), tested: !meta.isFree, type: meta.type || null, hasProducts: !!meta.avanzaId },
       symbol, name: meta.name, isIndex: !!meta.isIndex, isUS: !!meta.isUS, avanzaUrl: avanzaUrl(meta), preliminary: !(meta.isUS ? isFinalUS : isFinal)(bars[bars.length - 1].t),
       bars: bars.map(b => [b.t, r4(b.o), r4(b.h), r4(b.l), r4(b.c), b.v]),
       ema20: pick(ind.ema20), ema50: pick(ind.ema50), ema200: pick(ind.ema200), rsi: pick(ind.rsi),
@@ -1122,7 +1171,7 @@ export default async function handler(req, res) {
     if (url.pathname === '/api/trades10y') return send(res, 200, JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'trades-10y.json'), 'utf8')));
     if (url.pathname === '/api/summary') return send(res, 200, await summary());
     if (url.pathname === '/api/news') {
-      const meta = bySymbol.get(url.searchParams.get('symbol'));
+      const meta = bySymbol.get(url.searchParams.get('symbol')) || freeMeta.get(url.searchParams.get('symbol'));
       if (meta && !meta.isIndex) return send(res, 200, { items: await news(meta.newsQuery || companyQuery(meta.name)) });
       const [market, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }), news(GEO_QUERY, { limit: 30 })]);
       const perSource = {};
@@ -1132,17 +1181,35 @@ export default async function handler(req, res) {
     if (url.pathname === '/api/log') return send(res, 200, await logView());
     if (url.pathname === '/api/macro') return send(res, 200, (await macro())(today()));
     if (url.pathname === '/api/products') {
-      const meta = bySymbol.get(url.searchParams.get('symbol'));
-      if (!meta?.avanzaId) return send(res, 404, { error: 'Okänd symbol' });
+      const meta = bySymbol.get(url.searchParams.get('symbol')) || freeMeta.get(url.searchParams.get('symbol'));
+      if (meta?.isFree) meta.avanzaId ??= await avanzaIdFor(meta);
+      if (!meta?.avanzaId) return send(res, 404, { error: 'Inga hävstångspapper hittades' });
       const bars = await fetchBars(meta.symbol);
       const ev = applyGuards(evaluate(bars.slice(-CHART_BARS)), await guards(meta));
       if (meta.isUS) await usProducts(ev, meta);
+      // Fri tillgång i nedtrend: papper för en kort position (minifutures kort / bear).
+      if (meta.isFree) {
+        const f = freeView(ev, bars);
+        if (f.direction.side === 'short') {
+          const products = await fetchProducts(meta.avanzaId, 'short');
+          return send(res, 200, { status: ev.status, side: 'short', stop: f.shortPlan.stop, size: 1, updated: products.at,
+            ...recommend(products, { plan: f.shortPlan, atr: ev.atr, isIndex: false, side: 'short' }) });
+        }
+      }
       const products = await fetchProducts(meta.avanzaId);
       return send(res, 200, { status: ev.status, stop: ev.plan.stop, size: ev.guards.size, updated: products.at, ...recommend(products, { plan: ev.plan, atr: ev.atr, isIndex: !!meta.isIndex }) });
     }
+    if (url.pathname === '/api/search') {
+      const q = (url.searchParams.get('q') || '').slice(0, 60);
+      return send(res, 200, { results: q.trim().length >= 2 ? await searchAssets(q) : [] });
+    }
     if (url.pathname === '/api/analysis') {
       const symbol = url.searchParams.get('symbol');
-      if (!bySymbol.has(symbol)) return send(res, 404, { error: 'Okänd symbol' });
+      // Fria tillgångar (från sökningen): kontrollera att kursdata finns.
+      if (!bySymbol.has(symbol) && !freeMeta.has(symbol)) {
+        if (!/^[\w.^=-]{1,20}$/.test(symbol || '')) return send(res, 404, { error: 'Okänd symbol' });
+        freeMeta.set(symbol, { symbol, name: url.searchParams.get('name')?.slice(0, 80) || symbol, isFree: true });
+      } else if (freeMeta.has(symbol) && url.searchParams.get('name')) freeMeta.get(symbol).name = url.searchParams.get('name').slice(0, 80);
       return send(res, 200, await analysis(symbol));
     }
     let file = url.pathname === '/' ? '/index.html' : url.pathname;
