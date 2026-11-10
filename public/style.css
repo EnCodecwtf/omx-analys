@@ -633,3 +633,6 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .verdict.short { border-left-color: var(--red); }
 .free-ma { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); font-size: 13px; }
 .free-note { color: #f59e0b; margin: 6px 0 0; }
+.ig-form { display: grid; gap: 10px; margin: 12px 0; }
+.ig-form label { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.ig-form input { font-size: 16px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); }

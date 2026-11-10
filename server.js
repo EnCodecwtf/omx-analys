@@ -10,7 +10,8 @@ import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
 import { freeView } from './lib/freeview.js';
-import { igStatus, igEnabled } from './lib/ig.js';
+import { igStatus, igEnabled, configureIg, igTryLogin } from './lib/ig.js';
+import crypto from 'node:crypto';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
@@ -504,6 +505,19 @@ async function ensureAiPicks(entries) {
   }
   if (changed) { try { await signalLog.kvSet(AI_PICKS_KEY, picks); } catch (err) { console.error('AI-tradern kunde inte spara val:', err.message); } }
   return picks;
+}
+
+// IG-uppgifter som kopplas via appen sparas krypterat (AES-256-GCM) i lagringen.
+// Nyckeln härleds från lagringens egen hemlighet, så de syns inte i klartext där.
+const IG_KEY = 'omx-analys:ig-creds';
+const igCipherKey = () => crypto.createHash('sha256').update('omx-analys-ig:' + (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.VAPID_PRIVATE_KEY || 'lokal')).digest();
+function seal(obj) { const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', igCipherKey(), iv); const data = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]); return { iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), data: data.toString('base64') }; }
+function unseal(b) { const d = crypto.createDecipheriv('aes-256-gcm', igCipherKey(), Buffer.from(b.iv, 'base64')); d.setAuthTag(Buffer.from(b.tag, 'base64')); return JSON.parse(Buffer.concat([d.update(Buffer.from(b.data, 'base64')), d.final()]).toString('utf8')); }
+let igLoadedAt = 0;
+async function loadIgCreds(force = false) {
+  if (!force && Date.now() - igLoadedAt < 5 * 60 * 1000) return;
+  igLoadedAt = Date.now();
+  try { const b = await signalLog.kvGet(IG_KEY, null); configureIg(b?.data ? unseal(b) : null); } catch (err) { console.error('IG-uppgifterna kunde inte läsas:', err.message); }
 }
 
 // ---------------------------------------------------------------------------
@@ -1049,6 +1063,7 @@ export default async function handler(req, res) {
     url.searchParams.delete('__path');
   }
   try {
+    await loadIgCreds();
     // Schemalagda körningar skriver i loggen och skickar notiser. När CRON_SECRET
     // är satt krävs den (Vercel Cron skickar den som Bearer, GitHub som ?key=).
     if (url.pathname.startsWith('/api/cron/')) {
@@ -1202,6 +1217,20 @@ export default async function handler(req, res) {
     }
     // Status för IG-kopplingen (realtid). Visar inga hemligheter.
     if (url.pathname === '/api/ig/status') return send(res, 200, await igStatus());
+    // Koppla IG från appen: uppgifterna provas först, sparas krypterat och visas aldrig igen.
+    // Är IG redan kopplat krävs nuvarande lösenord för att byta eller koppla bort.
+    if ((url.pathname === '/api/ig/connect' || url.pathname === '/api/ig/disconnect') && req.method === 'POST') {
+      const b = await readJson(req);
+      const saved = await signalLog.kvGet(IG_KEY, null);
+      if (saved?.data) { let old; try { old = unseal(saved); } catch { old = null; } if (old && b.currentPassword !== old.password) return send(res, 403, { error: 'Fel nuvarande lösenord för det kopplade IG-kontot.' }); }
+      if (url.pathname === '/api/ig/disconnect') { await signalLog.kvSet(IG_KEY, null); configureIg(null); return send(res, 200, { ok: true }); }
+      const c = { apiKey: String(b.apiKey || '').trim(), identifier: String(b.identifier || '').trim(), password: String(b.password || '') };
+      if (!c.apiKey || !c.identifier || !c.password) return send(res, 400, { error: 'Fyll i API-nyckel, användarnamn och lösenord.' });
+      try { await igTryLogin(c); } catch (err) { return send(res, 400, { error: err.message }); }
+      await signalLog.kvSet(IG_KEY, seal(c));
+      configureIg(c); igLoadedAt = Date.now();
+      return send(res, 200, { ok: true, status: await igStatus() });
+    }
     if (url.pathname === '/api/search') {
       const q = (url.searchParams.get('q') || '').slice(0, 60);
       return send(res, 200, { results: q.trim().length >= 2 ? await searchAssets(q) : [] });

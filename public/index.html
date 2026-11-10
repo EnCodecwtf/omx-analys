@@ -76,6 +76,7 @@
           <button class="menu-item" data-tool="loans"><span class="mi-ico">❄</span><span><b>Betala av lån</b><small>Snöbollsmetoden: minsta lånet först</small></span></button>
           <button class="menu-item" data-tool="strategy"><span class="mi-ico">📈</span><span><b>Ränta på ränta med strategin</b><small>Möjliga utfall med appens riktiga affärer</small></span></button>
           <div class="menu-head">Inställningar och statistik</div>
+          <button class="menu-item" data-tool="ig"><span class="mi-ico">⚡</span><span><b>Realtidskurser (IG)</b><small>Koppla ditt IG-demokonto för index och råvaror i realtid</small></span></button>
           <button class="menu-item" data-tool="account"><span class="mi-ico">👤</span><span><b>Mitt konto</b><small>Kontots värde och risk per affär</small></span></button>
           <button class="menu-item" data-tool="system"><span class="mi-ico">✓</span><span><b>Fungerar systemet?</b><small>Backtest mot verkligt utfall</small></span></button>
           <button class="menu-item" data-tool="shorts"><span class="mi-ico">↘</span><span><b>Blankning (AI)</b><small>Experimentell, mäts framåt</small></span></button>
@@ -153,6 +154,21 @@
           <div id="lookup-results" class="lookup-results"></div>
           <div id="lookup-recent"></div>
           <p class="muted small" style="margin-top:12px">Analysen använder samma metod som appens signaler: trend, stöd och motstånd, RSI, MACD och Elliottvågor, plus MA 44/332. I upptrend visas en plan för köp, i nedtrend en plan för blankning. Reglerna är bara testade på OMXS30- och S&amp;P 500-aktier, så för andra tillgångar är analysen ett underlag, inte en signal. Inga signaler loggas härifrån.</p>
+        </article>
+      </div>
+
+      <div class="tool" data-tool="ig" data-title="Realtidskurser (IG)" hidden>
+        <article class="card tool-card">
+          <div id="ig-status" class="muted small">Kontrollerar…</div>
+          <form id="ig-form" class="ig-form" autocomplete="off">
+            <label>API-nyckel <input id="ig-key" type="text" autocomplete="off" spellcheck="false" required></label>
+            <label>Användarnamn för demokontot <input id="ig-user" type="text" autocomplete="off" spellcheck="false" required></label>
+            <label>Lösenord för demokontot <input id="ig-pass" type="password" autocomplete="new-password" required></label>
+            <label id="ig-cur-wrap" hidden>Nuvarande lösenord (för det kopplade kontot) <input id="ig-cur" type="password" autocomplete="off"></label>
+            <button class="btn" type="submit" id="ig-save">Koppla IG</button>
+            <button class="btn small" type="button" id="ig-off" hidden>Koppla bort</button>
+          </form>
+          <p class="muted small">Uppgifterna provas mot IG först. Fungerar de sparas de krypterat på appens server och visas aldrig igen – inte här, inte i appen och inte för någon annan. Använd bara ditt <b>demokonto</b>. Användarnamnet står i välkomstmejlet från IG (det är inte e-postadressen).</p>
         </article>
       </div>
 

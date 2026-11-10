@@ -110,6 +110,7 @@ function openTool(name) {
   if (name === 'morning') renderMorning();
   if (name === 'report') loadReport();
   if (name === 'monthly') loadMonthly();
+  if (name === 'ig') loadIg();
   if (name === 'lookup') { renderLookupRecent(); setTimeout(() => $('#lookup-q').focus(), 50); }
 }
 function closeTool() {
@@ -1802,6 +1803,41 @@ function renderMonthly() {
   $('#mo-refresh').addEventListener('click', () => loadMonthly(true));
 }
 
+// Koppla IG (realtid). Formuläret skickar direkt till appens server.
+async function loadIg() {
+  const el = $('#ig-status');
+  el.innerHTML = 'Kontrollerar kopplingen…';
+  let s;
+  try { s = await (await fetch('/api/ig/status')).json(); } catch { el.textContent = 'Kunde inte kontrollera.'; return; }
+  $('#ig-cur-wrap').hidden = !s.enabled; $('#ig-off').hidden = !s.enabled;
+  $('#ig-save').textContent = s.enabled ? 'Byt uppgifter' : 'Koppla IG';
+  if (!s.enabled) { el.innerHTML = '<b>Inte kopplat.</b> Kurserna kommer från Yahoo (cirka 15 minuters fördröjning).'; return; }
+  if (s.login !== 'ok') { el.innerHTML = `<b class="neg">Kopplat men inloggningen misslyckas:</b> ${esc(s.login || '')}`; return; }
+  const rows = Object.entries(s.markets).map(([sym, m]) => typeof m === 'string' ? `<tr><td>${esc(sym)}</td><td colspan="3" class="muted">${esc(m)}</td></tr>`
+    : `<tr><td>${esc(sym)}</td><td>${esc(m.name)}</td><td class="r num">${fmt(m.price)}</td><td class="small">${m.delayMin ? `<span class="neg">${m.delayMin} min fördröjd</span>` : '<span class="pos">realtid</span>'} · ${esc(m.status || '')}</td></tr>`).join('');
+  el.innerHTML = `<b class="pos">Kopplat</b> <span class="muted">(${s.demo ? 'demokonto' : 'riktigt konto'}, ${esc(s.user || '')}, sparat via ${esc(s.source)})</span>
+    <table class="rp-table" style="margin-top:8px"><tr><th>Symbol</th><th>Hos IG</th><th class="r">Kurs</th><th>Status</th></tr>${rows}</table>`;
+}
+$('#ig-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('#ig-save'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Provar inloggningen…';
+  try {
+    const r = await fetch('/api/ig/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: $('#ig-key').value, identifier: $('#ig-user').value, password: $('#ig-pass').value, currentPassword: $('#ig-cur').value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Det gick inte');
+    for (const id of ['ig-key', 'ig-user', 'ig-pass', 'ig-cur']) $('#' + id).value = '';
+    await loadIg();
+  } catch (err) { $('#ig-status').innerHTML = `<b class="neg">${esc(err.message)}</b>`; }
+  finally { btn.disabled = false; btn.textContent = old; }
+});
+$('#ig-off').addEventListener('click', async () => {
+  if (!confirm('Koppla bort IG? Kurserna går tillbaka till Yahoo.')) return;
+  const r = await fetch('/api/ig/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: $('#ig-cur').value }) });
+  const j = await r.json(); if (!r.ok) { $('#ig-status').innerHTML = `<b class="neg">${esc(j.error)}</b>`; return; }
+  loadIg();
+});
+
+if (location.hash === '#ig') { setView('more'); openTool('ig'); }
 if (location.hash === '#manadens-aktier') { setView('more'); openTool('monthly'); }
 loadMonthlyTeaser();
 
