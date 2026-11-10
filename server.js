@@ -1224,7 +1224,7 @@ export default async function handler(req, res) {
       const saved = await signalLog.kvGet(IG_KEY, null);
       if (saved?.data) { let old; try { old = unseal(saved); } catch { old = null; } if (old && b.currentPassword !== old.password) return send(res, 403, { error: 'Fel nuvarande lösenord för det kopplade IG-kontot.' }); }
       if (url.pathname === '/api/ig/disconnect') { await signalLog.kvSet(IG_KEY, null); configureIg(null); return send(res, 200, { ok: true }); }
-      const c = { apiKey: String(b.apiKey || '').trim(), identifier: String(b.identifier || '').trim(), password: String(b.password || '') };
+      const c = { apiKey: String(b.apiKey || '').trim(), identifier: String(b.identifier || '').trim(), password: String(b.password || ''), env: b.env === 'live' ? 'live' : 'demo' };
       if (!c.apiKey || !c.identifier || !c.password) return send(res, 400, { error: 'Fyll i API-nyckel, användarnamn och lösenord.' });
       try { await igTryLogin(c); } catch (err) { return send(res, 400, { error: err.message }); }
       await signalLog.kvSet(IG_KEY, seal(c));

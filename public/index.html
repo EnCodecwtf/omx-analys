@@ -161,14 +161,15 @@
         <article class="card tool-card">
           <div id="ig-status" class="muted small">Kontrollerar…</div>
           <form id="ig-form" class="ig-form" autocomplete="off">
+            <label>Kontotyp <select id="ig-env"><option value="demo">Demokonto</option><option value="live">Riktigt konto – bara kurser, appen handlar aldrig på det</option></select></label>
             <label>API-nyckel <input id="ig-key" type="text" autocomplete="off" spellcheck="false" required></label>
-            <label>Användarnamn för demokontot <input id="ig-user" type="text" autocomplete="off" spellcheck="false" required></label>
-            <label>Lösenord för demokontot <input id="ig-pass" type="password" autocomplete="new-password" required></label>
+            <label>Användarnamn hos IG <input id="ig-user" type="text" autocomplete="off" spellcheck="false" required></label>
+            <label>Lösenord hos IG <input id="ig-pass" type="password" autocomplete="new-password" required></label>
             <label id="ig-cur-wrap" hidden>Nuvarande lösenord (för det kopplade kontot) <input id="ig-cur" type="password" autocomplete="off"></label>
             <button class="btn" type="submit" id="ig-save">Koppla IG</button>
             <button class="btn small" type="button" id="ig-off" hidden>Koppla bort</button>
           </form>
-          <p class="muted small">Uppgifterna provas mot IG först. Fungerar de sparas de krypterat på appens server och visas aldrig igen – inte här, inte i appen och inte för någon annan. Använd bara ditt <b>demokonto</b>. Användarnamnet står i välkomstmejlet från IG (det är inte e-postadressen).</p>
+          <p class="muted small">Uppgifterna provas mot IG först. Fungerar de sparas de krypterat på appens server och visas aldrig igen – inte här, inte i appen och inte för någon annan. Med ett <b>riktigt konto</b> hämtar appen bara kurser – den lägger aldrig affärer på det. AI-traderns automatiska affärer körs bara på ett demokonto. API-nyckeln måste vara skapad för samma kontotyp. Användarnamnet står i välkomstmejlet från IG (det är inte e-postadressen).</p>
         </article>
       </div>
 

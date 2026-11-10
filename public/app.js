@@ -1815,14 +1815,14 @@ async function loadIg() {
   if (s.login !== 'ok') { el.innerHTML = `<b class="neg">Kopplat men inloggningen misslyckas:</b> ${esc(s.login || '')}`; return; }
   const rows = Object.entries(s.markets).map(([sym, m]) => typeof m === 'string' ? `<tr><td>${esc(sym)}</td><td colspan="3" class="muted">${esc(m)}</td></tr>`
     : `<tr><td>${esc(sym)}</td><td>${esc(m.name)}</td><td class="r num">${fmt(m.price)}</td><td class="small">${m.delayMin ? `<span class="neg">${m.delayMin} min fördröjd</span>` : '<span class="pos">realtid</span>'} · ${esc(m.status || '')}</td></tr>`).join('');
-  el.innerHTML = `<b class="pos">Kopplat</b> <span class="muted">(${s.demo ? 'demokonto' : 'riktigt konto'}, ${esc(s.user || '')}, sparat via ${esc(s.source)})</span>
+  el.innerHTML = `<b class="pos">Kopplat</b> <span class="muted">(${s.demo ? 'demokonto' : 'riktigt konto – bara kurser'}, ${esc(s.user || '')}, sparat via ${esc(s.source)})</span>
     <table class="rp-table" style="margin-top:8px"><tr><th>Symbol</th><th>Hos IG</th><th class="r">Kurs</th><th>Status</th></tr>${rows}</table>`;
 }
 $('#ig-form').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = $('#ig-save'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Provar inloggningen…';
   try {
-    const r = await fetch('/api/ig/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: $('#ig-key').value, identifier: $('#ig-user').value, password: $('#ig-pass').value, currentPassword: $('#ig-cur').value }) });
+    const r = await fetch('/api/ig/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ env: $('#ig-env').value, apiKey: $('#ig-key').value, identifier: $('#ig-user').value, password: $('#ig-pass').value, currentPassword: $('#ig-cur').value }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'Det gick inte');
     for (const id of ['ig-key', 'ig-user', 'ig-pass', 'ig-cur']) $('#' + id).value = '';
