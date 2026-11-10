@@ -11,9 +11,6 @@ on:
   schedule:
     - cron: '7 7,10,13,16,19 * * 1-5'
   workflow_dispatch:
-concurrency:
-  group: live
-  cancel-in-progress: false
 permissions:
   actions: write
   contents: read
@@ -22,7 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 320
     steps:
+      # Bara en omgång åt gången: kör redan en äldre omgång avslutar den här sig själv.
+      # (GitHubs kö kan avbryta väntande körningar, därför används den inte.)
+      - name: Kontrollera att ingen annan omgång kör
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Omgången som startade den här är på väg att avslutas – vänta upp till 3 minuter på den.
+          for i in $(seq 1 18); do
+            older=$(gh run list --repo "${{ github.repository }}" --workflow live.yml --status in_progress --json databaseId --jq "[.[] | select(.databaseId < ${{ github.run_id }})] | length" || echo 0)
+            [ "${older:-0}" -eq 0 ] && exit 0
+            sleep 10
+          done
+          echo "En äldre omgång kör redan – avslutar."; echo "skip=1" >> "$GITHUB_OUTPUT"
       - name: Anropa live-kontrollen var 10:e minut
+        if: steps.guard.outputs.skip != '1'
         env:
           KEY: ${{ secrets.CRON_SECRET }}
         run: |
@@ -36,7 +48,7 @@ jobs:
             sleep 600
           done
       - name: Starta nästa omgång
-        if: always()
+        if: always() && steps.guard.outputs.skip != '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

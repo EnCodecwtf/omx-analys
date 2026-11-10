@@ -231,7 +231,9 @@ async function scan() {
     let panic = null;
     try {
       const date = dayOf(rows.find(r => r.isIndex)?.t ?? Date.now() / 1000);
-      panic = panicPicks({ stocks: await mapLimit(symbols.stocks, 6, async s => ({ ...s, bars: await fetchBars(s.symbol) })), vixBars: await fetchBars('^VIX'), date });
+      // Aktier som redan ägs i en annan affär hoppas över (en affär per aktie).
+      const held = new Set([...(await openSlots()).values()].filter(e => e.kind !== 'panic').map(e => e.symbol));
+      panic = panicPicks({ stocks: await mapLimit(symbols.stocks, 6, async s => ({ ...s, bars: await fetchBars(s.symbol) })), vixBars: await fetchBars('^VIX'), date, exclude: held });
       const open = (await signalLog.entries()).some(e => e.kind === 'panic' && e.exitDate >= today());
       panic.holding = open;
       if (panic.active && !open && isFinal(rows.find(r => r.isIndex).t)) {

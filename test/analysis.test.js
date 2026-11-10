@@ -470,7 +470,7 @@ test('Avanza: korta papper räknas spegelvänt', async () => {
   assert.equal(r.bulls[0].kind, 'Bear (daglig hävstång)');
 });
 
-test('en affär i taget per aktie och strategi', async () => {
+test('en affär i taget per aktie, oavsett strategi', async () => {
   const { busy, idOf } = await import('../lib/log.js');
   const list = [
     { date: '2026-11-02', symbol: 'ATCO-A.ST', state: 'öppen' },
@@ -479,11 +479,14 @@ test('en affär i taget per aktie och strategi', async () => {
     { date: '2026-10-01', symbol: 'LIFCO-B.ST', state: 'stängd', exitDate: '2026-10-10' },
     { date: '2026-10-10', symbol: 'LIFCO-B.ST', state: 'stängd', exitDate: '2026-10-20' },
     { date: '2026-10-11', symbol: 'LIFCO-B.ST', state: 'öppen' },
+    // Panikveckan spärrar också: en OMX-signal medan aktien ägs via panikveckan tas bort.
+    { date: '2026-11-06', symbol: 'ABB.ST', kind: 'panic', state: 'öppen', exitDate: '2026-11-13' },
+    { date: '2026-11-09', symbol: 'ABB.ST', state: 'öppen' },
   ];
   const { until, dupes } = busy(list);
-  assert.deepEqual(dupes, [idOf(list[4]), idOf(list[1])]);
-  assert.equal(until.get('ATCO-A.ST|'), '9999-12-31');
-  assert.equal(until.get('LIFCO-B.ST|'), '9999-12-31');
+  assert.deepEqual(dupes.sort(), [idOf(list[4]), idOf(list[1]), idOf(list[2]), idOf(list[7])].sort());
+  assert.equal(until.get('ATCO-A.ST'), '9999-12-31');
+  assert.equal(until.get('LIFCO-B.ST'), '9999-12-31');
 });
 
 test('coachen bygger på verkliga nivåer', async () => {

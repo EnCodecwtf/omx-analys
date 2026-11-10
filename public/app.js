@@ -21,7 +21,9 @@ const store = { get: (k, d) => { try { return localStorage.getItem(k) ?? d; } ca
 $('#acct').value = store.get('acct', '10000');
 // Standardrisk 2,5 % per affär: affärerna kommer ofta samma dag i samma sektor,
 // och fördelen framåt är troligen mindre än i backtestet (se README).
-$('#risk').value = store.get('risk', '2.5');
+// Risken per affär måste vara rimlig (0,1–10 %). Ett kontobelopp i fel fält gav annars miljonbelopp.
+const okRisk = v => { const x = +String(v).replace(',', '.'); return x > 0 && x <= 10 ? x : null; };
+$('#risk').value = okRisk(store.get('risk', '2.5')) ?? '2.5';
 $('#peak').value = store.get('peak', $('#acct').value);
 
 // Nedgångsregel: bestämd i förväg så att beslutet inte fattas när det känns
@@ -40,6 +42,8 @@ function ddFactor() {
 }
 ddFactor();
 for (const id of ['acct', 'risk', 'peak']) $('#' + id).addEventListener('input', () => {
+  if (id === 'risk' && okRisk($('#risk').value) == null) { $('#risk').setCustomValidity('Ange 0,1–10 %'); $('#risk').reportValidity(); return; }
+  if (id === 'risk') $('#risk').setCustomValidity('');
   store.set(id, $('#' + id).value);
   ddFactor();
   if (lastDetail?.isCrypto) renderCryptoCards(lastDetail);
@@ -504,7 +508,7 @@ async function loadProducts(symbol, status) {
   }
   if (current !== symbol) return;
   const active = status === 'strong' || status === 'buy';
-  const acct = Math.max(0, +$('#acct').value || 0), riskPct = Math.max(0, +$('#risk').value || 0);
+  const acct = Math.max(0, +$('#acct').value || 0), riskPct = okRisk($('#risk').value) ?? 2.5;
   const size = r.size ?? 1;
   const dd = ddFactor();
   const riskKr = acct * riskPct / 100 * size * dd;
@@ -769,7 +773,7 @@ const SECTOR = {
 // inget efter TP2 när stoppet ligger på köpkursen).
 function riskPanel(open) {
   if (!open.length) return '';
-  const acct = Math.max(0, +$('#acct').value || 0), risk = Math.max(0, +$('#risk').value || 0) / 100, dd = ddFactor();
+  const acct = Math.max(0, +$('#acct').value || 0), risk = (okRisk($('#risk').value) ?? 2.5) / 100, dd = ddFactor();
   const left = e => (e.hit || 0) >= 2 ? 0 : (e.hit || 0) === 1 ? 2 / 3 : 1;
   const stopped = open.filter(e => e.stop != null && e.kind !== 'panic' && e.kind !== 'crypto');
   const noStop = open.filter(e => e.kind === 'panic' || e.kind === 'crypto');
