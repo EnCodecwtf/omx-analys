@@ -995,8 +995,10 @@ async function coachRound(entries) {
   for (const e of entries) {
     if (!e.coach?.lines?.length || (e.state !== 'öppen' && e.state !== 'väntar på köp')) continue;
     const trade = signalLog.idOf(e);
-    const prev = saved.messages.find(m => m.trade === trade);
-    if (prev && prev.lines.join('|') === e.coach.lines.join('|')) continue;
+    // Nytt meddelande bara när läget ändrats på riktigt (inte bara kurser och procent).
+    const gist = l => l.join('|').replace(/[−+-]?\d[\d\s.,]*/g, '#');
+    const prev = saved.messages.find(m => m.trade === trade && !m.tp);
+    if (prev && gist(prev.lines) === gist(e.coach.lines)) continue;
     added.push({ id: `${slotId}|${trade}`, at, slot: slotLabel(slot), date: s.date, trade, symbol: e.symbol, name: e.name, tone: e.coach.tone, lines: e.coach.lines });
   }
   saved = { lastSlot: slotId, messages: [...added, ...saved.messages].slice(0, 300) };

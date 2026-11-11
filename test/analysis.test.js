@@ -497,7 +497,7 @@ test('coachen bygger på verkliga nivåer', async () => {
   const e = { name: 'Test', date: day(0), entry: 100, stop: 95, tps: [106, 114, 120], hit: 1, last: 107, state: 'öppen' };
   const c = coachTrade(e, bars, ev, { date: '2099-01-01', days: 30 });
   assert.equal(c.tone, 'good');
-  assert.match(c.lines[0], /TP1 är taget/);
+  assert.match(c.lines[0], /kvar till TP2/); assert.doesNotMatch(c.lines[0], /taget/);
   assert.ok(c.lines.some(l => /stödet 96,00–99,00 håller/.test(l)));
   assert.ok(c.lines.some(l => /Inga nya bottnar/.test(l)));
   assert.ok(c.lines.some(l => /Motståndet 110,00–112,00 ligger före TP2/.test(l)));
