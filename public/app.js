@@ -687,17 +687,17 @@ function renderAi() {
   const pct = v => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
   const pos = p => `<div class="trade-card" data-symbol="${esc(p.symbol)}">
       <div class="tc-head"><div><b>${esc(p.name)}</b> <span class="tag">${esc(p.market)}</span></div><div class="tc-res ${p.pnl > 0 ? 'pos' : p.pnl < 0 ? 'neg' : ''}">${sign(p.pnl)}</div></div>
-      ${p.product ? `<div class="ai-product"><a href="${esc(p.product.url)}" target="_blank" rel="noopener">${esc(p.product.name)}</a> <span class="muted small">${p.product.type === 'mini' ? 'minifuture' : 'bull-certifikat'} · ${String(p.product.leverage).replace('.', ',')}x${p.product.knockout ? ` · knock-out ${fmt(p.product.knockout)}` : ''}${p.product.late ? ' · valt i efterhand' : ''}</span></div>` : '<div class="muted small">Simulerad minifuture 5x (inget papper hittades)</div>'}
+      ${p.panic ? '<div class="muted small">Aktien direkt, utan hävstång</div>' : p.product ? `<div class="ai-product"><a href="${esc(p.product.url)}" target="_blank" rel="noopener">${esc(p.product.name)}</a> <span class="muted small">${p.product.type === 'mini' ? 'minifuture' : 'bull-certifikat'} · ${String(p.product.leverage).replace('.', ',')}x${p.product.knockout ? ` · knock-out ${fmt(p.product.knockout)}` : ''}${p.product.late ? ' · valt i efterhand' : ''}</span></div>` : '<div class="muted small">Simulerad minifuture 5x (inget papper hittades)</div>'}
       <div class="muted small">Köpt ${esc(p.opened)} för ${kr(p.amount)} · ${Math.round(p.left * 100)} % kvar · värde nu ${kr(p.value)} · ${pct(p.pnlPct)}</div>
-      ${tradeBar({ ...p, stop: p.stop < p.entry ? p.stop : p.entry - (p.tps[0] - p.entry) * 0.6 })}
-      <div class="tc-next">Stopp ${p.stop >= p.entry ? `flyttat till ${fmt(p.stop)}` : fmt(p.stop)}${p.trailing ? ' (glidande)' : ''}.</div>
+      ${p.panic ? `<div class="tc-next">Panikvecka: ingen hävstång, inget stopp. Säljs på stängningen ${esc(p.exitDate)}, oavsett kurs.</div>` : `${tradeBar({ ...p, stop: p.stop < p.entry ? p.stop : p.entry - (p.tps[0] - p.entry) * 0.6 })}
+      <div class="tc-next">Stopp ${p.stop >= p.entry ? `flyttat till ${fmt(p.stop)}` : fmt(p.stop)}${p.trailing ? ' (glidande)' : ''}.</div>`}
     </div>`;
   el.innerHTML = `<div class="ai-head">
       <div class="ai-top"><span class="ai-bot">🤖</span><div><b>AI-tradern</b><div class="muted small">Fiktivt konto · tar alla signaler · fattar egna beslut</div></div></div>
       <div class="calc-tiles">
         <div class="stat"><b class="num">${kr(a.equity)}</b><span>kontots värde</span></div>
         <div class="stat"><b class="num ${cls}">${sign(pnl)}</b><span>${pct(a.returnPct)} sedan start (${kr(a.start)})</span></div>
-        <div class="stat"><b class="num">${a.open.length} av ${a.maxOpen}</b><span>affärer igång</span></div>
+        <div class="stat"><b class="num">${a.open.filter(p => !p.panic).length} av ${a.maxOpen}</b><span>affärer igång${a.open.some(p => p.panic) ? ` + ${a.open.filter(p => p.panic).length} panikvecka` : ''}</span></div>
         <div class="stat"><b class="num">${kr(a.cash)}</b><span>kontanter</span></div>
       </div>
       ${aiCurve(a.curve)}
@@ -708,7 +708,7 @@ function renderAi() {
     <h2 class="v-title">Beslut</h2>
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
     ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
-    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
+    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). Panikveckan tas också, vid sidan av de tre: 10 % per aktie, utan hävstång, säljs på säljdagen. AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
       Vid TP1 avgör en maskininlärningsmodell (tränad på 2017–2021, testad på 2022–2026) om resten ska få löpa eller säljas. Övriga beslut följer regler som väger trend (EMA 20), mål, stopp, rapporter och tid i affären. Inte investeringsrådgivning.</p>`;
   bindRows(el);
 }
@@ -1023,6 +1023,15 @@ async function loadReport(month) {
       <div class="rp-box"><b>Jämförelse</b>
         <p>OMXS30 under månaden: <b>${sgn(r.benchmark.changePct, '%')}</b>.</p>
         <p>Förväntan från tioårstestet: cirka <b>+${sv(r.expected.avgR)} R</b> per affär och TP1 i ${r.expected.tp1Rate} % av affärerna. En enskild månad kan avvika mycket åt båda hållen.</p></div>
+      ${r.panic ? `<div class="rp-box"><b>Panikveckan</b>
+        <p>${r.panic.trades} affärer${r.panic.open ? `, varav ${r.panic.open} öppna (just nu ${sgn(r.panic.nowPct, '%')} i snitt)` : ''}.</p>
+        ${r.panic.closed ? `<p>Avslutade: summa <b class="${r.panic.sumPct >= 0 ? 'pos' : 'neg'}">${sgn(r.panic.sumPct, '%')}</b>, snitt ${sgn(r.panic.avgPct, '%')} per affär. Bästa ${sgn(r.panic.bestPct, '%')}, sämsta ${sgn(r.panic.worstPct, '%')}.</p>` : ''}
+        <p class="muted small">Räknas i procent (inget stopp, inget R), från köpet på öppningen till stängningen på säljdagen, med 0,2 % i avgift. Ingår i vinstandelen men inte i summa R.</p></div>` : ''}
+      ${r.monthly ? `<div class="rp-box"><b>Månadens aktier</b>
+        <p>${esc([...r.monthly.names, ...(r.monthly.mode !== 'aktier' ? ['kassaläge (guld och olja kort)'] : [])].join(', '))} – beslutat ${esc(r.monthly.decided)}${r.monthly.backfilled ? ' <span class="muted">(räknat i efterhand)</span>' : ''}.</p>
+        <p>${r.monthly.open ? 'Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.rules.stockLev).replace('.', ',')}x aktier, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>
+        ${r.monthly.aiPart ? `<p>AI-traderns del: ${kr(r.monthly.aiPart.amount)} → <b>${kr(r.monthly.aiPart.value)}</b> (${sgn(r.monthly.aiPart.pnlPct, '%')}). Egna beslut: ${sgn(r.monthly.aiPart.edge, 'kr')} mot att bara följa reglerna.</p>` : ''}
+        <p class="muted small">Beräknat från kurserna utan ränta och spread. Hela historiken finns under Mer → Månadens aktier.</p></div>` : ''}
       ${r.account ? `<div class="rp-box"><b>AI-traderns fiktiva konto</b>
         <p>${kr(r.account.start)} → <b>${kr(r.account.end)}</b> (<span class="${r.account.changeKr >= 0 ? 'pos' : 'neg'}">${sgn(r.account.changePct, '%')}</span>, ${sgn(Math.round(r.account.changeKr))} kr).</p>
         <p class="muted small">${r.account.decisions} beslut under månaden, varav ${r.account.skipped} gånger avstod den en signal.</p></div>` : ''}

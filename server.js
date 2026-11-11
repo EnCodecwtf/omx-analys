@@ -1124,8 +1124,11 @@ export default async function handler(req, res) {
       const out = await withOutcomes();
       const months = [...new Set(out.map(e => e.date.slice(0, 7)))].sort().reverse();
       const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : today().slice(0, 7);
-      const [ai, omx] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => [])]);
-      return send(res, 200, { months: months.includes(today().slice(0, 7)) ? months : [today().slice(0, 7), ...months], ...buildReport({ month, entries: out, ai, omx }) });
+      const [ai, omx, mv] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => []), monthlyView().catch(() => null)]);
+      // Månadens aktier: perioden för rapportens månad (beslutad vid förra månadsskiftet) och AI-traderns del.
+      const per = mv?.periods.find(p => p.month === month) || null;
+      const monthlyPart = per ? { ...per, rules: mv.rules, aiPart: ai?.monthly && ai.monthly.month === month ? { value: ai.monthly.value, amount: ai.monthly.amount, pnlPct: ai.monthly.pnlPct, edge: ai.monthly.edge } : null } : null;
+      return send(res, 200, { months: months.includes(today().slice(0, 7)) ? months : [today().slice(0, 7), ...months], ...buildReport({ month, entries: out, ai, omx }), monthly: monthlyPart });
     }
     // Det som publicerades (frysta nivåer och tid), för ögonblicksbilderna på GitHub.
     if (url.pathname === '/api/log-frozen') {

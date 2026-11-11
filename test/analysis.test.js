@@ -514,3 +514,18 @@ test('AI-traderns modell vid TP1 ger rimliga sannolikheter', async () => {
   const strong = TP1_MODEL.mu.slice(); strong[0] += 0.15; strong[9] += 0.8;
   assert.ok(tp1Hold(strong) > mid);
 });
+
+test('AI-tradern tar panikveckan: köp på öppningen, sälj på säljdagen, utan hävstång', async () => {
+  const { runAiTrader } = await import('../lib/aitrader.js');
+  const t0 = Date.parse('2026-11-02T15:30:00Z') / 1000, D = 86400;
+  const days = [0, 1, 2, 3, 4, 7, 8, 9, 10, 11];
+  const bars = days.map((k, i) => ({ t: t0 + k * D, o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i }));
+  const e = { kind: 'panic', date: '2026-11-06', symbol: 'ABB.ST', name: 'ABB', exitDate: '2026-11-13', size: 0.1, vix: 26 };
+  const r = runAiTrader([e], () => bars);
+  const buy = r.log.find(l => l.action === 'köper'), sale = r.log.find(l => l.action === 'säljer');
+  assert.equal(buy.date, '2026-11-09');
+  assert.equal(sale.date, '2026-11-13');
+  assert.equal(r.closed.length, 1);
+  // Utan hävstång: köp 105 (öppning 9/11), sälj 109 → cirka +3,6 % minus 0,2 % avgift.
+  assert.ok(Math.abs(r.closed[0].pnlPct - 3.6) < 0.4, r.closed[0].pnlPct);
+});
