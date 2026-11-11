@@ -110,6 +110,7 @@ function openTool(name) {
   if (name === 'morning') renderMorning();
   if (name === 'report') loadReport();
   if (name === 'monthly') loadMonthly();
+  if (name === 'risk') loadRisk();
   if (name === 'ig') loadIg();
   if (name === 'lookup') { renderLookupRecent(); setTimeout(() => $('#lookup-q').focus(), 50); }
 }
@@ -1857,6 +1858,61 @@ function renderMonthly() {
   $('#alloc-use')?.addEventListener('click', () => { store.set('momStart', String(Math.round((+store.get('allocTotal', '') || 0) * 0.4 / 100) * 100 || 3000)); renderMonthly(); });
   $('.alloc-card')?.addEventListener('toggle', e => store.set('allocOpen', e.target.open ? '1' : '0'));
   $('#mo-refresh').addEventListener('click', () => loadMonthly(true));
+}
+
+// Riskpanel: AI-traderns konto (som följer fördelningen 40/20/20/20), omräknat till ditt kapital.
+let riskData = null;
+async function loadRisk() {
+  try { riskData = await (await fetch('/api/risk')).json(); } catch { $('#risk').innerHTML = '<div class="loading">Kunde inte räkna på risken.</div>'; return; }
+  renderRisk();
+}
+function renderRisk() {
+  const r = riskData, el = $('#risk');
+  if (!r || r.error) { el.innerHTML = `<div class="loading">${esc(r?.error || 'Ingen data.')}</div>`; return; }
+  const mine = Math.max(0, +store.get('allocTotal', '') || 0);
+  const useMine = store.get('riskMine', '1') === '1' && mine > 0;
+  const k = useMine ? mine / r.total : 1, total = r.total * k;
+  const K = v => kr(v * k);
+  const neg = v => `<span class="${v < -0.5 ? 'neg' : v > 0.5 ? 'pos' : ''}">${v > 0.5 ? '+' : v < -0.5 ? '−' : ''}${kr(Math.abs(v * k))}</span>`;
+  const pctOf = v => `${String(Math.round(v / r.total * 1000) / 10).replace('.', ',').replace('-', '−')} %`;
+  const ko = h => h.koDistPct == null ? '–' : `<b class="${h.koDistPct < 15 ? 'neg' : h.koDistPct < 30 ? 'warn-txt' : ''}">${String(h.koDistPct).replace('.', ',')} %</b>`;
+  const levTxt = r.leverage < 1 ? 'under 1x: en del ligger i kontanter' : r.leverage < 1.3 ? 'låg' : r.leverage < 1.8 ? 'måttlig' : 'hög';
+  el.innerHTML = `<article class="card tool-card">
+    <div class="pf-head">
+      <div><div class="muted small">${useMine ? 'Ditt kapital, fördelat som AI-tradern' : 'AI-traderns konto'}</div><div class="pf-value num">${kr(total)}</div></div>
+      <label class="pf-start small">Mitt kapital <input id="risk-total" type="number" min="0" step="1000" value="${mine || ''}" placeholder="t.ex. 30000"> kr</label>
+    </div>
+    <div class="calc-tiles">
+      <div class="stat"><b class="num">${K(r.exposure)}</b><span>exponering (värde × hävstång)</span></div>
+      <div class="stat"><b class="num">${String(r.leverage).replace('.', ',')}x</b><span>hävstång på hela kapitalet – ${levTxt}</span></div>
+      ${r.worst ? `<div class="stat"><b class="num neg">${pctOf(r.worst.loss50)}</b><span>om ${esc(r.worst.name)} halveras (största enskilda risken)</span></div>` : ''}
+    </div>
+
+    <h2 class="v-title">Om marknaden rör sig</h2>
+    <table class="pf-table"><tr><th>Scenario</th><th class="r">Hela kapitalet</th></tr>
+      ${r.scenarios.map(x => `<tr><td><b>${esc(x.title)}</b><div class="small muted">${esc(x.note)}</div></td><td class="r num"><b>${neg(x.change)}</b><div class="small">${pctOf(x.change)}</div></td></tr>`).join('')}
+    </table>
+
+    <h2 class="v-title">Varje innehav</h2>
+    <p class="small muted">Förlust i kronor om tillgången rör sig 10, 30 eller 50 % åt fel håll (för olja kort: om oljan stiger). Under knock-out räknas pappret som värdelöst.</p>
+    <div class="risk-list">${r.holdings.map(h => `<div class="trade-card">
+      <div class="tc-head"><div><b>${esc(h.name)}</b> <span class="muted small">${esc(h.part)}${h.side === 'short' ? ' · kort' : ''}</span></div><div class="num"><b>${K(h.value)}</b></div></div>
+      <div class="small muted">${esc(h.paper)} · ${String(h.lev).replace('.', ',')}x · exponering ${K(h.exposure)}${h.koDistPct != null ? ` · knock-out om ${ko(h)}` : ''}</div>
+      <div class="risk-row small"><span>−10 %: ${neg(h.loss10)}</span><span>−30 %: ${neg(h.loss30)}</span><span>−50 %: ${neg(h.loss50)}</span>${h.stopLoss != null ? `<span>vid stoppet: ${neg(h.stopLoss)}</span>` : ''}</div>
+    </div>`).join('')}</div>
+
+    <details class="mo-more"><summary>Så ska du läsa det här</summary><div class="rp-box rp-honest small">
+      <ul><li><b>Hävstång på hela kapitalet</b> är exponeringen delad med kapitalet. 1x betyder att en börs som faller 10 % ger ungefär −10 %.</li>
+        <li><b>Knock-out</b>: når kursen pappers knock-out-nivå slås det ut och nästan hela beloppet försvinner. Under 15 % kvar får du en notis. AI-tradern säljer under 10 %.</li>
+        <li><b>Den lånade delen</b>: en minifuture med 1,8x betyder att du betalar cirka 56 % av aktiens pris och emittenten lånar ut resten. Räntan (cirka 4 % per år av ditt belopp vid 1,8x) läggs dagligen på finansieringsnivån, så pappret tappar lite värde även när kursen står still.</li>
+        <li><b>Tänk efter före</b>: bestäm hur stor nedgång du tål innan den kommer. Fördelningen har historiskt fallit runt 20–30 % som mest – mer i ett ras där allt faller samtidigt. Nedgångsregeln under Mitt konto halverar risken vid 20 % under toppen.</li></ul>
+      <p class="muted">Räknat på AI-traderns innehav just nu, omräknat till ditt kapital. Dina egna papper och belopp kan skilja sig. Inte investeringsrådgivning.</p></div></details>
+    <label class="small" style="display:block;margin-top:10px"><input type="checkbox" id="risk-mine" ${useMine ? 'checked' : ''} ${mine ? '' : 'disabled'}> Räkna om till mitt kapital</label>
+    <button class="btn small" id="risk-refresh">Uppdatera</button>
+  </article>`;
+  $('#risk-total').addEventListener('change', e => { store.set('allocTotal', e.target.value); renderRisk(); });
+  $('#risk-mine').addEventListener('change', e => { store.set('riskMine', e.target.checked ? '1' : '0'); renderRisk(); });
+  $('#risk-refresh').addEventListener('click', loadRisk);
 }
 
 // Koppla IG (realtid). Formuläret skickar direkt till appens server.

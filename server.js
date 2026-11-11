@@ -963,6 +963,78 @@ async function aiTrader() {
   });
 }
 
+// Riskpanel: AI-traderns konto (som följer fördelningen) – exponering, avstånd till knock-out och
+// vad olika kursfall skulle betyda för hela kapitalet. Gränssnittet kan skala om till ditt eget kapital.
+// Minifutures räknas med finansieringsnivån F: värdet följer (kurs − F) för lång och (F − kurs) för kort,
+// och vid knock-out räknas värdet som noll (lite brukar betalas tillbaka, men det är osäkert).
+function scenarioValue(h, move) {
+  const S1 = h.last * (1 + move);
+  if (h.type === 'mini') {
+    if (h.side === 'short' ? S1 >= h.ko : S1 <= h.ko) return 0;
+    return Math.max(0, h.value * (h.side === 'short' ? (h.F - S1) / (h.F - h.last) : (S1 - h.F) / (h.last - h.F)));
+  }
+  return Math.max(0, h.value * (1 + (h.side === 'short' ? -1 : 1) * h.lev * move));
+}
+async function riskView() {
+  return cached('risk', async () => {
+    const a = await aiTrader();
+    const r2 = x => Math.round(x * 100) / 100;
+    const H = [];
+    const mini = (base, entry, lev, side, ko) => {
+      const F = side === 'short' ? entry * (1 + 1 / lev) : entry * (1 - 1 / lev);
+      return { ...base, type: 'mini', side, F, ko: ko ?? F, levNow: r2(base.last / Math.abs(base.last - F)) };
+    };
+    for (const p of a.monthly?.positions || []) {
+      if (p.sold || !p.last) continue;
+      const cls = p.kind === 'stock' ? 'aktie' : p.kind === 'gold' ? 'guld' : 'olja';
+      H.push(mini({ part: 'Månadens aktier', name: p.name, paper: p.paper, cls, value: p.value, last: p.last, usd: true }, p.entry, p.lev, p.side, p.stopLoss));
+    }
+    for (const p of a.open || []) {
+      const base = { part: 'OMX-signaler', name: p.name, paper: p.product?.name || (p.panic ? 'aktien' : 'simulerad mini 5x'), cls: 'aktie', value: p.value, last: p.last, stop: p.panic ? null : p.stop, usd: p.market === 'USA' };
+      if (p.panic) H.push({ ...base, type: 'direkt', side: 'long', lev: 1, levNow: 1 });
+      else if (p.product?.type === 'mini') H.push(mini(base, p.entry, p.product.leverage, 'long', p.product.knockout));
+      else { const lev = p.product?.leverage ?? 5; H.push({ ...base, type: 'cert', side: 'long', lev, levNow: lev }); }
+    }
+    for (const x of a.allocation?.sleeves || []) H.push({ part: x.title, name: x.asset, paper: 'utan hävstång', cls: x.symbol === 'BTC-USD' ? 'bitcoin' : 'guld', type: 'direkt', side: 'long', lev: 1, levNow: 1, value: x.value, last: 1, usd: true });
+    const total = a.equity;
+    const cash = Math.max(0, total - H.reduce((t, h) => t + h.value, 0));
+    const one = H.map(h => {
+      const ko = h.type === 'mini' ? r2((h.side === 'short' ? h.ko / h.last - 1 : 1 - h.ko / h.last) * 100) : null;
+      const loss = m => r2(scenarioValue(h, h.side === 'short' ? -m : m) - h.value);
+      const stopLoss = h.stop != null && h.stop < h.last ? r2(scenarioValue(h, h.stop / h.last - 1) - h.value) : null;
+      return { part: h.part, name: h.name, paper: h.paper, cls: h.cls, side: h.side, value: r2(h.value), lev: h.levNow, exposure: r2(h.value * h.levNow), koDistPct: ko,
+        loss10: loss(-0.1), loss30: loss(-0.3), loss50: loss(-0.5), stopLoss };
+    });
+    // Samma papper i samma del (t.ex. ett tillskott) visas som ett innehav.
+    const holdings = [];
+    for (const h of one) {
+      const g = holdings.find(x => x.part === h.part && x.paper === h.paper && x.name === h.name && h.paper !== 'utan hävstång');
+      if (!g) { holdings.push({ ...h }); continue; }
+      for (const f of ['value', 'exposure', 'loss10', 'loss30', 'loss50']) g[f] = r2(g[f] + h[f]);
+      if (h.stopLoss != null) g.stopLoss = r2((g.stopLoss || 0) + h.stopLoss);
+      g.lev = r2(g.exposure / g.value);
+    }
+    // Scenarier för hela kontot: rörelse per tillgångsslag (olja kort tjänar på fallande olja).
+    const scen = (moves, title, note) => {
+      let d = 0;
+      for (const h of H) { const m = moves[h.cls] ?? 0; d += scenarioValue(h, m) - h.value; }
+      if (moves.sek) d += H.filter(h => h.usd).reduce((t, h) => t + (scenarioValue(h, 0)) * moves.sek, 0);
+      return { title, note, change: r2(d), pct: r2(d / total * 100) };
+    };
+    const scenarios = [
+      scen({ aktie: -0.1 }, 'Börsen −10 %', 'Alla aktier faller 10 %, resten oförändrat.'),
+      scen({ aktie: -0.3 }, 'Börsras −30 %', 'Alla aktier faller 30 %, resten oförändrat.'),
+      scen({ aktie: -0.3, guld: -0.12, bitcoin: -0.45, olja: -0.5 }, 'Allt säljs (som mars 2020)', 'Aktier −30 %, guld −12 %, bitcoin −45 %, olja −50 % (den korta oljan tjänar då pengar och dämpar fallet).'),
+      scen({ guld: -0.2 }, 'Guldet −20 %', 'Bara guldet faller.'),
+      scen({ sek: -0.1 }, 'Kronan stärks 10 %', 'Allt i dollar tappar cirka 10 % räknat i kronor.'),
+    ];
+    const worst1 = holdings.reduce((w, h) => (!w || h.loss50 < w.loss50 ? h : w), null);
+    return { updated: Date.now(), total: r2(total), cash: r2(cash), exposure: r2(holdings.reduce((t, h) => t + h.exposure, 0)),
+      leverage: r2(holdings.reduce((t, h) => t + h.exposure, 0) / total), holdings, scenarios, worst: worst1 && { name: worst1.name, loss50: worst1.loss50, pct: r2(worst1.loss50 / total * 100) },
+      allocation: a.allocation?.parts || null };
+  });
+}
+
 // Experiment som mäts framåt (lib/experiments.js). Loggas i signalloggen som kind 'exp'.
 const fomcDays = new Set(JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'fomc.json'), 'utf8')).decisionDays);
 // Timstaplar för guld (New York-tid), för Asien-guld. Sparas i minnet i 10 minuter.
@@ -1075,6 +1147,19 @@ async function liveCheck({ force = false } = {}) {
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
   try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   try { sent.push(...await monthlyJumpCheck()); } catch (err) { console.error('Månadens aktier, säljregeln:', err.message); }
+  // Knock-out-varning: ett papper i Månadens aktier som är mindre än 15 % från sin knock-out (en gång per papper och månad).
+  if (usOpen) {
+    try {
+      const rv = await riskView(), month = monthly.nyNow().date.slice(0, 7);
+      for (const h of rv.holdings.filter(h => h.part === 'Månadens aktier' && h.koDistPct != null && h.koDistPct < 15)) {
+        if (!await signalLog.markWarning(`ko|${month}|${h.paper}`)) continue;
+        const body = `${h.paper} är bara ${String(h.koDistPct).replace('.', ',')} % från sin knock-out (hävstången är nu ${String(h.lev).replace('.', ',')}x). ` +
+          'Strategin har inget stopp, men går kursen till knock-out försvinner nästan hela beloppet. AI-tradern säljer om avståndet blir under 10 %. ' +
+          'Vill du ta mindre risk: byt till ett papper med lägre hävstång (se Månadens aktier) eller minska beloppet.';
+        if (await notifyText(`Risk: ${h.name} nära knock-out`, body)) sent.push(`${h.name} knock-out-varning`);
+      }
+    } catch (err) { console.error('Riskkontrollen:', err.message); }
+  }
   return { ok: true, marketOpen: open, sent };
 }
 
@@ -1384,6 +1469,7 @@ export default async function handler(req, res) {
       return send(res, 200, { generated: new Date().toISOString(), count: frozen.length, monthHashes: months, entries: frozen });
     }
     if (url.pathname === '/api/ai-trader') return send(res, 200, await aiTrader());
+    if (url.pathname === '/api/risk') return send(res, 200, await riskView());
     if (url.pathname === '/api/monthly') {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('monthly');
       return send(res, 200, await monthlyView());

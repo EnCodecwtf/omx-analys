@@ -601,6 +601,8 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .pf-value { font-size: 30px; font-weight: 700; margin: 2px 0; }
 .pf-start { display: flex; align-items: center; gap: 6px; }
 .pf-start input { width: 100px; }
+.risk-row { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; }
+.risk-list .trade-card { margin-bottom: 8px; }
 .pf-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 4px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); }
 .pf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .pf-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--border); }
