@@ -25,7 +25,7 @@ import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
 import { coachTrade, coachTp, reachedDate } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
-import { runAiTrader } from './lib/aitrader.js';
+import { runAiTrader, AI_START_CAPITAL } from './lib/aitrader.js';
 import { buildReport, frozenHash } from './lib/report.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
@@ -621,7 +621,8 @@ async function ensureMonthly() {
   const spyBars = await fetchBars('SPY', { range: '2y' });
   if (!spyBars.some(b => dayOf(b.t) === rd.last)) return state;
   const prev = state.history.at(-1);
-  const held = prev && prev.month === monthly.addMonths(target, -1) ? prev.stocks.map(s => s.symbol) : [];
+  // Aktier som sålts med säljregeln räknas inte som ägda: de köps bara tillbaka om de är bland de två bästa.
+  const held = prev && prev.month === monthly.addMonths(target, -1) ? prev.stocks.filter(s => !s.sold).map(s => s.symbol) : [];
   const d = await monthlyDecision(target, held, rd.last);
   const [gold, oil] = await Promise.all([closeOn(monthly.GOLD.yahoo, rd.last), closeOn(monthly.OIL.yahoo, rd.last)]);
   if (prev && !prev.end) {
@@ -633,7 +634,7 @@ async function ensureMonthly() {
     // Beslut som räknats fram i efterhand (t.ex. startpunkten) märks, de publicerades inte i förväg.
     backfilled: rd.today > monthly.nextNyseDay(rd.last),
     mode: d.mode, cashShare: d.cashShare, spy: d.spy, skipped: d.skipped.map(x => ({ symbol: x.symbol, name: x.name, rank: x.rank, fromHigh: x.fromHigh })),
-    stocks: d.stocks.map(s => { const old = prev?.stocks.find(x => x.symbol === s.symbol);
+    stocks: d.stocks.map(s => { const old = prev?.stocks.find(x => x.symbol === s.symbol && !x.sold);
       return { symbol: s.symbol, name: s.name, rank: s.rank, mom: s.mom, fromHigh: s.fromHigh, price: s.price, entry: old?.entry ?? s.price, since: old?.since ?? rd.last, kept: !!old }; }),
     gold, oil, top: d.top.map(x => ({ symbol: x.symbol, name: x.name, mom: x.mom })),
   });
@@ -654,7 +655,7 @@ async function monthlyView() {
     const cur = state.history.at(-1) || null;
     const nextTarget = monthly.addMonths(rd.next.slice(0, 7), 1);
     let next;
-    try { next = await monthlyDecision(nextTarget, cur?.stocks.map(s => s.symbol) || [], null); } catch (err) { next = { error: err.message }; }
+    try { next = await monthlyDecision(nextTarget, cur?.stocks.filter(s => !s.sold).map(s => s.symbol) || [], null); } catch (err) { next = { error: err.message }; }
     const L = monthly.RULES;
     // Läget just nu för innehaven.
     const live = { prices: {}, gold: await closeOn(monthly.GOLD.yahoo), oil: await closeOn(monthly.OIL.yahoo) };
@@ -662,9 +663,11 @@ async function monthlyView() {
     const withProduct = async s => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, minis: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, L.stockLev, 'long') });
     const current = cur && {
       ...cur,
-      stocks: await Promise.all(cur.stocks.map(async s => ({ ...(await withProduct(s)), last: live.prices[s.symbol],
-        changePct: live.prices[s.symbol] ? Math.round((live.prices[s.symbol] / s.entry - 1) * 1e4) / 100 : null,
-        miniPct: live.prices[s.symbol] ? Math.round((monthly.miniGrowth(s.entry, live.prices[s.symbol], L.stockLev) - 1) * 1e4) / 100 : null }))),
+      // En såld aktie (säljregeln) visas med säljkursen; platsen är kontanter till nästa byte.
+      stocks: await Promise.all(cur.stocks.map(async s => { const px = s.sold?.price ?? live.prices[s.symbol];
+        return { ...(await withProduct(s)), last: px, now: live.prices[s.symbol],
+          changePct: px ? Math.round((px / s.entry - 1) * 1e4) / 100 : null,
+          miniPct: px ? Math.round((monthly.miniGrowth(s.entry, px, L.stockLev) - 1) * 1e4) / 100 : null }; })),
       goldNow: live.gold, oilNow: live.oil,
     };
     if (next && !next.error) next.stocks = await Promise.all(next.stocks.map(withProduct));
@@ -684,6 +687,38 @@ async function monthlyView() {
   });
 }
 
+// Säljregeln: en aktie i Månadens aktier som stiger minst 10 % på en dag säljs samma dag.
+// Kollas 15.30–16.00 i New York (21.30–22.00 svensk tid) så att det hinns före stängningen,
+// och efter stängningen med slutkursen om kontrollen före missades (då säljs den vid öppningen).
+async function monthlyJumpCheck() {
+  const ny = monthly.nyNow();
+  if (!monthly.isNyseDay(ny.date) || ny.min < 15 * 60 + 30) return [];
+  const state = await ensureMonthly();
+  const cur = state.history.at(-1);
+  if (!cur || cur.decided >= ny.date) return [];
+  const sent = [];
+  for (const s of cur.stocks) {
+    if (s.sold) continue;
+    let bars;
+    try { bars = await fetchBars(s.symbol, { range: '1mo' }); } catch { continue; }
+    const i = bars.findIndex(b => dayOf(b.t) === ny.date);
+    if (i < 1) continue;
+    const price = bars[i].c, prev = bars[i - 1].c;
+    if (!monthly.jumpHit(price, prev)) continue;
+    const after = ny.min >= 16 * 60;
+    const pct = Math.round((price / prev - 1) * 1000) / 10;
+    s.sold = { date: ny.date, price, prevClose: prev, dayPct: pct, at: after ? 'stängning' : 'före stängning', notedAt: new Date().toISOString() };
+    await signalLog.kvSet(MONTHLY_KEY, state);
+    cache.delete('monthly'); cache.delete('aitrader');
+    const mini = Math.round((monthly.miniGrowth(s.entry, price, monthly.RULES.stockLev) - 1) * 1000) / 10;
+    const body = `${s.name} har stigit ${String(pct).replace('.', ',')} % idag (minin ${mini >= 0 ? '+' : ''}${String(mini).replace('.', ',')} % sedan köpet). ` +
+      `Regeln: sälj efter en dag med minst 10 % uppgång – en sådan rusning rinner ofta delvis tillbaka. ${after ? 'Börsen har stängt: sälj vid öppningen i morgon (15.30 svensk tid).' : 'Sälj före 22.00 svensk tid.'} ` +
+      'Pengarna står som kontanter till nästa månadsbyte, då aktien köps tillbaka om den fortfarande är bland de två bästa.';
+    if (await notifyText(`Månadens aktier: sälj ${s.name}`, body)) sent.push(`${s.symbol} säljregel`);
+  }
+  return sent;
+}
+
 // Påminnelser på bytesdagen: en under eftermiddagen och en strax före stängningen.
 async function monthlyNotify(kind) {
   const rd = monthly.rebalanceDays();
@@ -697,7 +732,9 @@ async function monthlyNotify(kind) {
   const v = await monthlyView();
   if (!v.changeText) return null;
   const title = kind === 'final' ? 'Månadens aktier: dags att byta nu' : 'Månadens aktier: byte ikväll';
-  const body = `${v.changeText}\n${kind === 'final' ? 'Handla före 22.00 svensk tid.' : 'Bytet görs strax före stängningen 22.00 svensk tid. Slutligt besked kommer cirka 21.00.'}`;
+  const btc = btcCycle(rd.today);
+  const body = `${v.changeText}\n${kind === 'final' ? 'Handla före 22.00 svensk tid.' : 'Bytet görs strax före stängningen 22.00 svensk tid. Slutligt besked kommer cirka 21.00.'}` +
+    `\nStäll samtidigt om hela kapitalet: 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld, 20 % bitcoin-cykeln (${btc.inWindow ? 'bitcoin' : 'i guld till ' + btc.until}).`;
   const ok = await notifyText(title, body);
   state.pushed[nextTarget] = kind;
   await signalLog.kvSet(MONTHLY_KEY, state);
@@ -709,7 +746,9 @@ async function monthlyNotify(kind) {
 // Beslut mitt i månaden har sänkt resultatet i testet, så den säljer inte i förtid.
 const AI_MONTHLY_KEY = 'omx-analys:ai-monthly';
 const AI_MONTHLY_SHARE = 0.1;
-async function aiMonthly(aiStart) {
+// hooks (från aiTrader): migrate(val) → belopp delen ska ha när fördelningen startar (null = ingen ändring),
+// switchMoney(val, dag) → belopp att köpa för vid månadsbytet (ombalansering mot hela kontot).
+async function aiMonthly(aiStart, hooks = {}) {
   const v = await monthlyView();
   const cur = v.current;
   if (!cur) return null;
@@ -755,8 +794,29 @@ async function aiMonthly(aiStart) {
     st.edge = (st.edge || 0) + (val - shadow);
     const sold = st.positions.filter(p => !p.sold).map(p => p.name).join(', ');
     st.log = [{ date: cur.decided, action: 'säljer', name: 'Månadens aktier', text: `Månadsbyte. Säljer ${sold || 'inget'}; värdet är ${Math.round(val).toLocaleString('sv-SE')} kr.` }, ...(st.log || [])];
-    st = await open(st, val, cur.decided, 'Ny månad enligt reglerna.');
+    const money = hooks.switchMoney ? await hooks.switchMoney(val, cur.decided) : val;
+    if (Math.abs(money - val) >= 1) st.log.unshift({ date: cur.decided, action: 'fördelar', name: 'Månadens aktier', text: `Ombalansering mot hela kontot: ${money > val ? 'tillför' : 'tar ut'} ${Math.round(Math.abs(money - val)).toLocaleString('sv-SE')} kr så att delen blir ${Math.round(AI_ALLOC.monthly * 100)} % av kontot.` });
+    st.amount = (st.amount || 0) + (money - val);
+    st = await open(st, money, cur.decided, 'Ny månad enligt reglerna.');
     changed = true;
+  }
+  // Fördelningen 40/20/20/20 startar: fyll på delen till 40 % av kontot på dagens kurser.
+  if (hooks.migrate && !st.allocated) {
+    const { val: v0 } = await valueAt(st);
+    const target = await hooks.migrate(v0);
+    if (target != null) {
+      const extra = target - v0;
+      st.allocated = now;
+      if (extra >= monthly.MIN_ORDER) {
+        const add = await open({ log: [] }, extra, null, `Ny fördelning: delen ökas till ${Math.round(AI_ALLOC.monthly * 100)} % av kontot (${Math.round(target).toLocaleString('sv-SE')} kr).`);
+        st.positions = [...st.positions, ...add.positions.map(x => ({ ...x, added: now }))];
+        st.cash = (st.cash || 0) + (add.cash || 0);
+        st.shadowCash = (st.shadowCash ?? 0) + (add.cash || 0);
+        st.amount = (st.amount || 0) + extra;
+        st.log = [...add.log, ...(st.log || [])];
+      }
+      changed = true;
+    }
   }
   // Daglig bevakning. AI:n får sälja när den vill, men bara på kraftiga varningssignaler:
   // i testet sänkte vanliga säljregler mitt i månaden resultatet, medan sällsynta
@@ -782,6 +842,9 @@ async function aiMonthly(aiStart) {
     const last = c.at(-1), raw = last / p.entry - 1, dir = p.side === 'short' ? -1 : 1;
     const yr = c.slice(-252), fromHigh = last / Math.max(...yr) - 1, sma50 = c.slice(-50).reduce((a, x) => a + x, 0) / 50;
     const pct = Math.round((monthly.miniGrowth(p.entry, last, p.lev, p.side) - 1) * 1000) / 10;
+    // Säljregeln (minst 10 % uppgång på en dag) – samma beslut som i Månadens aktier.
+    const ms = cur.stocks.find(x => x.symbol === p.symbol);
+    if (p.kind === 'stock' && ms?.sold) { sell(p, ms.sold.price, `Säljregeln: ${p.name} steg ${String(ms.sold.dayPct).replace('.', ',')} % på en dag. I testet höjde regeln avkastningen från ${monthly.JUMP_TEST.without.cagr} % till ${monthly.JUMP_TEST.with.cagr} % per år och minskade största nedgången.`); continue; }
     // Nära pappers knock-out: sälj hellre än att pappret löses ut.
     if (p.stopLoss && dir * (last - p.stopLoss) / last < 0.1) { sell(p, last, `Kursen är mindre än 10 % från pappers knock-out (${p.stopLoss}).`); continue; }
     if (p.kind === 'stock' && raw <= -0.3) { sell(p, last, 'Aktien har fallit mer än 30 % sedan köpet – nödbroms.'); continue; }
@@ -790,7 +853,7 @@ async function aiMonthly(aiStart) {
     if (p.kind === 'gold' && raw <= -0.15) { sell(p, last, 'Guldet har fallit mer än 15 % sedan köpet – nödbroms.'); continue; }
     if (p.kind === 'stock' && fromHigh < -0.25) think(`hi-${p.symbol}`, `${p.name} ligger ${Math.round(-fromHigh * 100)} % under sitt årshögsta. Jag håller: att sälja vid 25 % sänkte resultatet i testet till ${T.fromHigh25.cagr} % per år mot ${T.none.cagr} %. Jag säljer om den når 35 % och går under sitt 50-dagars snitt.`);
     if (pct <= -10) think(`down-${p.symbol}`, `${p.name} är ${String(pct).replace('.', ',')} % i pappret. Jag håller – vanliga stopp gav sämre resultat i testet. Nödbromsen går vid ${p.kind === 'stock' ? '−30 % i aktien' : p.kind === 'gold' ? '−15 % i guldet' : '+20 % i oljan'}.`);
-    if (pct >= 20) think(`up-${p.symbol}`, `${p.name} är upp ${String(pct).replace('.', ',')} % i pappret. Jag låter den löpa – några få stora vinnare står för det mesta av avkastningen.`);
+    if (pct >= 20) think(`up-${p.symbol}`, `${p.name} är upp ${String(pct).replace('.', ',')} % i pappret. Jag låter den löpa – några få stora vinnare står för det mesta av avkastningen. Jag säljer bara om den stiger minst 10 % på en enda dag (säljregeln).`);
   }
   const { val, shadow, rows } = await valueAt(st);
   if (changed) { st.log = st.log.slice(0, 60); await signalLog.kvSet(AI_MONTHLY_KEY, st); }
@@ -798,6 +861,19 @@ async function aiMonthly(aiStart) {
   return { started: st.started, amount: st.amount, value: Math.round(val), pnl: Math.round(val - st.amount), pnlPct: Math.round((val / st.amount - 1) * 1000) / 10,
     month: st.month, next: v.rebalance.next, positions: rows.map(r => ({ ...r, value: Math.round(r.value) })), cash: Math.round(st.cash || 0), log: st.log,
     edge: Math.round(edge), shadowValue: Math.round(val - edge) };
+}
+
+// Fördelningen av AI-traderns konto (från november 2026), vald efter test 2016–2026 av alla modeller:
+// 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld och 20 % bitcoin-cykeln (guld utanför köpfönstret).
+// Historiskt 37 % per år med största nedgång −19 % (månadsdata, i SEK); med försiktigare antaganden
+// om framtiden cirka 15 % per år. Ställs om till målvikterna vid varje byte i Månadens aktier.
+const AI_ALLOC = { monthly: 0.4, omx: 0.2, gold: 0.2, btc: 0.2 };
+const AI_ALLOC_KEY = 'omx-analys:ai-alloc';
+const btcSymbolOn = d => (btcCycle(d).inWindow ? 'BTC-USD' : 'GC=F');
+async function sleeveValue(x, d = null) {
+  if (!x) return 0;
+  const px = await closeOn(x.symbol, d);
+  return px ? x.money * px / x.entry : x.money;
 }
 
 // AI-tradern: fiktivt konto som tar alla OMX- och USA-signaler i loggen.
@@ -813,13 +889,77 @@ async function aiTrader() {
     }
     const [macroAt, vix] = await Promise.all([macro(), fetchBars('^VIX').catch(() => [])]);
     const vixAt = new Map(vix.map(b => [dayOf(b.t), b.c]));
-    const a = runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
-      productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20 });
-    // 10 % av kontot ligger i Månadens aktier (tas från kontanterna när delen startar).
+    // Fördelningen: pengar flyttas mellan OMX-delen och de andra delarna (sparas, så historiken ligger fast).
+    let alloc = await signalLog.kvGet(AI_ALLOC_KEY, null);
+    if (!alloc) {
+      const mPrev = await signalLog.kvGet(AI_MONTHLY_KEY, null);
+      // Startbeloppet i Månadens aktier (10 % av kontot) togs från OMX-delen när den delen startade.
+      const first = mPrev ? { date: mPrev.started, amount: -mPrev.amount } : { date: today(), amount: -Math.round(AI_START_CAPITAL * AI_MONTHLY_SHARE) };
+      alloc = { transfers: [{ ...first, why: 'Månadens aktier (10 % av kontot)' }], sleeves: {}, log: [] };
+    }
+    const run = () => runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
+      productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20, transfers: alloc.transfers });
+    let a = run();
+    const engineAt = d => { let v = a.start; for (const c of a.curve) { if (c.date <= d) v = c.equity; else break; } return v; };
+    let changed = false;
+    const setSleeves = async (T, d) => {
+      for (const k of ['gold', 'btc']) {
+        const sym = k === 'gold' ? 'GC=F' : btcSymbolOn(d || today());
+        const entry = await closeOn(sym, d);
+        if (!entry) throw new Error(`Ingen kurs för ${sym}`);
+        alloc.sleeves[k] = { symbol: sym, money: T * AI_ALLOC[k], entry, date: d || today() };
+      }
+    };
+    const fmt = v => `${Math.round(v).toLocaleString('sv-SE')} kr`;
+    const hooks = {
+      migrate: async val => {
+        if (alloc.started) return null;
+        const T = a.equity + val, target = T * AI_ALLOC.monthly;
+        await setSleeves(T, null);
+        alloc.transfers.push({ date: today(), amount: -((target - val) + T * (AI_ALLOC.gold + AI_ALLOC.btc)), why: 'Ny fördelning 40/20/20/20' });
+        alloc.started = today();
+        alloc.log.unshift({ date: today(), action: 'fördelar', text: `Ny fördelning av kontot (${fmt(T)}): 40 % Månadens aktier (${fmt(target)}), 20 % OMX-signaler (${fmt(T * AI_ALLOC.omx)}), 20 % guld (${fmt(T * AI_ALLOC.gold)}) och 20 % bitcoin-cykeln (${fmt(T * AI_ALLOC.btc)}, ${alloc.sleeves.btc.symbol === 'BTC-USD' ? 'bitcoin' : 'i guld tills köpfönstret öppnar'}).` });
+        changed = true;
+        return target;
+      },
+      switchMoney: async (val, d) => {
+        if (!alloc.started || d < alloc.started) return val;
+        const g = await sleeveValue(alloc.sleeves.gold, d), b = await sleeveValue(alloc.sleeves.btc, d);
+        const T = engineAt(d) + val + g + b, target = T * AI_ALLOC.monthly;
+        const wasBtc = alloc.sleeves.btc?.symbol;
+        await setSleeves(T, d);
+        alloc.transfers.push({ date: d, amount: -((target - val) + T * (AI_ALLOC.gold + AI_ALLOC.btc) - g - b), why: 'Ombalansering vid månadsbytet' });
+        const swap = wasBtc && wasBtc !== alloc.sleeves.btc.symbol ? (alloc.sleeves.btc.symbol === 'BTC-USD' ? ' Bitcoin-cykelns köpfönster har öppnat: den delen går från guld till bitcoin.' : ' Bitcoin-cykelns köpfönster har stängt: den delen går till guld.') : '';
+        alloc.log.unshift({ date: d, action: 'fördelar', text: `Ombalansering (kontot ${fmt(T)}): tillbaka till 40/20/20/20.${swap}` });
+        changed = true;
+        return target;
+      },
+    };
     let m = null;
-    try { m = await aiMonthly(a.start); } catch (err) { console.error('AI-tradern, Månadens aktier:', err.message); }
-    if (m) { a.equity = Math.round((a.equity - m.amount + m.value) * 100) / 100; a.cash = Math.round((a.cash - m.amount) * 100) / 100; a.returnPct = Math.round((a.equity / a.start - 1) * 1e4) / 100; }
-    return { updated: Date.now(), ...a, monthly: m };
+    try { m = await aiMonthly(a.start, hooks); } catch (err) { console.error('AI-tradern, Månadens aktier:', err.message); }
+    if (changed) { await signalLog.kvSet(AI_ALLOC_KEY, alloc); a = run(); }
+    const sl = [];
+    for (const [k, title] of [['gold', 'Guld'], ['btc', 'Bitcoin-cykeln']]) {
+      const x = alloc.sleeves[k];
+      if (!x) continue;
+      const value = await sleeveValue(x);
+      sl.push({ key: k, title, asset: x.symbol === 'BTC-USD' ? 'Bitcoin' : 'Guld', symbol: x.symbol, since: x.date, money: Math.round(x.money), value: Math.round(value), pct: Math.round((value / x.money - 1) * 1000) / 10 });
+    }
+    const engine = { equity: a.equity, cash: a.cash, pending: a.pendingMoves };
+    const others = (m?.value || 0) + sl.reduce((t, x) => t + x.value, 0);
+    a.equity = Math.round((a.equity + others) * 100) / 100;
+    a.returnPct = Math.round((a.equity / a.start - 1) * 1e4) / 100;
+    // Kurvan: OMX-delen plus det som flyttats ut (till anskaffningsvärde), och dagens värde sist.
+    const outBy = d => -alloc.transfers.filter(t => t.date <= d).reduce((t, x) => t + x.amount, 0);
+    a.curve = a.curve.map(c => ({ date: c.date, equity: Math.round((c.equity + outBy(c.date)) * 100) / 100 }));
+    if (a.curve.length) a.curve[a.curve.length - 1].equity = a.equity;
+    const parts = [
+      { key: 'monthly', title: 'Månadens aktier', value: Math.round(m?.value || 0) },
+      { key: 'omx', title: 'OMX-signaler', value: Math.round(engine.equity) },
+      ...sl.map(x => ({ key: x.key, title: x.title, value: x.value })),
+    ].map(x => ({ ...x, target: AI_ALLOC[x.key], share: a.equity ? Math.round(x.value / a.equity * 1000) / 10 : 0 }));
+    return { updated: Date.now(), ...a, monthly: m,
+      allocation: alloc.started ? { started: alloc.started, targets: AI_ALLOC, parts, sleeves: sl, engine, log: alloc.log.slice(0, 20), btcWindow: btcCycle() } : null };
   });
 }
 
@@ -934,6 +1074,7 @@ async function liveCheck({ force = false } = {}) {
   try { for (const e of await experimentCheck()) sent.push(`${e.symbol} experiment`); } catch (err) { console.error('Experimenten:', err.message); }
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
   try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
+  try { sent.push(...await monthlyJumpCheck()); } catch (err) { console.error('Månadens aktier, säljregeln:', err.message); }
   return { ok: true, marketOpen: open, sent };
 }
 
@@ -1209,6 +1350,7 @@ export default async function handler(req, res) {
       const s = await usScan();
       const live = await liveCheck({ force: true });
       await ensureMonthly().catch(err => console.error('Månadens aktier:', err.message));
+      await monthlyJumpCheck().catch(err => console.error('Månadens aktier, säljregeln:', err.message));
       return send(res, 200, { ok: true, signals: s.rows.filter(r => r.status === 'strong').map(r => r.symbol), alerts: live.sent });
     }
     // Egen kvällskörning för blankningsanalytikern (hämtar mycket data per bolag).

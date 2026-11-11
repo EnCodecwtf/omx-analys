@@ -70,3 +70,17 @@ test('fördelningen: 3 300 kr blir tre order på 1 100 kr, 2 500 kr tar bort olj
   assert.deepEqual(allocate(st, 2500, lists).map(l => [l.kind, Math.round(l.money)]), [['stock', 1250], ['gold', 1250]]);
   assert.deepEqual(allocate(st, 4000, lists).map(l => [l.kind, Math.round(l.money)]), [['stock', 2000], ['gold', 1000], ['oil', 1000]]);
 });
+
+test('säljregeln: minst 10 % på en dag, och en såld aktie låses på säljkursen', async () => {
+  const { jumpHit, periodReturn, RULES } = await import('../lib/monthly.js');
+  assert.equal(jumpHit(110, 100), true);
+  assert.equal(jumpHit(109.9, 100), false);
+  const h = { stocks: [{ symbol: 'A', price: 100, entry: 100, sold: { price: 120 } }, { symbol: 'B', price: 100, entry: 100 }], cashShare: 0 };
+  const r = periodReturn(h, { prices: { A: 90, B: 100 } });
+  assert.ok(Math.abs(r.raw - 0.1) < 1e-9); // A räknas på 120, inte 90
+  assert.ok(r.lev > r.raw);
+  // En såld aktie räknas inte som ägd i bytestexten.
+  const t = changeText({ stocks: [{ symbol: 'A', name: 'A', sold: { price: 120 } }], cashShare: 0.5 }, { stocks: [{ symbol: 'A', name: 'A' }, { symbol: 'C', name: 'C' }], cashShare: 0 });
+  assert.match(t, /Köp A och C/);
+  assert.equal(RULES.jumpSell, 0.1);
+});

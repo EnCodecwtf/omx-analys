@@ -872,6 +872,46 @@ av resten och stoppet flyttas till TP1, vid TP3 behålls sista delen med glidand
 resten om kursen faller under EMA 20 nära köpkursen, hälften säljs före en rapport om affären är i vinst, och en affär som
 inte nått TP1 på 20 handelsdagar avslutas. Varje beslut visas med motivering. Allt räknas om från början på dagsdata.
 
+**Fördelning (från 2026-11-11):** kontot är uppdelat i 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld och 20 %
+bitcoin-cykeln (guld utanför köpfönstret, alltså till 2027-04-15). Delarna ställs om till målvikterna vid varje byte i
+Månadens aktier. Pengar flyttas till och från OMX-delen med daterade flyttar (`transfers` i `runAiTrader`), som sparas så att
+historiken ligger fast; en flytt ut tas bara från kontanterna och resten tas när affärer stängs.
+
+Fördelningen valdes efter ett test 2016-12 – 2026-10 av alla modeller (månadsdata, i SEK med växelkurs, ombalansering varje månad):
+
+| Modell / fördelning | Per år | Största nedgång |
+|---|---|---|
+| Månadens aktier (1,8x, säljregel) | 29 % | −46 % |
+| OMX-signaler (10 % per affär, 1,8x) | 11 % | −11 % |
+| Panikveckan | 4 % | −9 % |
+| Guld | 13 % | −20 % |
+| Bitcoin-cykeln | 75 % | −46 % |
+| Nasdaq 100 | 20 % | −23 % |
+| Tidigare (10 Månadens / 80 OMX / 10 panik) | 13 % | −10 % |
+| **40 Månadens / 20 OMX / 20 guld / 20 bitcoin-cykel** | **37 %** | **−19 %** |
+| Optimerad i efterhand (40 Månadens / 60 bitcoin) | 64 % | −28 % |
+
+Samvariationen mellan Månadens aktier, OMX-signalerna, guld och bitcoin-cykeln är −0,05 till 0,2, så delarna faller sällan
+samtidigt. Med försiktigare antaganden (halva bitcoins uppgångar, 80 % av Månadens aktiers och 70 % av guldets) ger
+fördelningen cirka 15 % per år med −21 %. Den optimerade fördelningen valdes bort eftersom den bygger på bitcoins historiska
+uppgång och bara tre cykler. Månadsdata döljer nedgångar inom månaden.
+
+### Säljregel i Månadens aktier (2006–2026)
+Stiger en aktie i Månadens aktier minst 10 % på en dag säljs den samma dag (notis cirka 21.30 svensk tid, kontroll 15.30–16.00 i
+New York, och efter stängningen om kontrollen missades). Platsen står i kontanter till nästa byte. Med 1,8x:
+
+| Regel | Per år | 2006–15 | 2016–26 | Största nedgång |
+|---|---|---|---|---|
+| Ingen | 29,8 % | 33,4 % | 26,7 % | −62 % |
+| **Sälj efter dagsuppgång ≥ 10 %** | **34,6 %** | **38,1 %** | **31,5 %** | **−46 %** |
+| Fast TP +15–30 % från köp | 23–30 % | | | −59–62 % |
+| ≥ 10 %, återköp vid −4 % | 38,1 % | | | −57 % |
+| ≥ 10 % och RSI ≥ 70 | 27,3 % | | | −62 % |
+
+Gränserna 9–12 % var alla bättre i båda perioderna. Återköp gav mer avkastning men större nedgång och hoppade mellan nivåerna
+(brus), stopp på återköpet sänkte resultatet. Rasvarningar mitt i månaden (BOS, CHoCH, VIX, gap, glidande medel – 129
+kombinationer, valda på 2006–15 och prövade på 2016–26) gjorde inte en enda kombination bättre i båda perioderna.
+
 ### Månadsrapport
 Under **Mer → Månadsrapport** visas varje månad alla signaler som släppts, med de nivåer som frystes vid publiceringen:
 vinster, förluster, break-even och öppna. Vinstandelen räknas på alla avslutade affärer (break-even under ±0,1 R räknas inte

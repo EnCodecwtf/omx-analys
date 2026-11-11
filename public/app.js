@@ -663,18 +663,33 @@ function aiCurve(c) {
   return `<svg class="ai-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Kontots värde över tid"><polyline points="${pts}" fill="none" stroke="${up ? '#22c55e' : '#ef4444'}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
     <div class="vticks"><span>${esc(c[0].date)}</span><span>${kr(lo)} – ${kr(hi)}</span><span>${esc(c.at(-1).date)}</span></div>`;
 }
-// AI-traderns del i Månadens aktier (10 % av kontot).
-function aiMonthlyBox(m) {
+// Kontots fördelning: delarna mot målvikterna, och guld/bitcoin-cykeln.
+function aiAllocBox(al, total) {
+  const pc = v => `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
+  const w = al.btcWindow;
+  return `<h2 class="v-title">Fördelning</h2>
+    <div class="trade-card">
+      <table class="pf-table"><tr><th>Del</th><th class="r">Värde</th><th class="r">Andel</th><th class="r">Mål</th></tr>
+      ${al.parts.map(p => { const sl = al.sleeves.find(x => x.key === p.key);
+        return `<tr><td><b>${esc(p.title)}</b>${sl ? `<div class="small muted">${esc(sl.asset)} sedan ${esc(sl.since)} · ${pc(sl.pct)}</div>` : ''}</td><td class="r num"><b>${kr(p.value)}</b></td><td class="r num">${String(p.share).replace('.', ',')} %</td><td class="r num muted">${Math.round(p.target * 100)} %</td></tr>`; }).join('')}
+      <tr class="pf-sum"><td><b>Totalt</b></td><td class="r num"><b>${kr(total)}</b></td><td></td><td></td></tr></table>
+      <div class="tc-next">Ställs om till målvikterna vid varje månadsbyte. Bitcoin-cykeln: ${esc(w.inWindow ? `köpfönster – äger bitcoin till ${w.until}` : `utanför köpfönstret – ligger i guld till ${w.until}`)}.${al.engine.pending < -0.5 ? ` ${kr(-al.engine.pending)} flyttas från OMX-delen när affärer stängs.` : ''}</div>
+      <p class="small muted" style="margin-top:6px">Vald efter test 2016–2026 av alla modeller: historiskt cirka 37 % per år med största nedgång −19 % (månadsdata, i kronor), med försiktigare antaganden om framtiden cirka 15 % per år. Delarna rör sig nästan oberoende av varandra, så de sällan faller samtidigt.</p>
+    </div>
+    ${al.log.length ? `<ul class="ai-log">${al.log.slice(0, 4).map(l => `<li><span class="ai-ico">⚖️</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('')}</ul>` : ''}`;
+}
+// AI-traderns del i Månadens aktier.
+function aiMonthlyBox(m, share = 10) {
   const sgn = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(Math.round(v)).toLocaleString('sv-SE')} kr`;
   const pc = v => v == null ? '–' : `${v > 0 ? '+' : ''}${String(v).replace('.', ',')} %`;
-  return `<h2 class="v-title">Månadens aktier <span class="muted">(10 % av kontot)</span></h2>
+  return `<h2 class="v-title">Månadens aktier <span class="muted">(${share} % av kontot)</span></h2>
     <div class="trade-card ai-monthly">
       <div class="tc-head"><div><b>${kr(m.value)}</b> <span class="muted small">startade ${esc(m.started)} med ${kr(m.amount)}</span></div><div class="tc-res ${m.pnl > 0 ? 'pos' : m.pnl < 0 ? 'neg' : ''}">${sgn(m.pnl)} · ${pc(m.pnlPct)}</div></div>
       <table class="pf-table">${m.positions.map(p => p.sold ? `<tr class="sold"><td><b>${esc(p.name)}</b> <span class="tag bad">såld ${esc(p.sold.date)}</span><div class="small muted">${esc(p.sold.why)}</div></td>
-        <td class="r num">${kr(p.sold.value)}<div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.sold.pct > 0 ? 'pos' : 'neg'}">${pc(p.sold.pct)}</td></tr>` : `<tr><td><b>${esc(p.name)}</b> <span class="muted small">${p.side === 'short' ? 'kort' : 'lång'}</span><div class="small muted"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.paper)}</a> · ${svx(p.lev)}</div></td>
+        <td class="r num">${kr(p.sold.value)}<div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.sold.pct > 0 ? 'pos' : 'neg'}">${pc(p.sold.pct)}</td></tr>` : `<tr><td><b>${esc(p.name)}</b> <span class="muted small">${p.side === 'short' ? 'kort' : 'lång'}</span>${p.added ? ` <span class="tag">tillskott ${esc(p.added.slice(5))}</span>` : ''}<div class="small muted"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.paper)}</a> · ${svx(p.lev)}</div></td>
         <td class="r num"><b>${kr(p.value)}</b><div class="small muted">${kr(p.money)}</div></td><td class="r num ${p.pct > 0 ? 'pos' : p.pct < 0 ? 'neg' : ''}"><b>${pc(p.pct)}</b><div class="small muted">kursen ${pc(p.rawPct)}</div></td></tr>`).join('')}
         ${m.cash >= 1 ? `<tr><td><b>Kontanter</b></td><td class="r num">${kr(m.cash)}</td><td></td></tr>` : ''}</table>
-      <div class="tc-next">Nästa byte ${esc(moDay(m.next))}. AI-tradern får sälja när den vill under månaden, men gör det bara på kraftiga varningar (nödbroms) – vanliga säljregler sänkte resultatet i testet.</div>
+      <div class="tc-next">Nästa byte ${esc(moDay(m.next))}. AI-tradern säljer under månaden bara med säljregeln (minst 10 % uppgång på en dag) eller på kraftiga varningar (nödbroms) – vanliga säljregler sänkte resultatet i testet.</div>
       <div class="small ${m.edge > 0 ? 'pos' : m.edge < 0 ? 'neg' : 'muted'}" style="margin-top:6px">AI:ns egna beslut: ${m.edge === 0 ? 'inga än – värdet är detsamma som att bara följa reglerna' : `${sgn(m.edge)} jämfört med att bara följa reglerna (${kr(m.shadowValue)})`}.</div>
     </div>
     <ul class="ai-log">${m.log.slice(0, 8).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '🗓'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('')}</ul>`;
@@ -698,17 +713,18 @@ function renderAi() {
         <div class="stat"><b class="num">${kr(a.equity)}</b><span>kontots värde</span></div>
         <div class="stat"><b class="num ${cls}">${sign(pnl)}</b><span>${pct(a.returnPct)} sedan start (${kr(a.start)})</span></div>
         <div class="stat"><b class="num">${a.open.filter(p => !p.panic).length} av ${a.maxOpen}</b><span>affärer igång${a.open.some(p => p.panic) ? ` + ${a.open.filter(p => p.panic).length} panikvecka` : ''}</span></div>
-        <div class="stat"><b class="num">${kr(a.cash)}</b><span>kontanter</span></div>
+        <div class="stat"><b class="num">${kr(a.cash)}</b><span>kontanter${a.allocation ? ' i OMX-delen' : ''}</span></div>
       </div>
       ${aiCurve(a.curve)}
     </div>
+    ${a.allocation ? aiAllocBox(a.allocation, a.equity) : ''}
     <h2 class="v-title">Öppna affärer <span class="muted">(${a.open.length})</span></h2>
     ${a.open.length ? a.open.map(pos).join('') : '<div class="empty small">Inga affärer igång. AI-tradern väntar på nästa signal.</div>'}
-    ${a.monthly ? aiMonthlyBox(a.monthly) : ''}
+    ${a.monthly ? aiMonthlyBox(a.monthly, a.allocation ? Math.round(a.allocation.targets.monthly * 100) : 10) : ''}
     <h2 class="v-title">Beslut</h2>
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
     ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
-    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} Högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). Panikveckan tas också, vid sidan av de tre: 10 % per aktie, utan hävstång, säljs på säljdagen. AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
+    <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.allocation ? ` Sedan ${esc(a.allocation.started)} är kontot fördelat 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld och 20 % bitcoin-cykeln, och det ställs om vid varje månadsbyte. Kurvan räknar delarna utanför OMX-signalerna till anskaffningsvärdet fram till idag.` : a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} OMX-signaler: högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). Panikveckan tas också, vid sidan av de tre: 10 % per aktie, utan hävstång, säljs på säljdagen. AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
       Vid TP1 avgör en maskininlärningsmodell (tränad på 2017–2021, testad på 2022–2026) om resten ska få löpa eller säljas. Övriga beslut följer regler som väger trend (EMA 20), mål, stopp, rapporter och tid i affären. Inte investeringsrådgivning.</p>`;
   bindRows(el);
 }
@@ -1712,6 +1728,20 @@ function allocate(state, money, m) {
     return { ...l, money: amt, pick: chooseMini(l.list, l.target, amt, R.minOrder), note: i === 0 ? note : null };
   });
 }
+// Rekommenderad fördelning av hela kapitalet (test 2016–2026 av alla modeller i appen).
+const ALLOC = [['Månadens aktier', 0.4, 'den här sidan – startvärdet nedan'], ['OMX-signaler', 0.2, 'köpsignalerna, 1 000 kr per affär'], ['Guld', 0.2, 't.ex. en guld-ETC utan hävstång'], ['Bitcoin-cykeln', 0.2, null]];
+function allocCard(start, R) {
+  const total = Math.max(0, +store.get('allocTotal', '') || Math.round(start / 0.4));
+  const btcOpen = new Date().toISOString().slice(0, 10) >= '2027-04-15';
+  const amt = w => Math.round(total * w / 100) * 100;
+  const mo = amt(0.4);
+  return `<details class="mo-more alloc-card"${store.get('allocOpen', '1') === '1' ? ' open' : ''}><summary>Fördela hela kapitalet</summary>
+    <label class="pf-start small">Hela kapitalet <input id="alloc-total" type="number" min="5000" step="1000" value="${total}"> kr</label>
+    <table class="pf-table">${ALLOC.map(([n, w, how]) => `<tr><td><b>${n}</b> <span class="muted small">${Math.round(w * 100)} %</span><div class="small muted">${how || (btcOpen ? 'bitcoin – köpfönstret är öppet' : 'i guld till 15 april 2027, då köpfönstret öppnar')}</div></td><td class="r num"><b>${kr(amt(w))}</b></td></tr>`).join('')}</table>
+    ${Math.abs(mo - start) >= 100 ? `<button class="btn small" id="alloc-use">Sätt startvärdet till ${kr(mo)}</button>` : ''}
+    <p class="small muted">Ställ om till andelarna en gång i månaden, vid bytet. Delarna rör sig nästan oberoende av varandra: i testet 2016–2026 gav fördelningen cirka 37 % per år med största nedgång −19 % (månadsdata, i kronor). Räkna med betydligt mindre framåt – med försiktiga antaganden cirka 15 % per år. Inte investeringsrådgivning.</p>
+  </details>`;
+}
 function renderMonthly() {
   const m = monthlyData, el = $('#monthly'), rd = m.rebalance, R = m.rules, cur = m.current, nx = m.next;
   const start = Math.max(0, +store.get('momStart', '3000') || 0);
@@ -1739,13 +1769,14 @@ function renderMonthly() {
       <b class="num">${verb === 'Sälj' ? 'allt' : l.pick ? kr(l.pick.order) : l.kind === 'stock' && !l.s.minis?.length ? kr(l.money) : '–'}</b></div>
       <div class="small muted">${paperLine(l)}${l.pick?.spreadPct != null ? ` · spread ${String(l.pick.spreadPct).replace('.', ',')} %` : ''}</div>
       ${l.pick?.note ? `<div class="small warn-txt">${esc(l.pick.note)}</div>` : ''}${l.note && verb !== 'Sälj' ? `<div class="small muted">${esc(l.note)}</div>` : ''}</div>`).join('');
-  const startLegs = cur ? allocate(cur, start, m) : [];
-  const held = new Set((cur?.stocks || []).map(s => s.symbol));
+  // En aktie som sålts med säljregeln köps inte nu – den platsen är kontanter till nästa byte.
+  const startLegs = cur ? allocate({ ...cur, stocks: cur.stocks.filter(s => !s.sold) }, start, m) : [];
+  const held = new Set((cur?.stocks || []).filter(s => !s.sold).map(s => s.symbol));
   // Bytet: det som säljs och det som köps (det som behålls rörs inte).
   let swap = '';
   if (nx && !nx.error) {
     const nxLegs = allocate({ stocks: nx.stocks, cashShare: nx.cashShare }, total, m);
-    const sells = rows.filter(r => r.kind === 'stock' ? !nx.stocks.some(s => s.symbol === r.s.symbol) : !(nx.cashShare > 0));
+    const sells = rows.filter(r => r.kind === 'stock' ? !r.s.sold && !nx.stocks.some(s => s.symbol === r.s.symbol) : !(nx.cashShare > 0));
     const buys = nxLegs.filter(l => l.kind === 'stock' ? !held.has(l.s.symbol) : !(cur?.cashShare > 0));
     swap = sells.length || buys.length
       ? `${orderRows(sells, 'Sälj')}${orderRows(buys)}`
@@ -1775,11 +1806,14 @@ function renderMonthly() {
     </div>
     ${start < 2 * R.minOrder ? `<div class="status"><b>För lågt startvärde</b><span>Varje order måste vara minst ${kr(R.minOrder)} för att slippa courtage, så startvärdet behöver vara minst ${kr(2 * R.minOrder)} (helst ${kr(3 * R.minOrder)}).</span></div>` : ''}
 
+    ${allocCard(start, R)}
+
     <h2 class="v-title">Innehav</h2>
     <table class="pf-table">
       <tr><th>Innehav</th><th class="r">Värde</th><th class="r">Sedan ${esc(cur?.decided?.slice(5) || 'byte')}</th></tr>
       ${rows.map(r => `<tr><td><b>${esc(r.title)}</b> <span class="muted small">${esc(r.sub)}</span><div class="small muted">${paperLine(r)}</div>
-          ${r.kind === 'stock' && r.s.kept ? `<div class="small muted">Köpt ${esc(r.s.since)} · aktien ${svp(r.s.changePct)} sedan köp</div>` : ''}</td>
+          ${r.kind === 'stock' && r.s.kept ? `<div class="small muted">Köpt ${esc(r.s.since)} · aktien ${svp(r.s.changePct)} sedan köp</div>` : ''}
+          ${r.kind === 'stock' && r.s.sold ? `<div class="small"><b class="pos">Såld ${esc(moDay(r.s.sold.date))}</b> med säljregeln (${svp(r.s.sold.dayPct)} på en dag). Kontanter till nästa byte.</div>` : ''}</td>
         <td class="r num"><b>${kr(r.now)}</b><div class="small muted">${kr(r.inMini)}</div></td>
         <td class="r num ${cls(r.chg)}"><b>${r.inMini ? svp(Math.round(r.chg / r.inMini * 1000) / 10) : '–'}</b><div class="small">${sgnKr(r.chg)}</div></td></tr>`).join('')}
       ${cashLeft >= 1 ? `<tr><td><b>Kontanter</b><div class="small muted">Belopp som inte räcker till en order på minst ${kr(R.minOrder)}</div></td><td class="r num"><b>${kr(cashLeft)}</b></td><td></td></tr>` : ''}
@@ -1811,13 +1845,17 @@ function renderMonthly() {
         <li>Ligger S&amp;P 500 under sitt 200-dagars snitt köps inga aktier. Ligger en aktie mer än 25 % under sitt högsta det senaste året köps den inte.</li>
         <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort (allt i guld om beloppet är för litet för två order).</li>
         <li>Låg hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Hela platsens belopp läggs i det papper som har hävstång närmast målet, AVA-papper först. Ingen order under ${kr(R.minOrder)}.</li>
-        <li>Byte en gång i månaden, strax före stängningen sista handelsdagen. Inga stopp, inga mål.</li></ul>
-      <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med hävstång (25 % utan) mot 11 % för S&amp;P 500. Största nedgång cirka −51 % med hävstång (−32 % utan).
+        <li>Byte en gång i månaden, strax före stängningen sista handelsdagen. Inga stopp och inga vanliga mål.</li>
+        <li><b>Säljregel:</b> stiger en aktie minst ${Math.round(R.jumpSell * 100)} % på en dag säljs den samma dag (du får en notis cirka 21.30). Platsen står i kontanter till nästa byte. En sådan rusning rinner ofta delvis tillbaka – i testet gav regeln högre avkastning och mindre nedgångar.</li></ul>
+      <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med 1,8x och säljregeln (26 % utan hävstång) mot 11 % för S&amp;P 500. Största nedgång cirka −46 % med hävstång (−27 % utan). Utan säljregeln: 30 % per år och −62 %.
         Testet saknar en del bolag som avnoterats och resultatet bygger på ett fåtal stora vinnare, så verkligheten blir troligen sämre. Valutan (dollarn) påverkar också.</p>
       <p class="small muted">Startpunkten är räknad i efterhand. Inte investeringsrådgivning – varje affär är ditt eget beslut.</p></div></details>
     <button class="btn small" id="mo-refresh">Uppdatera kurserna</button>
   </article>`;
   $('#mo-start').addEventListener('change', e => { store.set('momStart', e.target.value); renderMonthly(); });
+  $('#alloc-total')?.addEventListener('change', e => { store.set('allocTotal', e.target.value); renderMonthly(); });
+  $('#alloc-use')?.addEventListener('click', () => { store.set('momStart', String(Math.round((+store.get('allocTotal', '') || 0) * 0.4 / 100) * 100 || 3000)); renderMonthly(); });
+  $('.alloc-card')?.addEventListener('toggle', e => store.set('allocOpen', e.target.open ? '1' : '0'));
   $('#mo-refresh').addEventListener('click', () => loadMonthly(true));
 }
 
