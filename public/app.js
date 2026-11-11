@@ -717,7 +717,7 @@ function renderAi() {
 let logData = null;
 // Målen med bock och grön färg när de är nådda.
 const tpChips = (tps, hit = 0) => tps.map((p, k) => `<span class="tp-chip${k < hit ? ' hit' : ''}" title="${k < hit ? 'Nådd' : 'Inte nådd än'}">TP${k + 1} ${fmt(p)}${k < hit ? ' ✓' : ''}</span>`).join(' ');
-const KIND = e => e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
+const KIND = e => e.kind === 'exp' ? `Experiment · ${e.title || ''}` : e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
 const isLive = e => e.state === 'öppen' || e.state === 'väntar på köp';
 const sv = v => String(v).replace('.', ',');
 const resText = e => e.pct != null ? `${e.pct > 0 ? '+' : ''}${sv(e.pct)} %` : e.r != null ? `${e.r > 0 ? '+' : ''}${sv(e.r)} R` : '–';
@@ -736,6 +736,7 @@ function tradeBar(e) {
 // Nästa steg i klartext.
 function nextStep(e) {
   const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
+  if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. Stäng senast <b>${esc(wd(e.exitDate))}</b>.${e.size < 1 ? ' Halv insats.' : ''}`;
   if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt ${esc(e.buyDate)}. ` : ''}Inget att göra förrän säljdagen: sälj på stängningen <b>${esc(wd(e.exitDate))}</b>, oavsett kurs.`;
   if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
   if (hit === 0) return `Nästa: ${act} 1/3 vid TP1 <b>${fmt(e.tps[0])}</b>. Stopp ${fmt(e.stop)}.`;
@@ -1030,6 +1031,9 @@ async function loadReport(month) {
         <p>${r.panic.trades} affärer${r.panic.open ? `, varav ${r.panic.open} öppna (just nu ${sgn(r.panic.nowPct, '%')} i snitt)` : ''}.</p>
         ${r.panic.closed ? `<p>Avslutade: summa <b class="${r.panic.sumPct >= 0 ? 'pos' : 'neg'}">${sgn(r.panic.sumPct, '%')}</b>, snitt ${sgn(r.panic.avgPct, '%')} per affär. Bästa ${sgn(r.panic.bestPct, '%')}, sämsta ${sgn(r.panic.worstPct, '%')}.</p>` : ''}
         <p class="muted small">Räknas i procent (inget stopp, inget R), från köpet på öppningen till stängningen på säljdagen, med 0,2 % i avgift. Ingår i vinstandelen men inte i summa R.</p></div>` : ''}
+      ${r.experiments ? `<div class="rp-box"><b>Experiment</b> <span class="muted small">(NFP-guld, Fed-vändning)</span>
+        <p>${r.experiments.closed} avslutade${r.experiments.closed ? `, ${r.experiments.wins} med vinst, summa <b class="${r.experiments.sumPct >= 0 ? 'pos' : 'neg'}">${sgn(r.experiments.sumPct, '%')}</b>` : ''}${r.experiments.open ? `, ${r.experiments.open} öppna` : ''}.</p>
+        <p class="muted small">Mäts framåt med liten insats. Räknas i procent i guld, silver eller olja, från stängningskursen signaldagen.</p></div>` : ''}
       ${r.monthly ? `<div class="rp-box"><b>Månadens aktier</b>
         <p>${esc([...r.monthly.names, ...(r.monthly.mode !== 'aktier' ? ['kassaläge (guld och olja kort)'] : [])].join(', '))} – beslutat ${esc(r.monthly.decided)}${r.monthly.backfilled ? ' <span class="muted">(räknat i efterhand)</span>' : ''}.</p>
         <p>${r.monthly.open ? 'Pågår – räknas när månaden är slut. Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.rules.stockLev).replace('.', ',')}x aktier, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>

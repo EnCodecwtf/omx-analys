@@ -10,6 +10,7 @@ import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
 import { freeView } from './lib/freeview.js';
+import { EXPERIMENTS, experimentSignal, expOutcome } from './lib/experiments.js';
 import { igStatus, igEnabled, configureIg, igTryLogin } from './lib/ig.js';
 import crypto from 'node:crypto';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
@@ -321,7 +322,7 @@ async function shortScan() {
 async function outcomeOf(e) {
   try {
     const bars = await fetchBars(e.symbol);
-    return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
+    return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'exp' ? expOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
   } catch { return { state: 'okänd' }; }
 }
 
@@ -822,6 +823,21 @@ async function aiTrader() {
   });
 }
 
+// Experiment som mäts framåt (lib/experiments.js). Loggas i signalloggen som kind 'exp'.
+const fomcDays = new Set(JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'fomc.json'), 'utf8')).decisionDays);
+async function experimentCheck() {
+  const ny = monthly.nyNow(), added = [];
+  for (const x of Object.values(EXPERIMENTS)) {
+    const isEvent = x.event === 'nfp' ? (new Date(ny.date + 'T12:00:00Z').getUTCDay() === 5 && +ny.date.slice(8) <= 7) : fomcDays.has(ny.date);
+    if (!isEvent || ny.min < x.settle + 10) continue;
+    const e = experimentSignal(x, await fetchBars(x.symbol), { date: ny.date, nyMin: ny.min, fomc: fomcDays });
+    if (!e) continue;
+    const rec = await recordFree([e]);
+    for (const r of rec) { await notifySignal(r); added.push(r); }
+  }
+  return added;
+}
+
 // Live under dagen: bevakar öppna affärer i signalloggen och skickar notis när
 // ett mål eller stoppet nås, påminner om säljdagen för krypto och förvarnar när
 // en köpsignal är på väg inför stängningen. Körs var 10–15:e minut av en extern
@@ -839,6 +855,15 @@ async function liveCheck({ force = false } = {}) {
         // Påminnelse kvällen före säljdagen (efter 17.00) eller på säljdagen.
         const now = sthlm();
         if (now.date >= e.exitDate || (addTradingDays(now.date, 1) === e.exitDate && now.min >= 17 * 60)) for (const k of await signalLog.markAlerts(id, ['exit'])) if (await notifyEvent(e, k)) sent.push(`${e.symbol} ${k}`);
+        continue;
+      }
+      if (e.kind === 'exp') {
+        // Experiment: notis vid stopp eller mål, och påminnelse på säljdagen.
+        const o = expOutcome(e, await fetchBars(e.symbol));
+        const ny = monthly.nyNow();
+        const kinds = o.state === 'stängd' && o.why !== 'säljdag' ? [o.why === 'mål' ? 'tp' : 'stop'] : o.state === 'öppen' && ny.date >= e.exitDate ? ['exit'] : [];
+        if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
+        for (const k of await signalLog.markAlerts(id, kinds)) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
         continue;
       }
       if (e.kind === 'crypto') {
@@ -879,6 +904,8 @@ async function liveCheck({ force = false } = {}) {
   }
   // Coachens omgång (09.30, 12.30, 15.30, 18.00) skapas här om ingen har öppnat appen.
   if (!s.weekend) { try { await logView(); } catch (err) { console.error('Coachens omgång misslyckades:', err.message); } }
+  // Experimenten (NFP-guld, Fed-vändning): signal när stängningskursen är satt i New York.
+  try { for (const e of await experimentCheck()) sent.push(`${e.symbol} experiment`); } catch (err) { console.error('Experimenten:', err.message); }
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
   try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   return { ok: true, marketOpen: open, sent };
