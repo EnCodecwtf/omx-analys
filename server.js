@@ -805,7 +805,7 @@ async function aiTrader() {
     const list = await signalLog.entries();
     const picks = await ensureAiPicks(list);
     const bars = new Map(), reports = new Map();
-    for (const e of list) if (!e.kind && !bars.has(e.symbol)) {
+    for (const e of list) if ((!e.kind || e.kind === 'panic') && !bars.has(e.symbol)) {
       try { bars.set(e.symbol, await fetchBars(e.symbol)); } catch { /* hoppas över */ }
       const meta = bySymbol.get(e.symbol);
       if (meta && !meta.isUS && !meta.isIndex) { const r = await nextReport(e.symbol).catch(() => null); reports.set(e.symbol, [...reportDates(e.symbol), ...(r ? [r.date] : [])]); }
