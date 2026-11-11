@@ -37,14 +37,28 @@ jobs:
         if: steps.guard.outputs.skip != '1'
         env:
           KEY: ${{ secrets.CRON_SECRET }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           inside() { d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 645 ] && [ "$t" -le 2115 ]; }
           end=$(( $(date +%s) + 5 * 3600 ))
+          # Morgonsoffans ljud: startas härifrån så fort dagens session finns men saknar ljud
+          # (GitHubs eget schema för ljudjobbet startar ofta flera timmar för sent).
+          audio() {
+            d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 600 ] && [ "$t" -le 1100 ] || return 0
+            today=$(TZ=Europe/Stockholm date +%F)
+            info=$(curl -fsS -m 60 "https://omx-analys.vercel.app/api/morning" | jq -r '[.morning.date // "", (.morning.audio != null)] | @tsv') || return 0
+            sdate=$(echo "$info" | cut -f1); has=$(echo "$info" | cut -f2)
+            [ "$sdate" = "$today" ] && [ "$has" = "false" ] || return 0
+            last=$(cat /tmp/audio_started 2>/dev/null || echo 0)
+            [ $(( $(date +%s) - last )) -ge 1200 ] || return 0   # högst ett försök per 20 minuter
+            gh workflow run morning-audio.yml --repo "${{ github.repository }}" && date +%s > /tmp/audio_started && echo "Startade Morgonsoffans ljud"
+          }
           while [ "$(date +%s)" -lt "$end" ]; do
             if inside; then
               curl -fsS -m 90 "https://omx-analys.vercel.app/api/cron/live?key=${KEY}" || echo "Anropet misslyckades, försöker igen om 10 minuter"
               echo
             fi
+            audio || true
             sleep 600
           done
       - name: Starta nästa omgång
