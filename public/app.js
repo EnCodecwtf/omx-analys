@@ -1055,7 +1055,7 @@ async function loadReport(month) {
         <p class="muted small">Mäts framåt med liten insats. Räknas i procent i guld, silver eller olja, från stängningskursen signaldagen.</p></div>` : ''}
       ${r.monthly ? `<div class="rp-box"><b>Månadens aktier</b>
         <p>${esc([...r.monthly.names, ...(r.monthly.mode !== 'aktier' ? ['kassaläge (guld och olja kort)'] : [])].join(', '))} – beslutat ${esc(r.monthly.decided)}${r.monthly.backfilled ? ' <span class="muted">(räknat i efterhand)</span>' : ''}.</p>
-        <p>${r.monthly.open ? 'Pågår – räknas när månaden är slut. Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.rules.stockLev).replace('.', ',')}x aktier, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>
+        <p>${r.monthly.open ? 'Pågår – räknas när månaden är slut. Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.lev ?? r.monthly.rules.stockLev).replace('.', ',')}x aktier enligt VIX-stegen, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>
         ${r.monthly.aiPart ? `<p>AI-traderns del: ${kr(r.monthly.aiPart.amount)} → <b>${kr(r.monthly.aiPart.value)}</b> (${sgn(r.monthly.aiPart.pnlPct, '%')}). Egna beslut: ${sgn(r.monthly.aiPart.edge, 'kr')} mot att bara följa reglerna.</p>` : ''}
         <p class="muted small">Beräknat från kurserna utan ränta och spread. Hela historiken finns under Mer → Månadens aktier.</p></div>` : ''}
       ${r.account ? `<div class="rp-box"><b>AI-traderns fiktiva konto</b>
@@ -1713,7 +1713,7 @@ function miniG(s0, s1, L, short) {
 // (t.ex. 3 300 kr = 3 × 1 100 kr). Räcker inte heller det tas olja kort bort först.
 function allocate(state, money, m) {
   const R = m.rules, cash = money * state.cashShare;
-  const legs = state.stocks.map(s => ({ key: s.symbol, title: s.name, sub: `${s.symbol} · aktie lång`, kind: 'stock', s, list: s.minis, target: R.stockLev, w: 1 / R.slots }));
+  const legs = state.stocks.map(s => ({ key: s.symbol, title: s.name, sub: `${s.symbol} · aktie lång`, kind: 'stock', s, list: s.minis, target: state.lev ?? R.stockLev, w: 1 / R.slots }));
   if (cash > 0) {
     legs.push({ key: 'gold', title: 'Guld', sub: 'kassaläge · lång', kind: 'gold', list: m.cash.gold, target: R.cashLev, w: state.cashShare / 2 });
     legs.push({ key: 'oil', title: 'Olja (Brent)', sub: 'kassaläge · kort', kind: 'oil', list: m.cash.oil, target: R.cashLev, short: true, w: state.cashShare / 2 });
@@ -1750,7 +1750,8 @@ function renderMonthly() {
   const closed = m.periods.filter(p => !p.open && p.retPct != null);
   const v0 = closed.reduce((v, p) => v * (1 + p.retPct / 100), start);
   const legs = cur ? allocate(cur, v0, m) : [];
-  const growth = l => l.kind === 'stock' ? (l.s.last ? miniG(l.s.entry, l.s.last, R.stockLev) / miniG(l.s.entry, l.s.price, R.stockLev) : 1)
+  const sLev = s => s.lev ?? cur?.lev ?? R.stockLev;
+  const growth = l => l.kind === 'stock' ? (l.s.last ? miniG(l.s.entry, l.s.last, sLev(l.s)) / miniG(l.s.entry, l.s.price, sLev(l.s)) : 1)
     : l.kind === 'gold' ? miniG(cur.gold, m.cash.goldNow, R.cashLev) : miniG(cur.oil, m.cash.oilNow, R.cashLev, true);
   let cashLeft = v0 - legs.reduce((a, l) => a + l.money, 0);
   const rows = legs.map(l => {
@@ -1776,9 +1777,11 @@ function renderMonthly() {
   // Bytet: det som säljs och det som köps (det som behålls rörs inte).
   let swap = '';
   if (nx && !nx.error) {
-    const nxLegs = allocate({ stocks: nx.stocks, cashShare: nx.cashShare }, total, m);
-    const sells = rows.filter(r => r.kind === 'stock' ? !r.s.sold && !nx.stocks.some(s => s.symbol === r.s.symbol) : !(nx.cashShare > 0));
-    const buys = nxLegs.filter(l => l.kind === 'stock' ? !held.has(l.s.symbol) : !(cur?.cashShare > 0));
+    const nxLegs = allocate({ stocks: nx.stocks, cashShare: nx.cashShare, lev: nx.lev }, total, m);
+    // Ändras hävstången (VIX-stegen) byts minin även i en aktie som behålls.
+    const relev = s => nx.lev != null && (s.lev ?? cur?.lev ?? R.stockLev) !== nx.lev;
+    const sells = rows.filter(r => r.kind === 'stock' ? !r.s.sold && (!nx.stocks.some(s => s.symbol === r.s.symbol) || relev(r.s)) : !(nx.cashShare > 0));
+    const buys = nxLegs.filter(l => l.kind === 'stock' ? !held.has(l.s.symbol) || relev(cur.stocks.find(s => s.symbol === l.s.symbol) || {}) : !(cur?.cashShare > 0));
     swap = sells.length || buys.length
       ? `${orderRows(sells, 'Sälj')}${orderRows(buys)}`
       : '<p>Inget byte – allt behålls.</p>';
@@ -1804,6 +1807,7 @@ function renderMonthly() {
       <span>Läge: <b>${cur ? modeText(cur) : '–'}</b></span>
       <span>Nästa byte: <b>${esc(moDay(rd.next))}</b>${rd.isToday ? ' <b class="pos">– idag före 22.00</b>' : ` (om ${daysTo(rd.next)} dagar)`}</span>
       <span>S&amp;P 500 ${cur?.spy?.below ? '<b class="neg">under</b>' : '<b class="pos">över</b>'} 200-dagars snitt</span>
+      <span>Hävstång: <b>${svx(cur?.lev ?? R.stockLev)}</b>${cur?.vix != null ? ` (VIX ${String(Math.round(cur.vix * 10) / 10).replace('.', ',')} vid bytet)` : ''}${nx && !nx.error && nx.lev != null && nx.lev !== (cur?.lev ?? R.stockLev) ? ` · nästa månad <b>${svx(nx.lev)}</b> om VIX ligger kvar (${String(Math.round((m.vixNow ?? 0) * 10) / 10).replace('.', ',')})` : ''}</span>
     </div>
     ${start < 2 * R.minOrder ? `<div class="status"><b>För lågt startvärde</b><span>Varje order måste vara minst ${kr(R.minOrder)} för att slippa courtage, så startvärdet behöver vara minst ${kr(2 * R.minOrder)} (helst ${kr(3 * R.minOrder)}).</span></div>` : ''}
 
@@ -1820,7 +1824,7 @@ function renderMonthly() {
       ${cashLeft >= 1 ? `<tr><td><b>Kontanter</b><div class="small muted">Belopp som inte räcker till en order på minst ${kr(R.minOrder)}</div></td><td class="r num"><b>${kr(cashLeft)}</b></td><td></td></tr>` : ''}
       <tr class="pf-sum"><td><b>Totalt</b></td><td class="r num"><b>${kr(total)}</b></td><td class="r num ${cls(total - v0)}"><b>${svp(Math.round((total / v0 - 1) * 1000) / 10)}</b><div class="small">${sgnKr(total - v0)}</div></td></tr>
     </table>
-    <p class="muted small">Värdet är beräknat från kurserna (minin med ${svx(R.stockLev)} på aktier och ${svx(R.cashLev)} på guld och olja), utan ränta och spread. Den lilla siffran under värdet är vad som köptes för vid senaste bytet.</p>
+    <p class="muted small">Värdet är beräknat från kurserna (minin med ${svx(cur?.lev ?? R.stockLev)} på aktier och ${svx(R.cashLev)} på guld och olja), utan ränta och spread. Den lilla siffran under värdet är vad som köptes för vid senaste bytet.</p>
 
     ${rd.isToday ? `<div class="mo-todo today"><h3>Byt idag – strax före 22.00</h3>${swap}</div>` : ''}
 
@@ -1845,7 +1849,7 @@ function renderMonthly() {
         <li>De två bästa köps med lika vikt. En aktie behålls så länge den är bland de fyra bästa.</li>
         <li>Ligger S&amp;P 500 under sitt 200-dagars snitt köps inga aktier. Ligger en aktie mer än 25 % under sitt högsta det senaste året köps den inte.</li>
         <li>Platser utan aktie går till kassaläget: hälften guld lång och hälften olja kort (allt i guld om beloppet är för litet för två order).</li>
-        <li>Låg hävstång: minifutures med cirka ${svx(R.stockLev)} på aktierna och ${svx(R.cashLev)} i kassaläget. Hela platsens belopp läggs i det papper som har hävstång närmast målet, AVA-papper först. Ingen order under ${kr(R.minOrder)}.</li>
+        <li><b>Hävstång efter VIX (VIX-stegen):</b> VIX under 15 vid bytet ger 1,8x, 15–25 ger 1,25x och över 25 ger 1x på aktierna. Momentum kraschar nästan alltid när marknaden redan är orolig, så hävstången dras ner innan. I testet: 32 % per år med största nedgång −32 %, mot 35 % och −46 % med fast 1,8x. Ändras hävstången byts minin även för en aktie som behålls. Kassaläget har ${svx(R.cashLev)}. Hela platsens belopp läggs i det papper som har hävstång närmast målet, AVA-papper först. Ingen order under ${kr(R.minOrder)}.</li>
         <li>Byte en gång i månaden, strax före stängningen sista handelsdagen. Inga stopp och inga vanliga mål.</li>
         <li><b>Säljregel:</b> stiger en aktie minst ${Math.round(R.jumpSell * 100)} % på en dag säljs den samma dag (du får en notis cirka 21.30). Platsen står i kontanter till nästa byte. En sådan rusning rinner ofta delvis tillbaka – i testet gav regeln högre avkastning och mindre nedgångar.</li></ul>
       <p class="small"><b>Testat 2006–2026:</b> cirka 35 % per år med 1,8x och säljregeln (26 % utan hävstång) mot 11 % för S&amp;P 500. Största nedgång cirka −46 % med hävstång (−27 % utan). Utan säljregeln: 30 % per år och −62 %.

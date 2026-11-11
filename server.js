@@ -625,6 +625,8 @@ async function ensureMonthly() {
   const held = prev && prev.month === monthly.addMonths(target, -1) ? prev.stocks.filter(s => !s.sold).map(s => s.symbol) : [];
   const d = await monthlyDecision(target, held, rd.last);
   const [gold, oil] = await Promise.all([closeOn(monthly.GOLD.yahoo, rd.last), closeOn(monthly.OIL.yahoo, rd.last)]);
+  // VIX-stegen: hävstången för månaden sätts efter VIX vid bytet.
+  const vix = await closeOn('^VIX', rd.last), lev = monthly.levForVix(vix);
   if (prev && !prev.end) {
     prev.end = { date: rd.last, gold, oil, prices: {} };
     for (const s of prev.stocks) prev.end.prices[s.symbol] = d.stocks.find(x => x.symbol === s.symbol)?.price ?? await closeOn(s.symbol, rd.last);
@@ -634,8 +636,11 @@ async function ensureMonthly() {
     // Beslut som räknats fram i efterhand (t.ex. startpunkten) märks, de publicerades inte i förväg.
     backfilled: rd.today > monthly.nextNyseDay(rd.last),
     mode: d.mode, cashShare: d.cashShare, spy: d.spy, skipped: d.skipped.map(x => ({ symbol: x.symbol, name: x.name, rank: x.rank, fromHigh: x.fromHigh })),
+    vix, lev,
     stocks: d.stocks.map(s => { const old = prev?.stocks.find(x => x.symbol === s.symbol && !x.sold);
-      return { symbol: s.symbol, name: s.name, rank: s.rank, mom: s.mom, fromHigh: s.fromHigh, price: s.price, entry: old?.entry ?? s.price, since: old?.since ?? rd.last, kept: !!old }; }),
+      // Samma hävstång: minin behålls. Annan hävstång: nytt papper från bytesdagen.
+      const same = old && (old.lev ?? prev.lev ?? monthly.RULES.stockLev) === lev;
+      return { symbol: s.symbol, name: s.name, rank: s.rank, mom: s.mom, fromHigh: s.fromHigh, price: s.price, entry: same ? old.entry : s.price, since: old?.since ?? rd.last, kept: !!old, lev, relevered: !!old && !same }; }),
     gold, oil, top: d.top.map(x => ({ symbol: x.symbol, name: x.name, mom: x.mom })),
   });
   await signalLog.kvSet(MONTHLY_KEY, state);
@@ -660,17 +665,21 @@ async function monthlyView() {
     // Läget just nu för innehaven.
     const live = { prices: {}, gold: await closeOn(monthly.GOLD.yahoo), oil: await closeOn(monthly.OIL.yahoo) };
     for (const s of cur?.stocks || []) live.prices[s.symbol] = await closeOn(s.symbol);
-    const withProduct = async s => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, minis: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, L.stockLev, 'long') });
+    const curLev = cur?.lev ?? L.stockLev;
+    const vixNow = await closeOn('^VIX');
+    if (next && !next.error) { next.vix = vixNow; next.lev = monthly.levForVix(vixNow); }
+    const withProduct = async (s, lev) => ({ ...s, avanzaId: momBySymbol.get(s.symbol)?.avanzaId || null, minis: await monthlyMini(momBySymbol.get(s.symbol)?.avanzaId, lev, 'long') });
     const current = cur && {
       ...cur,
       // En såld aktie (säljregeln) visas med säljkursen; platsen är kontanter till nästa byte.
       stocks: await Promise.all(cur.stocks.map(async s => { const px = s.sold?.price ?? live.prices[s.symbol];
-        return { ...(await withProduct(s)), last: px, now: live.prices[s.symbol],
+        return { ...(await withProduct(s, s.lev ?? curLev)), last: px, now: live.prices[s.symbol],
           changePct: px ? Math.round((px / s.entry - 1) * 1e4) / 100 : null,
-          miniPct: px ? Math.round((monthly.miniGrowth(s.entry, px, L.stockLev) - 1) * 1e4) / 100 : null }; })),
+          miniPct: px ? Math.round((monthly.miniGrowth(s.entry, px, s.lev ?? curLev) - 1) * 1e4) / 100 : null }; })),
+      lev: curLev,
       goldNow: live.gold, oilNow: live.oil,
     };
-    if (next && !next.error) next.stocks = await Promise.all(next.stocks.map(withProduct));
+    if (next && !next.error) next.stocks = await Promise.all(next.stocks.map(s => withProduct(s, next.lev)));
     const [goldMini, oilMini] = await Promise.all([monthlyMini(monthly.GOLD.id, L.cashLev, 'long'), monthlyMini(monthly.OIL.id, L.cashLev, 'short')]);
     // Beräknat resultat period för period.
     let idx = 1, idxRaw = 1;
@@ -678,10 +687,10 @@ async function monthlyView() {
       const end = h.end || (i === state.history.length - 1 ? { date: 'nu', prices: live.prices, gold: live.gold, oil: live.oil } : null);
       const r = monthly.periodReturn(h, end);
       if (r) { idx *= 1 + r.lev; idxRaw *= 1 + r.raw; }
-      return { month: h.month, decided: h.decided, to: end?.date ?? null, open: !h.end, backfilled: !!h.backfilled, mode: h.mode,
+      return { month: h.month, decided: h.decided, to: end?.date ?? null, open: !h.end, backfilled: !!h.backfilled, mode: h.mode, lev: h.lev ?? L.stockLev, vix: h.vix ?? null,
         names: h.stocks.map(s => s.name), retPct: r ? Math.round(r.lev * 1e4) / 100 : null, rawPct: r ? Math.round(r.raw * 1e4) / 100 : null };
     });
-    return { updated: Date.now(), rules: { ...L, minOrder: monthly.MIN_ORDER }, rebalance: rd, current, next, cash: { gold: goldMini, oil: oilMini, goldNow: live.gold, oilNow: live.oil },
+    return { updated: Date.now(), rules: { ...L, minOrder: monthly.MIN_ORDER, ladder: monthly.VIX_LADDER.map(x => ({ below: x.below === Infinity ? null : x.below, lev: x.lev })) }, vixNow, rebalance: rd, current, next, cash: { gold: goldMini, oil: oilMini, goldNow: live.gold, oilNow: live.oil },
       periods, totalPct: Math.round((idx - 1) * 1e4) / 100, totalRawPct: Math.round((idxRaw - 1) * 1e4) / 100,
       changeText: next && !next.error ? monthly.changeText(cur, next) : null };
   });
@@ -710,7 +719,7 @@ async function monthlyJumpCheck() {
     s.sold = { date: ny.date, price, prevClose: prev, dayPct: pct, at: after ? 'stängning' : 'före stängning', notedAt: new Date().toISOString() };
     await signalLog.kvSet(MONTHLY_KEY, state);
     cache.delete('monthly'); cache.delete('aitrader');
-    const mini = Math.round((monthly.miniGrowth(s.entry, price, monthly.RULES.stockLev) - 1) * 1000) / 10;
+    const mini = Math.round((monthly.miniGrowth(s.entry, price, s.lev ?? cur.lev ?? monthly.RULES.stockLev) - 1) * 1000) / 10;
     const body = `${s.name} har stigit ${String(pct).replace('.', ',')} % idag (minin ${mini >= 0 ? '+' : ''}${String(mini).replace('.', ',')} % sedan köpet). ` +
       `Regeln: sälj efter en dag med minst 10 % uppgång – en sådan rusning rinner ofta delvis tillbaka. ${after ? 'Börsen har stängt: sälj vid öppningen i morgon (15.30 svensk tid).' : 'Sälj före 22.00 svensk tid.'} ` +
       'Pengarna står som kontanter till nästa månadsbyte, då aktien köps tillbaka om den fortfarande är bland de två bästa.';
@@ -756,7 +765,7 @@ async function aiMonthly(aiStart, hooks = {}) {
   const now = today();
   const px = (l, day) => closeOn(l.symbol, day);
   const open = async (state, money, day, why) => {
-    const legs = monthly.allocate({ stocks: cur.stocks, cashShare: cur.cashShare }, money, { gold: v.cash.gold || [], oil: v.cash.oil || [] });
+    const legs = monthly.allocate({ stocks: cur.stocks.filter(s => !s.sold), cashShare: cur.cashShare }, money, { gold: v.cash.gold || [], oil: v.cash.oil || [] }, { ...monthly.RULES, stockLev: cur.lev ?? monthly.RULES.stockLev });
     const pos = [];
     let cash = money;
     for (const l of legs) {

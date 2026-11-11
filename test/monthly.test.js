@@ -84,3 +84,22 @@ test('säljregeln: minst 10 % på en dag, och en såld aktie låses på säljkur
   assert.match(t, /Köp A och C/);
   assert.equal(RULES.jumpSell, 0.1);
 });
+
+test('VIX-stegen: 1,8x lugnt, 1,25x normalt, 1x oroligt – och byte av mini när hävstången ändras', async () => {
+  const { levForVix, changeText, periodReturn } = await import('../lib/monthly.js');
+  assert.equal(levForVix(12), 1.8);
+  assert.equal(levForVix(15), 1.25);
+  assert.equal(levForVix(24.9), 1.25);
+  assert.equal(levForVix(25), 1);
+  assert.equal(levForVix(null), 1.8);
+  const t = changeText({ stocks: [{ symbol: 'A', name: 'A' }], cashShare: 0.5, lev: 1.8 }, { stocks: [{ symbol: 'A', name: 'A' }], cashShare: 0.5, lev: 1.25, vix: 18 });
+  assert.match(t, /Byt minin i A till en med cirka 1,25x/);
+  assert.match(t, /VIX är 18/);
+  assert.doesNotMatch(t, /Inget byte/);
+  const same = changeText({ stocks: [{ symbol: 'A', name: 'A' }], cashShare: 0.5, lev: 1.25 }, { stocks: [{ symbol: 'A', name: 'A' }], cashShare: 0.5, lev: 1.25, vix: 18 });
+  assert.match(same, /Behåll A/);
+  // Värderingen använder aktiens egen hävstång.
+  const h = { stocks: [{ symbol: 'A', price: 100, entry: 100, lev: 1 }, { symbol: 'B', price: 100, entry: 100, lev: 1 }], cashShare: 0 };
+  const r = periodReturn(h, { prices: { A: 110, B: 110 } });
+  assert.ok(Math.abs(r.lev - 0.1) < 1e-9);
+});

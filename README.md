@@ -896,6 +896,25 @@ samtidigt. Med försiktigare antaganden (halva bitcoins uppgångar, 80 % av Mån
 fördelningen cirka 15 % per år med −21 %. Den optimerade fördelningen valdes bort eftersom den bygger på bitcoins historiska
 uppgång och bara tre cykler. Månadsdata döljer nedgångar inom månaden.
 
+### VIX-stegen: hävstång efter marknadsläget (2006–2026)
+Hävstången på aktierna i Månadens aktier sätts vid varje byte efter VIX: under 15 ger 1,8x, 15–25 ger 1,25x och över 25 ger 1x
+(`levForVix` i `lib/monthly.js`). Ändras hävstången byts minin även för en aktie som behålls. Med säljregeln:
+
+| Hävstång | Per år | 2006–15 | 2016–26 | Största nedgång | I fördelningen 40/20/20/20 |
+|---|---|---|---|---|---|
+| Fast 1x | 25,9 % | 25,1 % | 26,5 % | −27 % | 33 %/år, −11 % |
+| Fast 1,25x | 29,5 % | 29,7 % | 29,2 % | −33 % | 34 %/år, −13 % |
+| Fast 1,8x | 34,6 % | 38,1 % | 31,5 % | −46 % | 37 %/år, −19 % |
+| **VIX-stegen** | **32,0 %** | **31,7 %** | **32,3 %** | **−32 %** | **36 %/år, −12 %** |
+| Volmål på aktiens svängning (30–60 %) | 21–31 % | | | −26 till −31 % | 30–34 %/år |
+| Mer hävstång på den starkaste aktien | 35,0 % | 33,6 % | 36,2 % | −37 % | 37 %/år, −15 % |
+
+Momentum kraschar nästan alltid när marknaden redan är orolig, så stegen drar ner hävstången före smällen. Hävstången sätts
+bara vid bytet – VIX som rusar mitt i månaden påverkar inte. Samma test i resten av appen: OMX-signalernas resultat per
+affär var ungefär lika vid alla VIX-nivåer (+0,29 till +0,36 R; stoppet anpassar redan storleken efter svängningen), och
+panikveckans affärer blev bättre ju högre VIX (+0,5 % vid 25–30, +4,7 % över 45), men större insats vid högt VIX gav bara
++0,5–1,5 procentenheter per år med större nedgång eftersom lägena kommer i klungor. Därför används stegen bara i Månadens aktier.
+
 ### Säljregel i Månadens aktier (2006–2026)
 Stiger en aktie i Månadens aktier minst 10 % på en dag säljs den samma dag (notis cirka 21.30 svensk tid, kontroll 15.30–16.00 i
 New York, och efter stängningen om kontrollen missades). Platsen står i kontanter till nästa byte. Med 1,8x:
