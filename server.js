@@ -1048,7 +1048,11 @@ async function logView() {
   for (const e of out) {
     if (e.state !== 'öppen' && e.state !== 'väntar på köp') continue;
     // Senaste först, efter dag och tid (mål-meddelanden på dagen målet nåddes).
-    e.coachLog = coachLog.messages.filter(m => m.trade === signalLog.idOf(e)).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.at || '').localeCompare(a.at || '')).slice(0, 12);
+    // Mål-meddelanden visas alltid; omgångar de 12 senaste. Gamla omgångar som började med
+    // "TP… är taget" (före rättelsen 11 nov) visas inte – de lät som att målet just nåtts.
+    const mine = coachLog.messages.filter(m => m.trade === signalLog.idOf(e) && (m.tp || !/^TP\d är taget/.test(m.lines[0] || '')));
+    const byTime = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.at || '').localeCompare(a.at || '');
+    e.coachLog = [...mine.filter(m => m.tp), ...mine.filter(m => !m.tp).sort(byTime).slice(0, 12)].sort(byTime);
   }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.
