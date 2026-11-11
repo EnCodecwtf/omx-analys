@@ -546,3 +546,20 @@ test('månadsrapporten räknar affärer efter säljdatum; öppna förs till mån
   assert.deepEqual(oct.rows.map(r => r.symbol), ['D']);
   assert.deepEqual(oct.openRows.map(r => r.symbol), ['A']); // öppen vid oktobers slut
 });
+
+test('coachen vid nått mål: en tredjedel, nästa mål och hinder', async () => {
+  const { coachTp } = await import('../lib/coach.js');
+  const d = i => 1_700_000_000 + i * 86400;
+  const bars = [{ t: d(0), o: 100, h: 101, l: 98, c: 100 }, { t: d(1), o: 100, h: 107, l: 99, c: 106 }];
+  const ev = { atr: 2, rsi: 62, ema: { e20: 103, e50: 104, e200: 110 }, zones: [{ kind: 'resistance', lo: 108, hi: 109, touches: 3 }] };
+  const e = { name: 'Test', entry: 100, stop: 95, tps: [105, 112, 118], last: 106 };
+  const c1 = coachTp(e, 1, bars, ev, { date: '2026-11-20', days: 6 });
+  assert.match(c1.lines[0], /en tredjedel/);
+  assert.match(c1.lines[1], /TP2/);
+  assert.match(c1.lines[2], /motstånd 108,00–109,00/);
+  assert.match(c1.lines[2], /EMA 200/);
+  assert.match(c1.lines[2], /rapport/);
+  const c3 = coachTp(e, 3, bars, ev, null);
+  assert.equal(c3.lines.length, 1);
+  assert.match(c3.lines[0], /sista tredjedelen/);
+});

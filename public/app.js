@@ -747,7 +747,7 @@ function nextStep(e) {
 function coachBox(e) {
   const msgs = e.coachLog?.length ? e.coachLog : e.coach?.lines?.length ? [{ lines: e.coach.lines, tone: e.coach.tone, now: true }] : [];
   if (!msgs.length) return '';
-  const when = m => m.now ? 'just nu' : `${m.date === new Date().toLocaleDateString('sv-SE') ? 'i dag' : new Date(m.date + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })} ${m.slot}`;
+  const when = m => m.now ? 'just nu' : `${m.date === new Date().toLocaleDateString('sv-SE') ? 'i dag' : new Date(m.date + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })} ${m.tp ? `· TP${m.tp} nådd` : m.slot}`;
   const latest = msgs[0];
   return `<details class="coach ${latest.tone}"><summary><span class="coach-ico" aria-hidden="true">🧭</span><b>Coachen</b><span class="coach-peek">${esc(when(latest))} · ${esc(latest.lines[0])}</span>${msgs.length > 1 ? `<span class="coach-count">${msgs.length}</span>` : ''}</summary>
     <div class="coach-body">${msgs.map((m, k) => `<div class="coach-msg${k ? ' old' : ''}"><div class="coach-when">${esc(when(m))}</div>${m.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>`).join('')}

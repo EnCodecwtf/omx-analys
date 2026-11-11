@@ -21,7 +21,7 @@ import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
-import { coachTrade } from './lib/coach.js';
+import { coachTrade, coachTp } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
 import { runAiTrader } from './lib/aitrader.js';
@@ -853,11 +853,19 @@ async function liveCheck({ force = false } = {}) {
       // Affärer som stängdes för flera dagar sedan markeras utan notis.
       if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
       const fresh = await signalLog.markAlerts(id, kinds);
-      if (fresh.length && o.state === 'öppen') {
-        // Coachens läsning av läget följer med notisen om ett nått mål.
-        try { const bars = await fetchBars(e.symbol); o.coach = coachTrade({ ...e, ...o }, bars, evaluate(bars.slice(-CHART_BARS)), null); } catch { /* notisen skickas ändå */ }
+      // Coachen: ett eget meddelande första gången varje mål nås (en tredjedel, nästa mål, hinder).
+      const tpCoach = {};
+      if (fresh.some(k => /^tp\d$/.test(k))) {
+        try {
+          const bars = await fetchBars(e.symbol), ev = evaluate(bars.slice(-CHART_BARS));
+          const meta = bySymbol.get(e.symbol);
+          const rep = meta && !meta.isIndex && !meta.isUS ? await nextReport(e.symbol).catch(() => null) : null;
+          const report = rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null;
+          for (const k of fresh.filter(k => /^tp\d$/.test(k))) tpCoach[k] = coachTp({ ...e, ...o }, +k.slice(2), bars, ev, report);
+          await saveTpCoach(e, tpCoach);
+        } catch (err) { console.error('Coachen vid mål misslyckades för', e.symbol, err.message); }
       }
-      for (const k of fresh) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
+      for (const k of fresh) if (await notifyEvent(e, k, { ...o, coach: tpCoach[k] || null })) sent.push(`${e.symbol} ${k}`);
     } catch (err) {
       console.error('Live-kontrollen misslyckades för', e.symbol, err.message);
     }
@@ -911,6 +919,17 @@ async function summary() {
 const COACH_KEY = 'omx-analys:coach';
 const COACH_SLOTS = [9 * 60 + 30, 12 * 60 + 30, 15 * 60 + 30, 18 * 60];
 const slotLabel = m => `${String(Math.floor(m / 60)).padStart(2, '0')}.${String(m % 60).padStart(2, '0')}`;
+// Coachens meddelande vid ett nått mål sparas som eget meddelande i samma logg som omgångarna.
+async function saveTpCoach(e, byKind) {
+  const list = Object.entries(byKind); if (!list.length) return;
+  const saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] };
+  const s = sthlm(), at = new Date().toISOString(), trade = signalLog.idOf(e);
+  const add = list.filter(([k]) => !saved.messages.some(m => m.id === `${trade}|${k}`))
+    .map(([k, c]) => ({ id: `${trade}|${k}`, at, slot: k.toUpperCase(), date: s.date, trade, symbol: e.symbol, name: e.name, tone: c.tone, lines: c.lines, tp: +k.slice(2) }));
+  if (!add.length) return;
+  saved.messages = [...add.reverse(), ...saved.messages].slice(0, 300);
+  await signalLog.kvSet(COACH_KEY, saved);
+}
 async function coachRound(entries) {
   let saved;
   try { saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] }; } catch { return { messages: [] }; }
