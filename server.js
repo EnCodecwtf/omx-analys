@@ -993,6 +993,23 @@ async function logView() {
       e.coach = coachTrade(e, bars, evaluate(bars.slice(-CHART_BARS)), rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null);
     } catch (err) { console.error('Coachen kunde inte räkna', e.symbol, err.message); }
   }
+  // Mål som nåtts men saknar coachens mål-meddelande (t.ex. nådda innan funktionen fanns) får det en gång.
+  for (const e of out) {
+    if (e.state !== 'öppen' || !e.hit || e.kind || !e.tps) continue;
+    try {
+      const saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] }, trade = signalLog.idOf(e);
+      const missing = [1, 2, 3].filter(k => k <= e.hit && !saved.messages.some(m => m.id === `${trade}|tp${k}`));
+      if (!missing.length) continue;
+      const bars = await fetchBars(e.symbol), ev = evaluate(bars.slice(-CHART_BARS));
+      const meta = bySymbol.get(e.symbol);
+      const rep = meta && !meta.isIndex && !meta.isUS ? await nextReport(e.symbol).catch(() => null) : null;
+      const report = rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null;
+      // Bara det senaste nådda målet beskriver läget nu; tidigare mål får en kort rad.
+      const by = {};
+      for (const k of missing) by[`tp${k}`] = k === e.hit ? coachTp(e, k, bars, ev, report) : { tone: 'good', lines: [`🎯 TP${k} nåddes tidigare på ${e.name} (${e.tps[k - 1]}). En tredjedel skulle säljas där.`] };
+      await saveTpCoach(e, by);
+    } catch (err) { console.error('Coachen (mål i efterhand) misslyckades för', e.symbol, err.message); }
+  }
   const coachLog = await coachRound(out);
   for (const e of out) {
     if (e.state !== 'öppen' && e.state !== 'väntar på köp') continue;
