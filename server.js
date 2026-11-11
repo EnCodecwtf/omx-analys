@@ -22,7 +22,7 @@ import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
 import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
-import { coachTrade, coachTp } from './lib/coach.js';
+import { coachTrade, coachTp, reachedDate } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
 import { runAiTrader } from './lib/aitrader.js';
@@ -912,7 +912,7 @@ async function liveCheck({ force = false } = {}) {
           const meta = bySymbol.get(e.symbol);
           const rep = meta && !meta.isIndex && !meta.isUS ? await nextReport(e.symbol).catch(() => null) : null;
           const report = rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null;
-          for (const k of fresh.filter(k => /^tp\d$/.test(k))) tpCoach[k] = coachTp({ ...e, ...o }, +k.slice(2), bars, ev, report);
+          for (const k of fresh.filter(k => /^tp\d$/.test(k))) tpCoach[k] = { ...coachTp({ ...e, ...o }, +k.slice(2), bars, ev, report, { reached: reachedDate(e, +k.slice(2), bars) || today(), today: today() }), reached: reachedDate(e, +k.slice(2), bars) || today() };
           await saveTpCoach(e, tpCoach);
         } catch (err) { console.error('Coachen vid mål misslyckades för', e.symbol, err.message); }
       }
@@ -978,7 +978,7 @@ async function saveTpCoach(e, byKind) {
   const saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] };
   const s = sthlm(), at = new Date().toISOString(), trade = signalLog.idOf(e);
   const add = list.filter(([k]) => !saved.messages.some(m => m.id === `${trade}|${k}`))
-    .map(([k, c]) => ({ id: `${trade}|${k}`, at, slot: k.toUpperCase(), date: s.date, trade, symbol: e.symbol, name: e.name, tone: c.tone, lines: c.lines, tp: +k.slice(2) }));
+    .map(([k, c]) => ({ id: `${trade}|${k}`, at, slot: k.toUpperCase(), date: c.reached || s.date, trade, symbol: e.symbol, name: e.name, tone: c.tone, lines: c.lines, tp: +k.slice(2), reached: c.reached || s.date }));
   if (!add.length) return;
   saved.messages = [...add.reverse(), ...saved.messages].slice(0, 300);
   await signalLog.kvSet(COACH_KEY, saved);
@@ -1026,7 +1026,9 @@ async function logView() {
     if (e.state !== 'öppen' || !e.hit || e.kind || !e.tps) continue;
     try {
       const saved = (await signalLog.kvGet(COACH_KEY, null)) || { messages: [] }, trade = signalLog.idOf(e);
-      const missing = [1, 2, 3].filter(k => k <= e.hit && !saved.messages.some(m => m.id === `${trade}|tp${k}`));
+      // Saknas eller saknar datum för när målet nåddes (äldre meddelanden): skrivs (om).
+      const missing = [1, 2, 3].filter(k => k <= e.hit && !saved.messages.some(m => m.id === `${trade}|tp${k}` && m.reached));
+      if (missing.length) { saved.messages = saved.messages.filter(m => !missing.some(k => m.id === `${trade}|tp${k}`)); await signalLog.kvSet(COACH_KEY, saved); }
       if (!missing.length) continue;
       const bars = await fetchBars(e.symbol), ev = evaluate(bars.slice(-CHART_BARS));
       const meta = bySymbol.get(e.symbol);
@@ -1034,14 +1036,19 @@ async function logView() {
       const report = rep ? { date: rep.date, days: tradingDaysBetween(today(), rep.date) } : null;
       // Bara det senaste nådda målet beskriver läget nu; tidigare mål får en kort rad.
       const by = {};
-      for (const k of missing) by[`tp${k}`] = k === e.hit ? coachTp(e, k, bars, ev, report) : { tone: 'good', lines: [`🎯 TP${k} nåddes tidigare på ${e.name} (${e.tps[k - 1]}). En tredjedel skulle säljas där.`] };
+      for (const k of missing) {
+        const reached = reachedDate(e, k, bars) || today();
+        by[`tp${k}`] = k === e.hit ? { ...coachTp(e, k, bars, ev, report, { reached, today: today() }), reached }
+          : { tone: 'good', reached, lines: [`🎯 TP${k} nåddes ${new Date(reached + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short' })} på ${e.name} (${String(e.tps[k - 1]).replace('.', ',')}). Där skulle en tredjedel säljas.`] };
+      }
       await saveTpCoach(e, by);
     } catch (err) { console.error('Coachen (mål i efterhand) misslyckades för', e.symbol, err.message); }
   }
   const coachLog = await coachRound(out);
   for (const e of out) {
     if (e.state !== 'öppen' && e.state !== 'väntar på köp') continue;
-    e.coachLog = coachLog.messages.filter(m => m.trade === signalLog.idOf(e)).slice(0, 12);
+    // Senaste först, efter dag och tid (mål-meddelanden på dagen målet nåddes).
+    e.coachLog = coachLog.messages.filter(m => m.trade === signalLog.idOf(e)).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.at || '').localeCompare(a.at || '')).slice(0, 12);
   }
   out.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name));
   // R gäller OMX-signalerna. Kryptosignalerna räknas i procent för sig.

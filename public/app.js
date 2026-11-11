@@ -749,7 +749,9 @@ function coachBox(e) {
   const msgs = e.coachLog?.length ? e.coachLog : e.coach?.lines?.length ? [{ lines: e.coach.lines, tone: e.coach.tone, now: true }] : [];
   if (!msgs.length) return '';
   const when = m => m.now ? 'just nu' : `${m.date === new Date().toLocaleDateString('sv-SE') ? 'i dag' : new Date(m.date + 'T12:00:00Z').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })} ${m.tp ? `· TP${m.tp} nådd` : m.slot}`;
-  const latest = msgs[0];
+  // Meddelanden sorteras efter när det hände (mål-meddelanden på dagen målet nåddes).
+  // Rubriken visar läget nu (senaste omgången), inte ett äldre mål-meddelande.
+  const latest = msgs.find(m => !m.tp) || msgs[0];
   return `<details class="coach ${latest.tone}"><summary><span class="coach-ico" aria-hidden="true">🧭</span><b>Coachen</b><span class="coach-peek">${esc(when(latest))} · ${esc(latest.lines[0])}</span>${msgs.length > 1 ? `<span class="coach-count">${msgs.length}</span>` : ''}</summary>
     <div class="coach-body">${msgs.map((m, k) => `<div class="coach-msg${k ? ' old' : ''}"><div class="coach-when">${esc(when(m))}</div>${m.lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>`).join('')}
     <p class="muted small">Coachen skriver ungefär var tredje timme: 09.30, 12.30, 15.30 och efter stängningen 18.00, när läget har ändrats.</p></div></details>`;

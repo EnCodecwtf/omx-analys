@@ -563,3 +563,17 @@ test('coachen vid nått mål: en tredjedel, nästa mål och hinder', async () =>
   assert.equal(c3.lines.length, 1);
   assert.match(c3.lines[0], /sista tredjedelen/);
 });
+
+test('coachen vid mål skrivet i efterhand visar datumet, inte "nu"', async () => {
+  const { coachTp, reachedDate } = await import('../lib/coach.js');
+  const t = d => Date.parse(d + 'T12:00:00Z') / 1000;
+  const bars = [{ t: t('2026-11-02'), o: 100, h: 101, l: 99, c: 100 }, { t: t('2026-11-05'), o: 101, h: 106, l: 100, c: 105 }, { t: t('2026-11-11'), o: 105, h: 107, l: 104, c: 106 }];
+  const ev = { atr: 2, rsi: 60, ema: { e20: 103, e50: 101, e200: 99 }, zones: [] };
+  const e = { name: 'Test', date: '2026-11-02', entry: 100, stop: 95, tps: [105, 112, 118], last: 106 };
+  assert.equal(reachedDate(e, 1, bars), '2026-11-05');
+  const old = coachTp(e, 1, bars, ev, null, { reached: '2026-11-05', today: '2026-11-11' });
+  assert.match(old.lines[0], /nåddes torsdag 5 nov/);
+  assert.match(old.lines[0], /Har du inte redan gjort det/);
+  const now = coachTp(e, 1, bars, ev, null, { reached: '2026-11-11', today: '2026-11-11' });
+  assert.match(now.lines[0], /är nådd/);
+});
