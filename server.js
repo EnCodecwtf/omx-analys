@@ -10,7 +10,7 @@ import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
 import { freeView } from './lib/freeview.js';
-import { EXPERIMENTS, experimentSignal, expOutcome } from './lib/experiments.js';
+import { EXPERIMENTS, experimentSignal, expOutcome, ASIA, asiaSignal, asiaOutcome } from './lib/experiments.js';
 import { igStatus, igEnabled, configureIg, igTryLogin } from './lib/ig.js';
 import crypto from 'node:crypto';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
@@ -322,7 +322,7 @@ async function shortScan() {
 async function outcomeOf(e) {
   try {
     const bars = await fetchBars(e.symbol);
-    return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'exp' ? expOutcome(e, bars) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
+    return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'exp' ? await expOutcomeFor(e) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
   } catch { return { state: 'okänd' }; }
 }
 
@@ -825,6 +825,20 @@ async function aiTrader() {
 
 // Experiment som mäts framåt (lib/experiments.js). Loggas i signalloggen som kind 'exp'.
 const fomcDays = new Set(JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'fomc.json'), 'utf8')).decisionDays);
+// Timstaplar för guld (New York-tid), för Asien-guld. Sparas i minnet i 10 minuter.
+let goldHoursCache = null;
+async function goldHours() {
+  if (goldHoursCache && Date.now() - goldHoursCache.at < 10 * 60 * 1000) return goldHoursCache.rows;
+  const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?range=730d&interval=60m', { headers: { 'User-Agent': 'Mozilla/5.0 (omx-analys)' }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`Yahoo svarade ${r.status} för guldets timdata`);
+  const j = (await r.json()).chart.result[0], q = j.indicators.quote[0];
+  const fmtNY = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  const rows = j.timestamp.map((t, i) => { const p = Object.fromEntries(fmtNY.formatToParts(new Date(t * 1000)).map(x => [x.type, x.value]));
+    return { t, d: `${p.year}-${p.month}-${p.day}`, hm: +p.hour % 24 * 60 + +p.minute, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] }; }).filter(x => x.c && x.o && x.h && x.l);
+  goldHoursCache = { at: Date.now(), rows };
+  return rows;
+}
+const expOutcomeFor = async e => e.exp === ASIA.id ? asiaOutcome(e, await goldHours()) : expOutcome(e, await fetchBars(e.symbol));
 async function experimentCheck() {
   const ny = monthly.nyNow(), added = [];
   for (const x of Object.values(EXPERIMENTS)) {
@@ -835,6 +849,16 @@ async function experimentCheck() {
     const rec = await recordFree([e]);
     for (const r of rec) { await notifySignal(r); added.push(r); }
   }
+  // Asien-guld: varje handelsdag kl 02.05–04.00 i New York (08.05–10.00 svensk tid).
+  // Pausas om de senaste 40 affärerna sammantaget gått minus (regeln förlorade 2015–2023).
+  try {
+    const log = await signalLog.entries();
+    const done = await Promise.all(log.filter(x => x.kind === 'exp' && x.exp === ASIA.id).slice(-ASIA.pauseAfter).map(expOutcomeFor));
+    const closed = done.filter(o => o.state === 'stängd');
+    const paused = closed.length >= ASIA.pauseAfter && closed.reduce((a, o) => a + (o.pct || 0), 0) < 0;
+    const e = paused ? null : asiaSignal(await goldHours(), { date: ny.date, nyMin: ny.min });
+    if (e) for (const r of await recordFree([e])) { await notifySignal(r); added.push(r); }
+  } catch (err) { console.error('Asien-guld:', err.message); }
   return added;
 }
 
@@ -859,9 +883,11 @@ async function liveCheck({ force = false } = {}) {
       }
       if (e.kind === 'exp') {
         // Experiment: notis vid stopp eller mål, och påminnelse på säljdagen.
-        const o = expOutcome(e, await fetchBars(e.symbol));
+        const o = await expOutcomeFor(e);
         const ny = monthly.nyNow();
-        const kinds = o.state === 'stängd' && o.why !== 'säljdag' ? [o.why === 'mål' ? 'tp' : 'stop'] : o.state === 'öppen' && ny.date >= e.exitDate ? ['exit'] : [];
+        // Asien-guld: påminnelse att stänga 09.20–09.30 i New York (15.20–15.30 svensk tid).
+        const exitNow = e.exp === ASIA.id ? ny.date === e.exitDate && ny.min >= ASIA.exit - 10 : ny.date >= e.exitDate;
+        const kinds = o.state === 'stängd' && o.why !== 'säljdag' ? [o.why === 'mål' ? 'tp' : 'stop'] : (o.state === 'öppen' || (e.exp === ASIA.id && o.why === 'säljdag' && ny.date === e.exitDate)) && exitNow ? ['exit'] : [];
         if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
         for (const k of await signalLog.markAlerts(id, kinds)) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
         continue;

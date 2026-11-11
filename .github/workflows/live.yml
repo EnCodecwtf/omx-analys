@@ -40,7 +40,7 @@ jobs:
           KEY: ${{ secrets.CRON_SECRET }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          inside() { d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 645 ] && [ "$t" -le 2115 ]; }
+          inside() { d=$(date -u +%u); t=$((10#$(date -u +%H%M))); [ "$d" -le 5 ] && [ "$t" -ge 600 ] && [ "$t" -le 2115 ]; }
           end=$(( $(date +%s) + 5 * 3600 ))
           # Morgonsoffans ljud: startas härifrån så fort dagens session finns men saknar ljud
           # (GitHubs eget schema för ljudjobbet startar ofta flera timmar för sent).

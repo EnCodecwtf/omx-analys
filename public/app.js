@@ -736,7 +736,7 @@ function tradeBar(e) {
 // Nästa steg i klartext.
 function nextStep(e) {
   const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
-  if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. Stäng senast <b>${esc(wd(e.exitDate))}</b>.${e.size < 1 ? ' Halv insats.' : ''}`;
+  if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. ${e.exitAt ? `Stäng i dag kl <b>${esc(e.exitAt)}</b>.` : `Stäng senast <b>${esc(wd(e.exitDate))}</b>.`}${e.size < 1 ? ' Halv insats.' : ''}`;
   if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt ${esc(e.buyDate)}. ` : ''}Inget att göra förrän säljdagen: sälj på stängningen <b>${esc(wd(e.exitDate))}</b>, oavsett kurs.`;
   if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
   if (hit === 0) return `Nästa: ${act} 1/3 vid TP1 <b>${fmt(e.tps[0])}</b>. Stopp ${fmt(e.stop)}.`;
