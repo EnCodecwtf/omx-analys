@@ -1196,7 +1196,7 @@ export default async function handler(req, res) {
     if (url.pathname === '/api/push/unsubscribe' && req.method === 'POST') { await unsubscribe((await readJson(req)).endpoint); return send(res, 200, { ok: true }); }
     if (url.pathname === '/api/push/test' && req.method === 'POST') {
       const { endpoint } = await readJson(req);
-      const n = await pushAll({ title: 'OMX Analys', body: 'Notiserna fungerar. Du får besked om köpsignaler, mål, stopp och säljdagar.', url: '/' }, { only: endpoint });
+      const n = await pushAll({ title: 'Trendjakt', body: 'Notiserna fungerar. Du får besked om köpsignaler, mål, stopp och säljdagar.', url: '/' }, { only: endpoint });
       return send(res, 200, { ok: n > 0 });
     }
     if (url.pathname === '/api/us/scan') {
@@ -1365,7 +1365,7 @@ export default async function handler(req, res) {
 // Lokalt (npm start) körs en vanlig server. På Vercel används handler som
 // serverlös funktion via api/index.js.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  http.createServer(handler).listen(PORT, () => console.log(`OMX Analys körs på http://localhost:${PORT}`));
+  http.createServer(handler).listen(PORT, () => console.log(`Trendjakt körs på http://localhost:${PORT}`));
   // Kör skannern varje timme så att signaler loggas även när ingen har appen öppen.
   setInterval(() => { cache.delete('scan'); scan().catch(err => console.error('Skanningen misslyckades:', err.message)); }, 60 * 60 * 1000).unref();
 }

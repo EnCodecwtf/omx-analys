@@ -1,8 +1,8 @@
 // Service worker för webbnotiser: visar notisen och öppnar appen vid klick.
 self.addEventListener('push', event => {
   let m = {};
-  try { m = event.data ? event.data.json() : {}; } catch { m = { title: 'OMX Analys', body: event.data?.text() }; }
-  event.waitUntil(self.registration.showNotification(m.title || 'OMX Analys', {
+  try { m = event.data ? event.data.json() : {}; } catch { m = { title: 'Trendjakt', body: event.data?.text() }; }
+  event.waitUntil(self.registration.showNotification(m.title || 'Trendjakt', {
     body: m.body || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: m.tag, renotify: !!m.tag, data: { url: m.url || '/' },
   }));
 });
