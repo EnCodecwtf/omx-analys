@@ -1007,18 +1007,21 @@ async function loadReport(month) {
     <div class="rp-top"><label class="small muted">Månad <select id="rp-month">${r.months.map(m => `<option value="${m}"${m === r.month ? ' selected' : ''}>${monthName(m)}</option>`).join('')}</select></label>
       <span class="muted small">Uppdaterad ${new Date(r.generated).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div>
     <h2 class="rp-title">Tradingresultat ${monthName(r.month)}</h2>
-    <p class="rp-line"><b>${S.signals} signaler.</b> ${S.wins} vinster, ${S.losses} förluster, ${S.breakeven} break-even och ${S.open} öppna.</p>
+    <p class="rp-line"><b>${S.closed} avslutade affärer.</b> ${S.wins} vinster, ${S.losses} förluster och ${S.breakeven} break-even.${S.open ? ` ${S.open} öppna affärer räknas den månad de stängs (se längre ner).` : ''}</p>
     <div class="calc-tiles">
       <div class="stat"><b class="num">${S.winRate == null ? '–' : sv(S.winRate) + ' %'}</b><span>vinstandel av alla ${S.closed} avslutade<br><span class="muted">break-even räknas inte som vinst</span></span></div>
       <div class="stat"><b class="num ${S.sumR > 0 ? 'pos' : S.sumR < 0 ? 'neg' : ''}">${sgn(S.sumR, 'R')}</b><span>summa för månaden<br><span class="muted">snitt ${sgn(S.avgR, 'R')} per affär</span></span></div>
       <div class="stat"><b class="num">${sgn(S.worstR, 'R')}</b><span>största förlust<br><span class="muted">största vinst ${sgn(S.bestR, 'R')}</span></span></div>
       <div class="stat"><b class="num">${sgn(S.maxDrawdownR, 'R')}</b><span>största nedgång i månaden</span></div>
     </div>
-    <table class="rp-table"><tr><th>Datum</th><th>Signal</th><th class="r">Köp · stopp</th><th class="r">Utfall</th></tr>
-      ${r.rows.map(x => `<tr><td class="num">${esc(x.date.slice(5))}</td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.type)}${x.side === 'kort' ? ' · kort' : ''}</span>${x.hit ? ` <span class="tp-chip hit">TP${x.hit} ✓</span>` : ''}</td>
+    <table class="rp-table"><tr><th>Avslutad</th><th>Affär</th><th class="r">Köp · stopp</th><th class="r">Utfall</th></tr>
+      ${r.rows.map(x => `<tr><td class="num">${esc((x.exitDate || x.date).slice(5))}<div class="muted small">signal ${esc(x.date.slice(5))}</div></td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.type)}${x.side === 'kort' ? ' · kort' : ''}</span>${x.hit ? ` <span class="tp-chip hit">TP${x.hit} ✓</span>` : ''}</td>
         <td class="r num small">${x.entry != null ? fmt(x.entry) : fmt(x.close)}${x.stop != null ? ` · ${fmt(x.stop)}` : ''}</td>
-        <td class="r">${badgeOf(x)}<div class="num small">${x.result === 'öppen' ? (x.value != null ? `just nu ${sgn(x.value, x.unit)}` : '') : sgn(x.value, x.unit)}</div></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Inga signaler den här månaden. Det redovisas också.</td></tr>'}
+        <td class="r">${badgeOf(x)}<div class="num small">${x.result === 'öppen' ? (x.value != null ? `just nu ${sgn(x.value, x.unit)}` : '') : sgn(x.value, x.unit)}</div></td></tr>`).join('') || '<tr><td colspan="4" class="muted">Inga affärer avslutades den här månaden. Det redovisas också.</td></tr>'}
     </table>
+    ${r.openRows?.length ? `<h3 class="rp-sub">Öppna affärer <span class="muted small">(${r.month === new Date().toLocaleDateString('sv-SE').slice(0, 7) ? 'just nu' : 'vid månadens slut'} – räknas den månad de stängs)</span></h3>
+      <table class="rp-table rp-open">${r.openRows.map(x => `<tr><td class="num">${esc(x.date.slice(5))}</td><td><b>${esc(x.name)}</b> <span class="muted small">${esc(x.type)}${x.side === 'kort' ? ' · kort' : ''}</span>${x.hit ? ` <span class="tp-chip hit">TP${x.hit} ✓</span>` : ''}</td>
+        <td class="r num small">${x.value != null ? `just nu ${sgn(x.value, x.unit)}` : '–'}</td></tr>`).join('')}</table>` : ''}
     <div class="rp-grid">
       <div class="rp-box"><b>Jämförelse</b>
         <p>OMXS30 under månaden: <b>${sgn(r.benchmark.changePct, '%')}</b>.</p>
@@ -1029,7 +1032,7 @@ async function loadReport(month) {
         <p class="muted small">Räknas i procent (inget stopp, inget R), från köpet på öppningen till stängningen på säljdagen, med 0,2 % i avgift. Ingår i vinstandelen men inte i summa R.</p></div>` : ''}
       ${r.monthly ? `<div class="rp-box"><b>Månadens aktier</b>
         <p>${esc([...r.monthly.names, ...(r.monthly.mode !== 'aktier' ? ['kassaläge (guld och olja kort)'] : [])].join(', '))} – beslutat ${esc(r.monthly.decided)}${r.monthly.backfilled ? ' <span class="muted">(räknat i efterhand)</span>' : ''}.</p>
-        <p>${r.monthly.open ? 'Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.rules.stockLev).replace('.', ',')}x aktier, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>
+        <p>${r.monthly.open ? 'Pågår – räknas när månaden är slut. Hittills' : 'Resultat'}: <b class="${r.monthly.retPct >= 0 ? 'pos' : 'neg'}">${sgn(r.monthly.retPct, '%')}</b> med minifutures (${String(r.monthly.rules.stockLev).replace('.', ',')}x aktier, ${String(r.monthly.rules.cashLev).replace('.', ',')}x guld/olja), ${sgn(r.monthly.rawPct, '%')} utan hävstång.</p>
         ${r.monthly.aiPart ? `<p>AI-traderns del: ${kr(r.monthly.aiPart.amount)} → <b>${kr(r.monthly.aiPart.value)}</b> (${sgn(r.monthly.aiPart.pnlPct, '%')}). Egna beslut: ${sgn(r.monthly.aiPart.edge, 'kr')} mot att bara följa reglerna.</p>` : ''}
         <p class="muted small">Beräknat från kurserna utan ränta och spread. Hela historiken finns under Mer → Månadens aktier.</p></div>` : ''}
       ${r.account ? `<div class="rp-box"><b>AI-traderns fiktiva konto</b>
@@ -1038,13 +1041,13 @@ async function loadReport(month) {
     </div>
     <div class="rp-box rp-honest"><b>Så räknas rapporten</b>
       <ul>
-        <li><b>Alla</b> signaler som släppts under månaden visas, också förluster och affärer som fortfarande är öppna. Inget räknas bort.</li>
+        <li><b>Alla</b> affärer som avslutades under månaden räknas, också förlusterna. Inget räknas bort. En affär som är öppen vid månadens slut räknas den månad den stängs och visas under Öppna affärer tills dess.</li>
         <li>Nivåerna är de som frystes när signalen publicerades, med tidsstämpel. De ändras aldrig i efterhand.</li>
-        <li>Vinstandelen räknas på alla avslutade affärer. Break-even (under ±0,1 R) räknas inte som vinst. Räknat på alla signaler inklusive öppna är den ${S.winRateAll == null ? '–' : sv(S.winRateAll) + ' %'}.</li>
+        <li>Vinstandelen räknas på alla avslutade affärer. Break-even (under ±0,1 R) räknas inte som vinst.</li>
         <li>Resultatet anges i R (1 R = förlusten om stoppet nås), så att små och stora affärer väger lika. Panikvecka och krypto anges i procent.</li>
         <li>Utfallet räknas med samma regler som backtestet: köp på öppningen dagen efter signalen, en tredjedel vid varje mål, stoppet till köpkursen efter TP2. Courtage och spread ingår inte i R.</li>
       </ul>
-      <p class="small">Kontrollsumma för månadens signaler (SHA-256): <code class="rp-hash">${esc(r.hash)}</code></p>
+      <p class="small">Kontrollsumma för de ${r.published} signaler som publicerades under månaden (SHA-256): <code class="rp-hash">${esc(r.hash)}</code></p>
       <p class="small muted">Varje kväll sparas en ögonblicksbild av det som publicerats på <a href="https://github.com/EnCodecwtf/omx-analys/releases/tag/signallogg" target="_blank" rel="noopener">GitHub</a>, där GitHub sätter tiden. Samma kontrollsumma i ögonblicksbilden visar att ingen signal har ändrats.</p>
     </div>
     <p class="muted small">Historiska resultat är ingen garanti för framtiden. Inte investeringsrådgivning.</p>

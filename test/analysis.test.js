@@ -529,3 +529,20 @@ test('AI-tradern tar panikveckan: köp på öppningen, sälj på säljdagen, uta
   // Utan hävstång: köp 105 (öppning 9/11), sälj 109 → cirka +3,6 % minus 0,2 % avgift.
   assert.ok(Math.abs(r.closed[0].pnlPct - 3.6) < 0.4, r.closed[0].pnlPct);
 });
+
+test('månadsrapporten räknar affärer efter säljdatum; öppna förs till månaden de stängs', async () => {
+  const { buildReport } = await import('../lib/report.js');
+  const entries = [
+    { date: '2026-10-28', symbol: 'A', name: 'A', close: 100, stop: 95, tps: [105, 110, 115], state: 'stängd', exitDate: '2026-11-04', r: 1.2 },
+    { date: '2026-11-02', symbol: 'B', name: 'B', close: 100, stop: 95, tps: [105, 110, 115], state: 'öppen', r: 0.5 },
+    { date: '2026-11-06', symbol: 'C', name: 'C', kind: 'panic', close: 100, state: 'öppen', exitDate: '2026-11-13', pct: 2 },
+    { date: '2026-10-01', symbol: 'D', name: 'D', close: 100, stop: 95, tps: [105, 110, 115], state: 'stängd', exitDate: '2026-10-10', r: -1 },
+  ];
+  const nov = buildReport({ month: '2026-11', entries });
+  assert.deepEqual(nov.rows.map(r => r.symbol), ['A']);
+  assert.deepEqual(nov.openRows.map(r => r.symbol).sort(), ['B', 'C']);
+  assert.equal(nov.summary.sumR, 1.2);
+  const oct = buildReport({ month: '2026-10', entries });
+  assert.deepEqual(oct.rows.map(r => r.symbol), ['D']);
+  assert.deepEqual(oct.openRows.map(r => r.symbol), ['A']); // öppen vid oktobers slut
+});

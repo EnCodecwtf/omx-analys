@@ -1122,7 +1122,8 @@ export default async function handler(req, res) {
     // Månadsrapport: alla signaler i månaden, ärligt räknat. ?month=ÅÅÅÅ-MM (standard: innevarande).
     if (url.pathname === '/api/report') {
       const out = await withOutcomes();
-      const months = [...new Set(out.map(e => e.date.slice(0, 7)))].sort().reverse();
+      // Månader med avslutade affärer (rapporten räknar efter säljdatum).
+      const months = [...new Set(out.filter(e => e.exitDate && e.state !== 'öppen' && e.state !== 'väntar på köp').map(e => e.exitDate.slice(0, 7)))].sort().reverse();
       const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : today().slice(0, 7);
       const [ai, omx, mv] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => []), monthlyView().catch(() => null)]);
       // Månadens aktier: perioden för rapportens månad (beslutad vid förra månadsskiftet) och AI-traderns del.
