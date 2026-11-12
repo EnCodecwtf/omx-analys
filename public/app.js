@@ -1670,7 +1670,7 @@ async function fetchMonthly(refresh) {
   monthlyData = await (await fetch('/api/monthly' + (refresh ? '?refresh=1' : ''))).json();
   return monthlyData;
 }
-// Fear & Greed-mätare (aktier, räknat med CNN:s metod) på startsidan.
+// Marknadshumöret (Fear & Greed, aktier, räknat med CNN:s metod) på startsidan.
 const FG_ZONES = [[0, 25, '#ef4444', 'Extrem rädsla'], [25, 45, '#f97316', 'Rädsla'], [45, 55, '#eab308', 'Neutralt'], [55, 75, '#84cc16', 'Girighet'], [75, 100, '#22c55e', 'Extrem girighet']];
 const fgColor = v => FG_ZONES.find(z => v < z[1] || z[1] === 100)[2];
 const fgName = v => FG_ZONES.find(z => v < z[1] || z[1] === 100)[3];
@@ -1681,7 +1681,7 @@ function fgGauge(v) {
     return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A 82 82 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" stroke="${col}" stroke-width="16" fill="none" opacity="${v >= a && (v < b || b === 100) ? 1 : 0.35}"/>`; };
   const [nx, ny] = pt(ang(v), 66);
   const ticks = [0, 25, 50, 75, 100].map(t => { const [x, y] = pt(ang(t), 100); return `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="middle" class="fg-tick">${t}</text>`; }).join('');
-  return `<svg viewBox="-8 -8 216 122" class="fg-svg" role="img" aria-label="Fear and Greed ${v} av 100, ${fgName(v)}">
+  return `<svg viewBox="-8 -8 216 122" class="fg-svg" role="img" aria-label="Marknadshumöret ${v} av 100, ${fgName(v)}">
     ${FG_ZONES.map(seg).join('')}${ticks}
     <line x1="100" y1="100" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/>
     <circle cx="100" cy="100" r="6" fill="var(--text)"/>
@@ -1694,7 +1694,7 @@ async function loadFearGreed() {
   const cmp = (lab, v) => v == null ? '' : `<li><span>${lab}</span><b style="color:${fgColor(v)}">${v}</b><small>${fgName(v).toLowerCase()}</small></li>`;
   const parts = Object.entries(s.parts || {}).filter(([, v]) => v != null);
   el.innerHTML = `<article class="card fg-card">
-    <div class="fg-head"><h3>Fear &amp; Greed</h3><span class="muted small">aktier · ${esc(s.d)}</span></div>
+    <div class="fg-head"><h3>Marknadshumöret</h3><span class="muted small">Fear &amp; Greed · aktier · ${esc(s.d)}</span></div>
     <div class="fg-body">
       <div class="fg-dial">${fgGauge(s.value)}<div class="fg-value" style="color:${fgColor(s.value)}">${s.value}</div><div class="fg-label">${esc(fgName(s.value))}</div></div>
       <ul class="fg-cmp">${cmp('Föregående dag', s.prevClose)}${cmp('För en vecka sedan', s.weekAgo)}${cmp('För en månad sedan', s.monthAgo)}${cmp('För ett år sedan', s.yearAgo)}</ul>
