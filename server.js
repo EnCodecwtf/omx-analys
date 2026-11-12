@@ -438,17 +438,41 @@ async function volumeProfile() {
 
 // Fear & Greed: aktier räknas själva med CNN:s metod (lib/feargreed.js), eftersom CNN:s data inte får
 // hämtas automatiskt. Bitcoin från alternative.me, som har ett öppet API för detta.
+// Put/call-kvoter från CBOE:s öppna dagsstatistik: historik i data/putcall.json (scripts/putcall-backfill.mjs),
+// nyare dagar hämtas vid behov och sparas i KV.
+const PUTCALL_KEY = 'omx-analys:putcall';
+const putcallBase = JSON.parse(await fs.readFile(path.join(__dirname, 'data', 'putcall.json'), 'utf8'));
+async function putCallSeries() {
+  const extra = (await signalLog.kvGet(PUTCALL_KEY, null)) || {};
+  const all = { ...putcallBase, ...extra };
+  const last = Object.keys(all).sort().at(-1) || '2026-11-01';
+  const need = [];
+  for (let d = new Date(last + 'T12:00:00Z'); need.length < 12;) { d.setUTCDate(d.getUTCDate() + 1); const x = d.toISOString().slice(0, 10); if (x >= today()) break; if (d.getUTCDay() % 6) need.push(x); }
+  let changed = false;
+  for (const d of need) {
+    try {
+      const r = await fetch(`https://cdn.cboe.com/data/us/options/market_statistics/daily/${d}_daily_options`, { signal: AbortSignal.timeout(8000) });
+      if (r.status === 403 || r.status === 404) { extra[d] = null; changed = true; continue; }
+      if (!r.ok) continue;
+      const j = await r.json(), v = n => +(j.ratios || []).find(x => x.name === n)?.value;
+      if (isFinite(v('TOTAL PUT/CALL RATIO'))) { extra[d] = { total: v('TOTAL PUT/CALL RATIO'), equity: isFinite(v('EQUITY PUT/CALL RATIO')) ? v('EQUITY PUT/CALL RATIO') : null }; changed = true; }
+    } catch { /* nästa gång */ }
+  }
+  if (changed) await signalLog.kvSet(PUTCALL_KEY, extra);
+  return Object.entries({ ...putcallBase, ...extra }).filter(([, v]) => v).sort(([a], [b]) => a.localeCompare(b)).map(([d, v]) => ({ d, c: v.total, equity: v.equity }));
+}
 async function fearGreedView() {
   return cached('feargreed', async () => {
     const pick = async s => (await fetchBars(s, { range: '5y' })).map(b => ({ d: dayOf(b.t), c: b.c }));
     const [SPY, RSP, IEF, HYG, VIX] = await Promise.all(['SPY', 'RSP', 'IEF', 'HYG', '^VIX'].map(pick));
-    const fg = fearGreed({ SPY, RSP, IEF, HYG, VIX });
+    const PC = await putCallSeries().catch(() => []);
+    const fg = fearGreed({ SPY, RSP, IEF, HYG, VIX, PC });
     const now = fg.at(-1), ago = n => fg.at(-1 - n) || null;
     let crypto = null;
     try { const j = await (await fetch('https://api.alternative.me/fng/?limit=8', { signal: AbortSignal.timeout(8000) })).json();
       const v = j.data?.map(x => +x.value); if (v?.length) crypto = { value: v[0], label: fgLabel(v[0]), weekAgo: v[7] ?? null, source: 'alternative.me' }; } catch { /* hoppas över */ }
     const wk = fg.slice(-6, -1).map(x => x.value);
-    return { stocks: now && { ...now, weekAgo: ago(5)?.value ?? null, weekMin: wk.length ? Math.min(...wk) : null, weekMax: wk.length ? Math.max(...wk) : null, monthAgo: ago(21)?.value ?? null, method: 'CNN:s metod med sex av sju mått (put/call saknas)' }, crypto, history: fg.slice(-260).map(x => ({ d: x.d, v: x.value })) };
+    return { stocks: now && { ...now, weekAgo: ago(5)?.value ?? null, weekMin: wk.length ? Math.min(...wk) : null, weekMax: wk.length ? Math.max(...wk) : null, monthAgo: ago(21)?.value ?? null, method: 'CNN:s metod med sju mått', putCall: PC.length ? { date: PC.at(-1).d, total: PC.at(-1).c, equity: PC.at(-1).equity, avg5: Math.round(PC.slice(-5).reduce((a, x) => a + x.c, 0) / Math.min(5, PC.length) * 100) / 100 } : null }, crypto, history: fg.slice(-260).map(x => ({ d: x.d, v: x.value })) };
   });
 }
 

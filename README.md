@@ -898,10 +898,11 @@ fördelningen cirka 15 % per år med −21 %. Den optimerade fördelningen valde
 uppgång och bara tre cykler. Månadsdata döljer nedgångar inom månaden.
 
 ### Fear & Greed
-CNN:s index får inte hämtas automatiskt, så aktieindexet räknas med samma metod (`lib/feargreed.js`): sex mått – S&P 500 mot
+CNN:s index får inte hämtas automatiskt, så aktieindexet räknas med samma metod (`lib/feargreed.js`): sju mått – S&P 500 mot
 125-dagars snitt, avstånd till 52-veckorshögsta, likaviktat S&P 500 mot 50-dagars snitt (bredd), VIX mot 50-dagars snitt,
-aktier mot statsobligationer och högavkastande mot statsobligationer (20 dagar) – vart och ett som percentil mot sitt senaste
-år, sedan snittet 0–100. CNN:s sjunde mått (put/call) saknas. Kontroll mot kända lägen: mars 2020 0–1, augusti 2024 5,
+aktier mot statsobligationer, högavkastande mot statsobligationer (20 dagar) och CBOE:s totala put/call-kvot (5-dagarssnitt,
+från CBOE:s öppna dagsstatistik; historik från 2023 i `data/putcall.json`, nya dagar hämtas automatiskt) – vart och ett som
+percentil mot sitt senaste år, sedan snittet 0–100. Kontroll mot kända lägen: mars 2020 0–1, augusti 2024 5,
 april 2025 0–9 (extrem rädsla), juli 2023 och 2025 78–83 (extrem girighet). Bitcoin hämtas från alternative.me (öppet API).
 Visas i Morgonsoffan och på `/api/feargreed`.
 
