@@ -1091,6 +1091,7 @@ async function loadMorning() {
   $('#morning-open').addEventListener('click', () => { setView('more'); openTool('morning'); });
   if (tool === 'morning') renderMorning();
 }
+const MTYPE = { fakta: 'Kurser och händelser som går att kontrollera', analys: 'Systemets tolkning – inte en signal', signal: 'Bara när alla regler är uppfyllda', 'affärer': 'Dina öppna affärer i signalloggen' };
 function renderMorning() {
   const el = $('#morning');
   const m = morningData;
@@ -1109,7 +1110,7 @@ function renderMorning() {
       <span class="small muted" id="say-voice"></span>
     </div>
     ${p(m.intro, 'm-intro')}
-    ${sections.map(x => `<h4 class="loan-h say" data-say="${i++}" data-head="1" data-title="${esc(x.title)}">${esc(x.title)}</h4>${x.links
+    ${sections.map(x => `<h4 class="loan-h say" data-say="${i++}" data-head="1" data-title="${esc(x.title)}">${esc(x.title)}${x.type ? ` <span class="tag m-type m-${esc(x.type)}" title="${esc(MTYPE[x.type] || '')}">${esc(x.type)}</span>` : ''}</h4>${x.links
       ? `<ul class="m-list">${x.lines.map((l, k) => `<li class="say" data-say="${i++}"><a href="${esc(x.links[k])}" target="_blank" rel="noopener">${esc(l)}</a></li>`).join('')}</ul>`
       : x.lines.map(l => p(l)).join('')}`).join('')}
     ${p(m.outro, 'm-outro')}
