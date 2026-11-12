@@ -21,6 +21,29 @@ VOICES = [
     ('sofie', 'sv-SE-SofieNeural', '+4%', '+0Hz'),
 ]
 
+# Uttal av engelska ord: samma mening med olika svenska stavningar (Glens röst).
+FG = [
+    ('fg-1', 'Fear and Greed'),
+    ('fg-2', 'Fiir änd griid'),
+    ('fg-3', 'Fiir and griid'),
+    ('fg-4', 'Fiöränd griid'),
+    ('fg-5', 'Fir end grid'),
+    ('fg-6', 'Fiir-änd-griid'),
+]
+
+async def fg_samples():
+    for name, word in FG:
+        path = f'public/rostprov/{name}.mp3'
+        text = f'{word}-index för aktier står på tjugonio, alltså rädsla. {word} har stigit från sex den senaste veckan.'
+        for attempt in range(3):
+            try:
+                await edge_tts.Communicate(text, 'sv-SE-MattiasNeural', rate='+8%', pitch='+4Hz').save(path)
+                if os.path.getsize(path) > 0:
+                    print('klar', name); break
+            except Exception as err:  # noqa: BLE001
+                print('försök', attempt + 1, name, err)
+            await asyncio.sleep(2)
+
 async def main():
     os.makedirs('public/rostprov', exist_ok=True)
     for name, voice, rate, pitch in VOICES:
@@ -35,3 +58,4 @@ async def main():
             await asyncio.sleep(2)
 
 asyncio.run(main())
+asyncio.run(fg_samples())
