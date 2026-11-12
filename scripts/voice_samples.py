@@ -57,5 +57,16 @@ async def main():
                 print('försök', attempt + 1, name, err)
             await asyncio.sleep(2)
 
-asyncio.run(main())
-asyncio.run(fg_samples())
+async def fg_mix():
+    import morning_audio  # samma uppläsning som Morgonsoffan
+    for name, voice in [('fg-mix-andrew', 'en-US-AndrewMultilingualNeural'), ('fg-mix-brian', 'en-US-BrianMultilingualNeural'), ('fg-mix-guy', 'en-US-GuyNeural')]:
+        morning_audio.EN_VOICE = voice
+        await morning_audio.synth('[[en:Fear and Greed]]-index för aktier står på tjugonio, alltså rädsla. Det har stigit från sex den senaste veckan.', f'public/rostprov/{name}.mp3')
+        print('klar', name)
+
+if os.environ.get('ONLY_MIX'):
+    asyncio.run(fg_mix())
+else:
+    asyncio.run(main())
+    asyncio.run(fg_samples())
+    asyncio.run(fg_mix())

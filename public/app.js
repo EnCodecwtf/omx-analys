@@ -1162,6 +1162,7 @@ function audioHighlight(a) {
 const MONTHS = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december'];
 function forSpeech(t) {
   return t
+    .replace(/\[\[en:([^\]]+)\]\]/g, '$1')
     .replace(/(\d)[ \u00a0](\d{3})\b/g, '$1$2')
     .replace(/(\d{4})-(\d{2})-(\d{2})/g, (_, y, mo, d) => `${+d} ${MONTHS[+mo - 1]}`)
     .replace(/\b[Kk]l\.? (\d{1,2})\.(\d{2})/g, (_, h, mi) => `klockan ${+h}${mi === '00' ? '' : ' och ' + +mi}`)

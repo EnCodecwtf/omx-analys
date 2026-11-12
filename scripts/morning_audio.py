@@ -7,14 +7,14 @@ Körs av .github/workflows/morning-audio.yml efter att sessionen skrivits kl 07.
 Inofficiell användning av tjänsten: slutar den fungera läser appen upp med
 enhetens egen röst i stället.
 """
-import asyncio, datetime, json, os, subprocess, sys, tempfile, urllib.request
+import asyncio, datetime, json, os, re, subprocess, sys, tempfile, urllib.request
 from zoneinfo import ZoneInfo
 
 import edge_tts
 
 APP = os.environ.get('APP_URL', 'https://omx-analys.vercel.app').rstrip('/')
 KEY = os.environ.get('CRON_SECRET', '')
-REPO = os.environ['GITHUB_REPOSITORY']
+REPO = os.environ.get('GITHUB_REPOSITORY', 'EnCodecwtf/omx-analys')
 VOICE = os.environ.get('VOICE', 'sv-SE-MattiasNeural')
 # Glen: Mattias, lite snabbare och ljusare än standard (valt efter röstproven i public/rostprov/).
 RATE = os.environ.get('RATE', '+8%')
@@ -32,16 +32,44 @@ def duration(path):
     return float(out.stdout.strip())
 
 
-async def synth(text, path):
+# Engelska uttryck i talmanuset är markerade [[en:…]] och läses av en engelsk mansröst,
+# eftersom den svenska rösten uttalar dem fel. Bitarna klipps ihop till ett stycke.
+EN_VOICE = os.environ.get('EN_VOICE', 'en-US-AndrewMultilingualNeural')
+EN_MARK = re.compile(r'\[\[en:(.+?)\]\]')
+
+
+async def synth_one(text, path, voice, rate, pitch):
     for attempt in range(3):
         try:
-            await edge_tts.Communicate(text, VOICE, rate=RATE, pitch=PITCH).save(path)
+            await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch).save(path)
             if os.path.getsize(path) > 0:
                 return
         except Exception as err:  # noqa: BLE001 – försök igen, tjänsten är inofficiell
             print('Försök', attempt + 1, 'misslyckades:', err)
         await asyncio.sleep(3)
     raise RuntimeError('Ingen röst från tjänsten')
+
+
+async def synth(text, path):
+    bits = EN_MARK.split(text)  # udda index = engelska
+    if len(bits) == 1:
+        return await synth_one(text, path, VOICE, RATE, PITCH)
+    work = tempfile.mkdtemp()
+    files = []
+    for k, bit in enumerate(bits):
+        bit = bit.strip(' ')
+        if not bit.strip():
+            continue
+        f = os.path.join(work, f'b{k:02d}.mp3')
+        if k % 2:
+            await synth_one(bit, f, EN_VOICE, '+0%', '+0Hz')
+        else:
+            await synth_one(bit, f, VOICE, RATE, PITCH)
+        files.append(f)
+    lst = os.path.join(work, 'l.txt')
+    with open(lst, 'w') as fh:
+        fh.writelines(f"file '{x}'\n" for x in files)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', lst, '-ac', '1', '-ar', '24000', '-b:a', '48k', '-acodec', 'libmp3lame', path], check=True)
 
 
 def main():
