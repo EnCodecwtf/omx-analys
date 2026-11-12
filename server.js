@@ -17,7 +17,8 @@ import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
 import { stressNow } from './lib/stress.js';
 import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
-import { computeIndicators } from './lib/indicators.js';
+import { computeIndicators, atr as atrOf, sma as smaOf } from './lib/indicators.js';
+import { zigzag, supportResistance } from './lib/structure.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
@@ -434,17 +435,41 @@ async function volumeProfile() {
   return out;
 }
 
+// Marknad för marknad: läge (trend mot 50- och 200-dagars snitt), senaste veckan och närmaste
+// stöd och motstånd från appens egen zonanalys (dagsstaplar). Analys – inte signaler.
+const LEVEL_MARKETS = [['OMXS30', '^OMX', ''], ['DAX', '^GDAXI', ''], ['Nasdaq 100', '^NDX', ''], ['Guld', 'GC=F', '$'], ['Silver', 'SI=F', '$'], ['Olja (Brent)', 'BZ=F', '$'], ['Bitcoin', 'BTC-USD', '$']];
+async function marketLevels() {
+  const out = [];
+  for (const [name, symbol, unit] of LEVEL_MARKETS) {
+    try {
+      const bars = await fetchBars(symbol, { range: '2y' });
+      if (bars.length < 220) continue;
+      const c = bars.map(b => b.c), a = atrOf(bars, 14), last = bars.length - 1, price = c[last];
+      const s50 = smaOf(c, 50)[last], s200 = smaOf(c, 200)[last];
+      const trend = price > s50 && s50 > s200 ? 'upptrend' : price < s50 && s50 < s200 ? 'nedåttrend' : price > s200 ? 'över 200-dagars snitt men utan tydlig trend' : 'under 200-dagars snitt men utan tydlig trend';
+      const zones = supportResistance(bars, a, zigzag(bars, a), { maxZones: 8 });
+      const sup = zones.filter(z => z.hi < price).sort((x, y) => y.hi - x.hi), res = zones.filter(z => z.lo > price).sort((x, y) => x.lo - y.lo);
+      const z = x => x && { lo: x.lo, hi: x.hi, pct: Math.round(((x.hi < price ? x.hi : x.lo) / price - 1) * 1000) / 10 };
+      let hi = 0; for (let k = Math.max(0, last - 251); k <= last; k++) hi = Math.max(hi, c[k]);
+      out.push({ name, symbol, unit, price, trend, week: Math.round((price / c[last - 5] - 1) * 1000) / 10, fromHigh: Math.round((price / hi - 1) * 1000) / 10,
+        support: z(sup[0]), support2: z(sup[1]), resistance: z(res[0]), resistance2: z(res[1]) });
+    } catch { /* hoppas över */ }
+  }
+  return out;
+}
+
 // Morgonsoffan med Glen: skrivs varje vardag kl 07.30 (GitHub Actions anropar
 // /api/cron/morning) och sparas, så att alla ser samma session hela dagen.
 const MORNING_KEY = 'omx-analys:morning';
 async function makeMorning() {
-  const [moves, s, cal, log, macroAt, night] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null)]);
+  const [moves, s, cal, log, macroAt, night, levels] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null), marketLevels().catch(() => [])]);
   const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
   const label = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro' };
   const omxRows = s.rows.filter(r => !r.isCrypto && !r.isIndex && !r.error);
   const [mk, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }).catch(() => []), news(GEO_QUERY, { limit: 30 }).catch(() => [])]);
   return buildMorning({
-    now: new Date(), moves, overnight: night, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic,
+    now: new Date(), moves, overnight: night, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic, levels,
+    monthly: await monthlyView().then(v => v.current && { lev: v.current.lev, stocks: v.current.stocks.map(x => x.name), cashShare: v.current.cashShare, vix: v.vixNow }).catch(() => null),
     signals: omxRows.filter(r => (r.status === 'strong' || r.status === 'buy') && !r.inTrade),
     near: omxRows.filter(r => !r.inTrade && r.missing?.length === 1).slice(0, 4).map(r => ({ name: r.name, missingText: label[r.missing[0]] || r.missing[0] })),
     news: { market: mk, geo: geo.filter(n => n.tags.includes('Geopolitik')) },

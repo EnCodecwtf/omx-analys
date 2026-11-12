@@ -1091,7 +1091,7 @@ async function loadMorning() {
   $('#morning-open').addEventListener('click', () => { setView('more'); openTool('morning'); });
   if (tool === 'morning') renderMorning();
 }
-const MTYPE = { fakta: 'Kurser och händelser som går att kontrollera', analys: 'Systemets tolkning – inte en signal', signal: 'Bara när alla regler är uppfyllda', 'affärer': 'Dina öppna affärer i signalloggen' };
+const MTYPE = { fakta: 'Kurser och händelser som går att kontrollera', analys: 'Systemets tolkning – inte en signal', fokus: 'Vad systemets regler säger i dag', signal: 'Bara när alla regler är uppfyllda', 'affärer': 'Dina öppna affärer i signalloggen' };
 function renderMorning() {
   const el = $('#morning');
   const m = morningData;
