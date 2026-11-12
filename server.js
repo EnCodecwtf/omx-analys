@@ -19,6 +19,7 @@ import { btcCycle } from './lib/cycle.js';
 import { news, companyQuery, MARKET_QUERY, GEO_QUERY } from './lib/news.js';
 import { computeIndicators, atr as atrOf, sma as smaOf } from './lib/indicators.js';
 import { zigzag, supportResistance } from './lib/structure.js';
+import { fearGreed, fgLabel } from './lib/feargreed.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
@@ -435,6 +436,22 @@ async function volumeProfile() {
   return out;
 }
 
+// Fear & Greed: aktier räknas själva med CNN:s metod (lib/feargreed.js), eftersom CNN:s data inte får
+// hämtas automatiskt. Bitcoin från alternative.me, som har ett öppet API för detta.
+async function fearGreedView() {
+  return cached('feargreed', async () => {
+    const pick = async s => (await fetchBars(s, { range: '5y' })).map(b => ({ d: dayOf(b.t), c: b.c }));
+    const [SPY, RSP, IEF, HYG, VIX] = await Promise.all(['SPY', 'RSP', 'IEF', 'HYG', '^VIX'].map(pick));
+    const fg = fearGreed({ SPY, RSP, IEF, HYG, VIX });
+    const now = fg.at(-1), ago = n => fg.at(-1 - n) || null;
+    let crypto = null;
+    try { const j = await (await fetch('https://api.alternative.me/fng/?limit=8', { signal: AbortSignal.timeout(8000) })).json();
+      const v = j.data?.map(x => +x.value); if (v?.length) crypto = { value: v[0], label: fgLabel(v[0]), weekAgo: v[7] ?? null, source: 'alternative.me' }; } catch { /* hoppas över */ }
+    const wk = fg.slice(-6, -1).map(x => x.value);
+    return { stocks: now && { ...now, weekAgo: ago(5)?.value ?? null, weekMin: wk.length ? Math.min(...wk) : null, weekMax: wk.length ? Math.max(...wk) : null, monthAgo: ago(21)?.value ?? null, method: 'CNN:s metod med sex av sju mått (put/call saknas)' }, crypto, history: fg.slice(-260).map(x => ({ d: x.d, v: x.value })) };
+  });
+}
+
 // Marknad för marknad: läge (trend mot 50- och 200-dagars snitt), senaste veckan och närmaste
 // stöd och motstånd från appens egen zonanalys (dagsstaplar). Analys – inte signaler.
 const LEVEL_MARKETS = [['OMXS30', '^OMX', ''], ['DAX', '^GDAXI', ''], ['Nasdaq 100', '^NDX', ''], ['Guld', 'GC=F', '$'], ['Silver', 'SI=F', '$'], ['Olja (Brent)', 'BZ=F', '$'], ['Bitcoin', 'BTC-USD', '$']];
@@ -462,13 +479,13 @@ async function marketLevels() {
 // /api/cron/morning) och sparas, så att alla ser samma session hela dagen.
 const MORNING_KEY = 'omx-analys:morning';
 async function makeMorning() {
-  const [moves, s, cal, log, macroAt, night, levels] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null), marketLevels().catch(() => [])]);
+  const [moves, s, cal, log, macroAt, night, levels, fg] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null), marketLevels().catch(() => []), fearGreedView().catch(() => null)]);
   const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
   const label = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro' };
   const omxRows = s.rows.filter(r => !r.isCrypto && !r.isIndex && !r.error);
   const [mk, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }).catch(() => []), news(GEO_QUERY, { limit: 30 }).catch(() => [])]);
   return buildMorning({
-    now: new Date(), moves, overnight: night, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic, levels,
+    now: new Date(), moves, overnight: night, macro: macroAt(today()), calendar: cal, fedwatch: cal.fedwatch, trades: live, panic: s.panic, levels, fearGreed: fg,
     monthly: await monthlyView().then(v => v.current && { lev: v.current.lev, stocks: v.current.stocks.map(x => x.name), cashShare: v.current.cashShare, vix: v.vixNow }).catch(() => null),
     signals: omxRows.filter(r => (r.status === 'strong' || r.status === 'buy') && !r.inTrade),
     near: omxRows.filter(r => !r.inTrade && r.missing?.length === 1).slice(0, 4).map(r => ({ name: r.name, missingText: label[r.missing[0]] || r.missing[0] })),
@@ -1523,6 +1540,7 @@ export default async function handler(req, res) {
     }
     if (url.pathname === '/api/ai-trader') return send(res, 200, await aiTrader());
     if (url.pathname === '/api/risk') return send(res, 200, await riskView());
+    if (url.pathname === '/api/feargreed') return send(res, 200, await fearGreedView());
     if (url.pathname === '/api/monthly') {
       if (url.searchParams.has('refresh') && mayRefresh()) cache.delete('monthly');
       return send(res, 200, await monthlyView());

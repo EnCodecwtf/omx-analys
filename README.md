@@ -897,6 +897,14 @@ samtidigt. Med försiktigare antaganden (halva bitcoins uppgångar, 80 % av Mån
 fördelningen cirka 15 % per år med −21 %. Den optimerade fördelningen valdes bort eftersom den bygger på bitcoins historiska
 uppgång och bara tre cykler. Månadsdata döljer nedgångar inom månaden.
 
+### Fear & Greed
+CNN:s index får inte hämtas automatiskt, så aktieindexet räknas med samma metod (`lib/feargreed.js`): sex mått – S&P 500 mot
+125-dagars snitt, avstånd till 52-veckorshögsta, likaviktat S&P 500 mot 50-dagars snitt (bredd), VIX mot 50-dagars snitt,
+aktier mot statsobligationer och högavkastande mot statsobligationer (20 dagar) – vart och ett som percentil mot sitt senaste
+år, sedan snittet 0–100. CNN:s sjunde mått (put/call) saknas. Kontroll mot kända lägen: mars 2020 0–1, augusti 2024 5,
+april 2025 0–9 (extrem rädsla), juli 2023 och 2025 78–83 (extrem girighet). Bitcoin hämtas från alternative.me (öppet API).
+Visas i Morgonsoffan och på `/api/feargreed`.
+
 ### Fed-natten (experiment)
 Dagen före Feds räntebesked, 21.20–21.58 svensk tid, kommer en notis: köp en Nasdaq-mini med cirka 3x före 22.00 och sälj
 när USA öppnar 15.30 dagen efter (före beskedet). Natten före Fed har Nasdaq (QQQ, stängning → öppning) stigit +0,27 %
