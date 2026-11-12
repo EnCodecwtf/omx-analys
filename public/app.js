@@ -823,6 +823,35 @@ function riskPanel(open) {
   </div>`;
 }
 
+// Avslutade affärer per månad (efter stängningsdag). Grön = vinst, röd = förlust, gul = break-even
+// (under ±0,1 R, eller ±0,1 % för affärer som räknas i procent – samma gräns som månadsrapporten).
+const outcomeOf = e => { const v = e.pct ?? e.r; if (v == null) return 'none'; const be = e.pct != null ? 0.1 : 0.1; return Math.abs(v) < be ? 'be' : v > 0 ? 'win' : 'loss'; };
+const OUT_TXT = { win: 'Vinst', loss: 'Förlust', be: 'Break-even', none: '–' };
+function closedByMonth(closed) {
+  const month = e => (e.exitDate || e.date).slice(0, 7);
+  const groups = new Map();
+  for (const e of [...closed].sort((a, b) => (b.exitDate || b.date).localeCompare(a.exitDate || a.date))) (groups.get(month(e)) || groups.set(month(e), []).get(month(e))).push(e);
+  const count = list => { const c = { win: 0, loss: 0, be: 0 }; for (const e of list) if (c[outcomeOf(e)] != null) c[outcomeOf(e)]++; return c; };
+  const sums = list => { const R = list.filter(e => e.pct == null && e.r != null), P = list.filter(e => e.pct != null);
+    return [R.length ? `${R.reduce((a, e) => a + e.r, 0) > 0 ? '+' : ''}${sv(Math.round(R.reduce((a, e) => a + e.r, 0) * 100) / 100)} R` : '', P.length ? `${P.reduce((a, e) => a + e.pct, 0) > 0 ? '+' : ''}${sv(Math.round(P.reduce((a, e) => a + e.pct, 0) * 100) / 100)} %` : ''].filter(Boolean).join(' · '); };
+  const chips = c => `<span class="oc oc-win">${c.win} vinst</span><span class="oc oc-loss">${c.loss} förlust</span>${c.be ? `<span class="oc oc-be">${c.be} BE</span>` : ''}`;
+  const mName = m => { const t = new Date(m + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' }); return t[0].toUpperCase() + t.slice(1); };
+  const why = e => e.why ? { stopp: 'stoppet nåddes', 'mål': 'målet nåddes', 'säljdag': 'säljdagen' }[e.why] || e.why : e.hit >= 3 ? 'TP3 nådd' : e.hit ? `TP${e.hit} nådd, resten stängdes` : 'stoppet nåddes';
+  const detail = e => {
+    const rows = [
+      ['Typ', KIND(e)], ['Signal', esc(e.date)], ['Köpt', e.entry != null ? `${fmt(e.entry)}${e.side === 'kort' ? ' (blankning)' : ''}` : '–'],
+      e.stop != null ? ['Stopp', fmt(e.stop)] : null, e.tps?.length ? ['Mål', e.tps.map((t, k) => `${k < (e.hit || 0) ? '✓ ' : ''}${fmt(t)}`).join(' · ')] : e.tp ? ['Mål', fmt(e.tp)] : null,
+      ['Stängd', `${esc(e.exitDate || '–')} – ${esc(why(e))}`], ['Resultat', `<b class="oc-txt-${outcomeOf(e)}">${resText(e)}</b>${e.kind === 'exp' ? ` utan hävstång (${esc(expLev(e))})` : ''}`],
+    ].filter(Boolean);
+    return `<dl class="done-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>${e.kind !== 'exp' && e.kind !== 'crypto' ? `<button class="btn small" data-open-symbol="${esc(e.symbol)}">Visa ${esc(e.name)} →</button>` : ''}`;
+  };
+  const tot = count(closed);
+  return `<details class="closed-list"${store.get('closedOpen', '0') === '1' ? ' open' : ''}><summary>Visa avslutade affärer (${closed.length}) ${chips(tot)}</summary>
+    ${[...groups].map(([m, list], gi) => `<details class="month-group"${gi === 0 ? ' open' : ''}><summary><b>${mName(m)}</b> <span class="muted small">${list.length} ${list.length === 1 ? 'affär' : 'affärer'}</span> ${chips(count(list))} <span class="num small m-sum">${sums(list)}</span></summary>
+      ${list.map(e => `<details class="done done-${outcomeOf(e)}"><summary><span class="done-name">${esc(e.name)} <span class="tag">${KIND(e)}</span></span><span class="done-res num">${resText(e)}</span><span class="done-meta small muted">${esc(e.exitDate || e.date)} · ${OUT_TXT[outcomeOf(e)]}</span></summary>${detail(e)}</details>`).join('')}
+    </details>`).join('')}
+  </details>`;
+}
 function renderTrades() {
   const el = $('#trades');
   if (!logData) { el.innerHTML = '<div class="loading">Hämtar signalloggen…</div>'; return; }
@@ -833,13 +862,10 @@ function renderTrades() {
     ${open.length ? open.map(tradeCard).join('') : '<div class="empty small">Inga öppna affärer. Nya signaler visas under Idag.</div>'}
     <h2 class="v-title">Avslutade <span class="muted">(${closed.length})</span></h2>
     ${s.closed ? `<div class="note small">OMX: ${s.closed} stängda · TP1 ${s.tp1Rate ?? '–'} % · snitt ${s.avgR == null ? '–' : sv(s.avgR) + ' R'}${s.panic?.closed ? ` · panikveckor snitt ${sv(s.panic.avgPct)} %` : ''}${s.crypto?.closed ? ` · krypto snitt ${sv(s.crypto.avgPct)} %` : ''}</div>` : ''}
-    ${closed.length ? `<details class="closed-list"${store.get('closedOpen', '0') === '1' ? ' open' : ''}><summary>Visa avslutade affärer (${closed.length}) · ${closed.filter(e => (e.pct ?? e.r) > 0).length} med vinst</summary>
-      ${closed.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
-      <div class="name">${esc(e.name)} <span class="tag">${KIND(e)}</span></div>
-      <div class="right num ${resCls(e)}">${resText(e)}${e.kind === 'exp' ? '<div class="small muted">utan hävstång</div>' : ''}</div>
-      <div class="meta"><span>${esc(e.date)}</span><span>${esc(e.state)}${e.hit ? ' · TP' + e.hit + ' ✓' : ''}</span>${expLev(e) ? `<span>${esc(expLev(e))}</span>` : ''}</div></div>`).join('')}</details>`
+    ${closed.length ? closedByMonth(closed)
       : '<div class="empty small">Inga avslutade affärer än. Alla signaler sparas med frysta nivåer, vinnare som förlorare.</div>'}`;
   el.querySelector('.closed-list')?.addEventListener('toggle', ev => store.set('closedOpen', ev.target.open ? '1' : '0'));
+  for (const b of el.querySelectorAll('[data-open-symbol]')) b.addEventListener('click', ev => { ev.preventDefault(); openSymbol(b.dataset.openSymbol); });
   bindRows(el);
 }
 

@@ -667,3 +667,30 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .fg-parts b { text-align: right; font-variant-numeric: tabular-nums; }
 .closed-list > summary { cursor: pointer; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text-2); font-size: 13px; }
 .closed-list[open] > summary { margin-bottom: 10px; }
+/* Avslutade affärer per månad */
+.closed-list > summary .oc { margin-left: 6px; }
+.oc { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; margin-right: 4px; font-weight: 600; }
+.oc-win { background: var(--green-soft); color: var(--green); }
+.oc-loss { background: var(--red-soft); color: var(--red); }
+.oc-be { background: var(--amber-soft); color: var(--amber); }
+.oc-txt-win { color: var(--green); } .oc-txt-loss { color: var(--red); } .oc-txt-be { color: var(--amber); }
+.month-group { margin: 0 0 8px; }
+.month-group > summary { cursor: pointer; padding: 8px 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border-bottom: 1px solid var(--border); }
+.month-group .m-sum { margin-left: auto; color: var(--text-2); }
+.done { margin: 6px 0; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; background: var(--panel); }
+.done-win { border-left-color: var(--green); } .done-loss { border-left-color: var(--red); } .done-be { border-left-color: var(--amber); }
+.done > summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 12px; }
+.done > summary::-webkit-details-marker { display: none; }
+.done-res { font-weight: 700; text-align: right; }
+.done-win .done-res { color: var(--green); } .done-loss .done-res { color: var(--red); } .done-be .done-res { color: var(--amber); }
+.done-meta { grid-column: 1 / -1; }
+.done[open] { padding-bottom: 10px; }
+.done-dl { display: grid; grid-template-columns: 90px 1fr; gap: 4px 10px; padding: 4px 12px 8px; font-size: 13px; }
+.done-dl dt { color: var(--muted); }
+.done .btn { margin-left: 12px; }
+.month-group > summary { list-style: none; }
+.month-group > summary::-webkit-details-marker { display: none; }
+.month-group > summary::before { content: '▸'; color: var(--muted); width: 12px; }
+.month-group[open] > summary::before { content: '▾'; }
+.done > summary .done-name::after { content: ' ›'; color: var(--muted); }
+.done[open] > summary .done-name::after { content: ' ⌄'; }
