@@ -672,9 +672,9 @@ function aiAllocBox(al, total) {
     <div class="trade-card">
       <table class="pf-table"><tr><th>Del</th><th class="r">Värde</th><th class="r">Andel</th><th class="r">Mål</th></tr>
       ${al.parts.map(p => { const sl = al.sleeves.find(x => x.key === p.key);
-        return `<tr><td><b>${esc(p.title)}</b>${sl ? `<div class="small muted">${esc(sl.asset)} sedan ${esc(sl.since)} · ${pc(sl.pct)}</div>` : ''}</td><td class="r num"><b>${kr(p.value)}</b></td><td class="r num">${String(p.share).replace('.', ',')} %</td><td class="r num muted">${Math.round(p.target * 100)} %</td></tr>`; }).join('')}
+        return `<tr><td><b>${esc(p.title)}</b>${sl ? `<div class="small muted">${esc(sl.asset)} sedan ${esc(sl.since)}${sl.symbol ? ` · ${pc(sl.pct)}` : ''}</div>` : ''}</td><td class="r num"><b>${kr(p.value)}</b></td><td class="r num">${String(p.share).replace('.', ',')} %</td><td class="r num muted">${Math.round(p.target * 100)} %</td></tr>`; }).join('')}
       <tr class="pf-sum"><td><b>Totalt</b></td><td class="r num"><b>${kr(total)}</b></td><td></td><td></td></tr></table>
-      <div class="tc-next">Ställs om till målvikterna vid varje månadsbyte. Bitcoin-cykeln: ${esc(w.inWindow ? `köpfönster – äger bitcoin till ${w.until}` : `utanför köpfönstret – ligger i guld till ${w.until}`)}.${al.engine.pending < -0.5 ? ` ${kr(-al.engine.pending)} flyttas från OMX-delen när affärer stängs.` : ''}</div>
+      <div class="tc-next">Ställs om till målvikterna vid varje månadsbyte. Bitcoin-cykeln: ${esc(w.inWindow ? `köpfönster – äger bitcoin till ${w.until}` : `utanför köpfönstret – ligger i kontanter till ${w.until}`)}.${al.engine.pending < -0.5 ? ` ${kr(-al.engine.pending)} flyttas från OMX-delen när affärer stängs.` : ''}</div>
       <p class="small muted" style="margin-top:6px">Vald efter test 2016–2026 av alla modeller: historiskt cirka 37 % per år med största nedgång −19 % (månadsdata, i kronor), med försiktigare antaganden om framtiden cirka 15 % per år. Delarna rör sig nästan oberoende av varandra, så de sällan faller samtidigt.</p>
     </div>
     ${al.log.length ? `<ul class="ai-log">${al.log.slice(0, 4).map(l => `<li><span class="ai-ico">⚖️</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('')}</ul>` : ''}`;
@@ -753,6 +753,7 @@ function tradeBar(e) {
 // Nästa steg i klartext.
 function nextStep(e) {
   const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
+  if (e.kind === 'exp' && e.exp === 'fed-night') return `Köpt ${esc(e.date)} på ${fmt(e.close)} (Nasdaq-mini cirka ${e.lev || 3}x). Sälj <b>${esc(wd(e.exitDate))} 15.30</b> när USA öppnar, före Feds besked. Inget stopp. Halv insats.`;
   if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. ${e.exitAt ? `Stäng i dag kl <b>${esc(e.exitAt)}</b>.` : `Stäng senast <b>${esc(wd(e.exitDate))}</b>.`}${e.size < 1 ? ' Halv insats.' : ''}`;
   if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt ${esc(e.buyDate)}. ` : ''}Inget att göra förrän säljdagen: sälj på stängningen <b>${esc(wd(e.exitDate))}</b>, oavsett kurs.`;
   if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
@@ -1050,7 +1051,7 @@ async function loadReport(month) {
         <p>${r.panic.trades} affärer${r.panic.open ? `, varav ${r.panic.open} öppna (just nu ${sgn(r.panic.nowPct, '%')} i snitt)` : ''}.</p>
         ${r.panic.closed ? `<p>Avslutade: summa <b class="${r.panic.sumPct >= 0 ? 'pos' : 'neg'}">${sgn(r.panic.sumPct, '%')}</b>, snitt ${sgn(r.panic.avgPct, '%')} per affär. Bästa ${sgn(r.panic.bestPct, '%')}, sämsta ${sgn(r.panic.worstPct, '%')}.</p>` : ''}
         <p class="muted small">Räknas i procent (inget stopp, inget R), från köpet på öppningen till stängningen på säljdagen, med 0,2 % i avgift. Ingår i vinstandelen men inte i summa R.</p></div>` : ''}
-      ${r.experiments ? `<div class="rp-box"><b>Experiment</b> <span class="muted small">(NFP-guld, Fed-vändning)</span>
+      ${r.experiments ? `<div class="rp-box"><b>Experiment</b> <span class="muted small">(NFP-guld, Fed-vändning, Asien-guld, Fed-natten)</span>
         <p>${r.experiments.closed} avslutade${r.experiments.closed ? `, ${r.experiments.wins} med vinst, summa <b class="${r.experiments.sumPct >= 0 ? 'pos' : 'neg'}">${sgn(r.experiments.sumPct, '%')}</b>` : ''}${r.experiments.open ? `, ${r.experiments.open} öppna` : ''}.</p>
         <p class="muted small">Mäts framåt med liten insats. Räknas i procent i guld, silver eller olja, från stängningskursen signaldagen.</p></div>` : ''}
       ${r.monthly ? `<div class="rp-box"><b>Månadens aktier</b>
@@ -1738,7 +1739,7 @@ function allocCard(start, R) {
   const mo = amt(0.4);
   return `<details class="mo-more alloc-card"${store.get('allocOpen', '1') === '1' ? ' open' : ''}><summary>Fördela hela kapitalet</summary>
     <label class="pf-start small">Hela kapitalet <input id="alloc-total" type="number" min="5000" step="1000" value="${total}"> kr</label>
-    <table class="pf-table">${ALLOC.map(([n, w, how]) => `<tr><td><b>${n}</b> <span class="muted small">${Math.round(w * 100)} %</span><div class="small muted">${how || (btcOpen ? 'bitcoin – köpfönstret är öppet' : 'i guld till 15 april 2027, då köpfönstret öppnar')}</div></td><td class="r num"><b>${kr(amt(w))}</b></td></tr>`).join('')}</table>
+    <table class="pf-table">${ALLOC.map(([n, w, how]) => `<tr><td><b>${n}</b> <span class="muted small">${Math.round(w * 100)} %</span><div class="small muted">${how || (btcOpen ? 'bitcoin – köpfönstret är öppet' : 'kontanter eller räntefond till 15 april 2027, då köpfönstret öppnar')}</div></td><td class="r num"><b>${kr(amt(w))}</b></td></tr>`).join('')}</table>
     ${Math.abs(mo - start) >= 100 ? `<button class="btn small" id="alloc-use">Sätt startvärdet till ${kr(mo)}</button>` : ''}
     <p class="small muted">Ställ om till andelarna en gång i månaden, vid bytet. Delarna rör sig nästan oberoende av varandra: i testet 2016–2026 gav fördelningen cirka 37 % per år med största nedgång −19 % (månadsdata, i kronor). Räkna med betydligt mindre framåt – med försiktiga antaganden cirka 15 % per år. Inte investeringsrådgivning.</p>
   </details>`;

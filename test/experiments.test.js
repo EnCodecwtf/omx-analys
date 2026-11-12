@@ -52,3 +52,17 @@ test('Asien-guld: följer nattens rörelse 02.00 → 09.30, stopp 1 %', async ()
   // Helg och fel tid: ingen signal.
   assert.equal(asiaSignal(hours, { date: '2026-11-11', nyMin: 60 }), null);
 });
+
+test('Fed-natten: signal 15.20–15.58 dagen före beslut, sälj på öppningen beslutsdagen', async () => {
+  const { fedNightSignal, fedNightOutcome } = await import('../lib/experiments.js');
+  const t = d => Date.parse(d + 'T14:30:00Z') / 1000;
+  const bars = [{ t: t('2026-12-08'), o: 600, h: 606, l: 598, c: 605 }, { t: t('2026-12-09'), o: 607, h: 610, l: 600, c: 602 }];
+  assert.equal(fedNightSignal(bars, { date: '2026-12-08', nyMin: 15 * 60, fedDay: '2026-12-09' }), null); // för tidigt
+  assert.equal(fedNightSignal(bars, { date: '2026-12-08', nyMin: 15 * 60 + 30, fedDay: null }), null); // inget beslut i morgon
+  const e = fedNightSignal(bars, { date: '2026-12-08', nyMin: 15 * 60 + 30, fedDay: '2026-12-09' });
+  assert.equal(e.exp, 'fed-night'); assert.equal(e.exitDate, '2026-12-09'); assert.equal(e.close, 605);
+  const o = fedNightOutcome(e, bars);
+  assert.equal(o.state, 'stängd'); assert.equal(o.last, 607);
+  assert.ok(Math.abs(o.pct - (607 / 605 - 1 - 0.0006) * 100) < 0.01);
+  assert.equal(fedNightOutcome(e, bars.slice(0, 1)).state, 'öppen');
+});

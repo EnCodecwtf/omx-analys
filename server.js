@@ -10,7 +10,7 @@ import * as signalLog from './lib/log.js';
 import { notifySignal, notifyEvent, notifyText } from './lib/notify.js';
 import * as monthly from './lib/monthly.js';
 import { freeView } from './lib/freeview.js';
-import { EXPERIMENTS, experimentSignal, expOutcome, ASIA, asiaSignal, asiaOutcome } from './lib/experiments.js';
+import { EXPERIMENTS, experimentSignal, expOutcome, ASIA, asiaSignal, asiaOutcome, FED_NIGHT, fedNightSignal, fedNightOutcome } from './lib/experiments.js';
 import { igStatus, igEnabled, configureIg, igTryLogin } from './lib/ig.js';
 import crypto from 'node:crypto';
 import { vapidKeys, subscribe, unsubscribe, pushAll } from './lib/push.js';
@@ -743,7 +743,7 @@ async function monthlyNotify(kind) {
   const title = kind === 'final' ? 'Månadens aktier: dags att byta nu' : 'Månadens aktier: byte ikväll';
   const btc = btcCycle(rd.today);
   const body = `${v.changeText}\n${kind === 'final' ? 'Handla före 22.00 svensk tid.' : 'Bytet görs strax före stängningen 22.00 svensk tid. Slutligt besked kommer cirka 21.00.'}` +
-    `\nStäll samtidigt om hela kapitalet: 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld, 20 % bitcoin-cykeln (${btc.inWindow ? 'bitcoin' : 'i guld till ' + btc.until}).`;
+    `\nStäll samtidigt om hela kapitalet: 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld, 20 % bitcoin-cykeln (${btc.inWindow ? 'bitcoin' : 'kontanter eller räntefond till ' + btc.until}).`;
   const ok = await notifyText(title, body);
   state.pushed[nextTarget] = kind;
   await signalLog.kvSet(MONTHLY_KEY, state);
@@ -878,9 +878,12 @@ async function aiMonthly(aiStart, hooks = {}) {
 // om framtiden cirka 15 % per år. Ställs om till målvikterna vid varje byte i Månadens aktier.
 const AI_ALLOC = { monthly: 0.4, omx: 0.2, gold: 0.2, btc: 0.2 };
 const AI_ALLOC_KEY = 'omx-analys:ai-alloc';
-const btcSymbolOn = d => (btcCycle(d).inWindow ? 'BTC-USD' : 'GC=F');
+// Utanför bitcoins köpfönster ligger delen i kontanter (som i testet; två oberoende tester visade att kontanter
+// slog både guld och bitcoin-trend där, och guld gjorde kontot för beroende av guldpriset).
+const btcSymbolOn = d => (btcCycle(d).inWindow ? 'BTC-USD' : null);
 async function sleeveValue(x, d = null) {
   if (!x) return 0;
+  if (!x.symbol) return x.money;
   const px = await closeOn(x.symbol, d);
   return px ? x.money * px / x.entry : x.money;
 }
@@ -909,17 +912,23 @@ async function aiTrader() {
     const run = () => runAiTrader(list, s => bars.get(s), s => reports.get(s) || [], {
       productFor: e => picks[signalLog.idOf(e)] || null, macroFor: d => macroAt(d).score, vixFor: d => vixAt.get(d) ?? 20, transfers: alloc.transfers });
     let a = run();
+    const fmt = v => `${Math.round(v).toLocaleString('sv-SE')} kr`;
     const engineAt = d => { let v = a.start; for (const c of a.curve) { if (c.date <= d) v = c.equity; else break; } return v; };
     let changed = false;
+    if (alloc.sleeves?.btc?.symbol === 'GC=F' && !btcCycle(today()).inWindow) {
+      const v = await sleeveValue(alloc.sleeves.btc);
+      alloc.sleeves.btc = { symbol: null, money: v, entry: null, date: today() };
+      alloc.log.unshift({ date: today(), action: 'fördelar', text: `Bitcoin-delen säljer sitt guld (${fmt(v)}) och ligger i kontanter till köpfönstret öppnar ${btcCycle(today()).until}. Så var regeln testad, och det halverar kontots beroende av guldpriset.` });
+      changed = true;
+    }
     const setSleeves = async (T, d) => {
       for (const k of ['gold', 'btc']) {
         const sym = k === 'gold' ? 'GC=F' : btcSymbolOn(d || today());
-        const entry = await closeOn(sym, d);
-        if (!entry) throw new Error(`Ingen kurs för ${sym}`);
+        const entry = sym ? await closeOn(sym, d) : null;
+        if (sym && !entry) throw new Error(`Ingen kurs för ${sym}`);
         alloc.sleeves[k] = { symbol: sym, money: T * AI_ALLOC[k], entry, date: d || today() };
       }
     };
-    const fmt = v => `${Math.round(v).toLocaleString('sv-SE')} kr`;
     const hooks = {
       migrate: async val => {
         if (alloc.started) return null;
@@ -927,7 +936,7 @@ async function aiTrader() {
         await setSleeves(T, null);
         alloc.transfers.push({ date: today(), amount: -((target - val) + T * (AI_ALLOC.gold + AI_ALLOC.btc)), why: 'Ny fördelning 40/20/20/20' });
         alloc.started = today();
-        alloc.log.unshift({ date: today(), action: 'fördelar', text: `Ny fördelning av kontot (${fmt(T)}): 40 % Månadens aktier (${fmt(target)}), 20 % OMX-signaler (${fmt(T * AI_ALLOC.omx)}), 20 % guld (${fmt(T * AI_ALLOC.gold)}) och 20 % bitcoin-cykeln (${fmt(T * AI_ALLOC.btc)}, ${alloc.sleeves.btc.symbol === 'BTC-USD' ? 'bitcoin' : 'i guld tills köpfönstret öppnar'}).` });
+        alloc.log.unshift({ date: today(), action: 'fördelar', text: `Ny fördelning av kontot (${fmt(T)}): 40 % Månadens aktier (${fmt(target)}), 20 % OMX-signaler (${fmt(T * AI_ALLOC.omx)}), 20 % guld (${fmt(T * AI_ALLOC.gold)}) och 20 % bitcoin-cykeln (${fmt(T * AI_ALLOC.btc)}, ${alloc.sleeves.btc.symbol === 'BTC-USD' ? 'bitcoin' : 'i kontanter tills köpfönstret öppnar'}).` });
         changed = true;
         return target;
       },
@@ -952,7 +961,7 @@ async function aiTrader() {
       const x = alloc.sleeves[k];
       if (!x) continue;
       const value = await sleeveValue(x);
-      sl.push({ key: k, title, asset: x.symbol === 'BTC-USD' ? 'Bitcoin' : 'Guld', symbol: x.symbol, since: x.date, money: Math.round(x.money), value: Math.round(value), pct: Math.round((value / x.money - 1) * 1000) / 10 });
+      sl.push({ key: k, title, asset: x.symbol === 'BTC-USD' ? 'Bitcoin' : x.symbol ? 'Guld' : 'Kontanter', symbol: x.symbol, since: x.date, money: Math.round(x.money), value: Math.round(value), pct: Math.round((value / x.money - 1) * 1000) / 10 });
     }
     const engine = { equity: a.equity, cash: a.cash, pending: a.pendingMoves };
     const others = (m?.value || 0) + sl.reduce((t, x) => t + x.value, 0);
@@ -1004,7 +1013,7 @@ async function riskView() {
       else if (p.product?.type === 'mini') H.push(mini(base, p.entry, p.product.leverage, 'long', p.product.knockout));
       else { const lev = p.product?.leverage ?? 5; H.push({ ...base, type: 'cert', side: 'long', lev, levNow: lev }); }
     }
-    for (const x of a.allocation?.sleeves || []) H.push({ part: x.title, name: x.asset, paper: 'utan hävstång', cls: x.symbol === 'BTC-USD' ? 'bitcoin' : 'guld', type: 'direkt', side: 'long', lev: 1, levNow: 1, value: x.value, last: 1, usd: true });
+    for (const x of (a.allocation?.sleeves || []).filter(x => x.symbol)) H.push({ part: x.title, name: x.asset, paper: 'utan hävstång', cls: x.symbol === 'BTC-USD' ? 'bitcoin' : 'guld', type: 'direkt', side: 'long', lev: 1, levNow: 1, value: x.value, last: 1, usd: true });
     const total = a.equity;
     const cash = Math.max(0, total - H.reduce((t, h) => t + h.value, 0));
     const one = H.map(h => {
@@ -1059,7 +1068,7 @@ async function goldHours() {
   goldHoursCache = { at: Date.now(), rows };
   return rows;
 }
-const expOutcomeFor = async e => e.exp === ASIA.id ? asiaOutcome(e, await goldHours()) : expOutcome(e, await fetchBars(e.symbol));
+const expOutcomeFor = async e => e.exp === ASIA.id ? asiaOutcome(e, await goldHours()) : e.exp === FED_NIGHT.id ? fedNightOutcome(e, await fetchBars(e.symbol)) : expOutcome(e, await fetchBars(e.symbol));
 async function experimentCheck() {
   const ny = monthly.nyNow(), added = [];
   for (const x of Object.values(EXPERIMENTS)) {
@@ -1070,6 +1079,14 @@ async function experimentCheck() {
     const rec = await recordFree([e]);
     for (const r of rec) { await notifySignal(r); added.push(r); }
   }
+  // Fed-natten: dagen före ett Fed-beslut, 15.20–15.58 i New York (21.20–21.58 svensk tid).
+  try {
+    const next = monthly.nextNyseDay(ny.date);
+    if (monthly.isNyseDay(ny.date) && fomcDays.has(next)) {
+      const e = fedNightSignal(await fetchBars(FED_NIGHT.symbol, { range: '1mo' }), { date: ny.date, nyMin: ny.min, fedDay: next });
+      if (e) for (const r of await recordFree([e])) { await notifySignal(r); added.push(r); }
+    }
+  } catch (err) { console.error('Fed-natten:', err.message); }
   // Asien-guld: varje handelsdag kl 02.05–04.00 i New York (08.05–10.00 svensk tid).
   // Pausas om de senaste 40 affärerna sammantaget gått minus (regeln förlorade 2015–2023).
   try {
@@ -1107,8 +1124,10 @@ async function liveCheck({ force = false } = {}) {
         const o = await expOutcomeFor(e);
         const ny = monthly.nyNow();
         // Asien-guld: påminnelse att stänga 09.20–09.30 i New York (15.20–15.30 svensk tid).
-        const exitNow = e.exp === ASIA.id ? ny.date === e.exitDate && ny.min >= ASIA.exit - 10 : ny.date >= e.exitDate;
-        const kinds = o.state === 'stängd' && o.why !== 'säljdag' ? [o.why === 'mål' ? 'tp' : 'stop'] : (o.state === 'öppen' || (e.exp === ASIA.id && o.why === 'säljdag' && ny.date === e.exitDate)) && exitNow ? ['exit'] : [];
+        // Fed-natten: sälj när USA öppnar beslutsdagen (09.25 i New York, 15.25 svensk tid).
+        const exitNow = e.exp === ASIA.id ? ny.date === e.exitDate && ny.min >= ASIA.exit - 10 : e.exp === FED_NIGHT.id ? ny.date === e.exitDate && ny.min >= FED_NIGHT.exitMin - 5 : ny.date >= e.exitDate;
+        const sameDay = (e.exp === ASIA.id || e.exp === FED_NIGHT.id) && o.why === 'säljdag' && ny.date === e.exitDate;
+        const kinds = o.state === 'stängd' && o.why !== 'säljdag' ? [o.why === 'mål' ? 'tp' : 'stop'] : (o.state === 'öppen' || sameDay) && exitNow ? ['exit'] : [];
         if (o.state === 'stängd' && o.exitDate < new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)) { await signalLog.markAlerts(id, kinds); continue; }
         for (const k of await signalLog.markAlerts(id, kinds)) if (await notifyEvent(e, k, o)) sent.push(`${e.symbol} ${k}`);
         continue;

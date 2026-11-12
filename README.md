@@ -873,7 +873,8 @@ resten om kursen faller under EMA 20 nära köpkursen, hälften säljs före en 
 inte nått TP1 på 20 handelsdagar avslutas. Varje beslut visas med motivering. Allt räknas om från början på dagsdata.
 
 **Fördelning (från 2026-11-11):** kontot är uppdelat i 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld och 20 %
-bitcoin-cykeln (guld utanför köpfönstret, alltså till 2027-04-15). Delarna ställs om till målvikterna vid varje byte i
+bitcoin-cykeln (kontanter utanför köpfönstret, alltså till 2027-04-15 – som i testet; guld där gjorde kontot cirka 60 %
+beroende av guldpriset utan att förbättra resultatet). Delarna ställs om till målvikterna vid varje byte i
 Månadens aktier. Pengar flyttas till och från OMX-delen med daterade flyttar (`transfers` i `runAiTrader`), som sparas så att
 historiken ligger fast; en flytt ut tas bara från kontanterna och resten tas när affärer stängs.
 
@@ -895,6 +896,15 @@ Samvariationen mellan Månadens aktier, OMX-signalerna, guld och bitcoin-cykeln 
 samtidigt. Med försiktigare antaganden (halva bitcoins uppgångar, 80 % av Månadens aktiers och 70 % av guldets) ger
 fördelningen cirka 15 % per år med −21 %. Den optimerade fördelningen valdes bort eftersom den bygger på bitcoins historiska
 uppgång och bara tre cykler. Månadsdata döljer nedgångar inom månaden.
+
+### Fed-natten (experiment)
+Dagen före Feds räntebesked, 21.20–21.58 svensk tid, kommer en notis: köp en Nasdaq-mini med cirka 3x före 22.00 och sälj
+när USA öppnar 15.30 dagen efter (före beskedet). Natten före Fed har Nasdaq (QQQ, stängning → öppning) stigit +0,27 %
+mot +0,05 % en vanlig natt, t 4,2, upp 71 % av gångerna; +0,28 % 2015–20 och +0,26 % 2021–26 – alltså även efter att
+Lucca & Moench (2015) publicerade effekten. Själva beslutsdagen gav inget extra (−0,10 % öppning → stängning). Med 3x och
+spread: +0,52 % per affär, sämsta −3,4 %. OMXS30 (som stänger före beskedet) steg +0,22 % på Fed-dagen (t 2,4).
+Kalendereffekter som testades samtidigt och inte höll: dagen före helgdag (Sverige negativ), optionslösen/quad witching,
+Santa rally, januarieffekten, KPI-dagen, utdelningsmånaden (stark före 2013, borta efter publicering), NFP-dagen för aktier.
 
 ### VIX-stegen: hävstång efter marknadsläget (2006–2026)
 Hävstången på aktierna i Månadens aktier sätts vid varje byte efter VIX: under 15 ger 1,8x, 15–25 ger 1,25x och över 25 ger 1x
