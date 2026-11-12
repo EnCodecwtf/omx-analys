@@ -643,3 +643,25 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .m-analys { background: rgba(234, 179, 8, .15); color: #eab308; }
 .m-signal { background: rgba(34, 197, 94, .15); color: #22c55e; }
 .m-fokus { background: rgba(59, 130, 246, .15); color: #60a5fa; }
+/* Fear & Greed-mätare */
+.fg-card { margin-bottom: 12px; }
+.fg-head { display: flex; justify-content: space-between; align-items: baseline; }
+.fg-head h3 { margin-bottom: 4px; }
+.fg-body { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.fg-dial { position: relative; width: 220px; max-width: 100%; text-align: center; }
+.fg-svg { width: 100%; height: auto; display: block; }
+.fg-tick { font-size: 8px; fill: var(--muted); }
+.fg-value { font-size: 34px; font-weight: 800; line-height: 1; margin-top: -6px; font-variant-numeric: tabular-nums; }
+.fg-label { font-weight: 600; margin-top: 2px; }
+.fg-cmp { list-style: none; flex: 1; min-width: 170px; display: grid; gap: 6px; }
+.fg-cmp li { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; align-items: baseline; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.fg-cmp li span { color: var(--muted); font-size: 12px; }
+.fg-cmp li b { font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
+.fg-cmp li small { grid-column: 1 / -1; color: var(--text-2); font-size: 11px; margin-top: -4px; }
+.fg-crypto { margin-top: 8px; color: var(--text-2); }
+.fg-more { margin-top: 8px; }
+.fg-parts { list-style: none; display: grid; gap: 6px; margin: 8px 0; }
+.fg-parts li { display: grid; grid-template-columns: 120px 1fr 28px; gap: 8px; align-items: center; font-size: 12px; }
+.fg-bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.fg-bar i { display: block; height: 100%; }
+.fg-parts b { text-align: right; font-variant-numeric: tabular-nums; }

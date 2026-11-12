@@ -472,7 +472,7 @@ async function fearGreedView() {
     try { const j = await (await fetch('https://api.alternative.me/fng/?limit=8', { signal: AbortSignal.timeout(8000) })).json();
       const v = j.data?.map(x => +x.value); if (v?.length) crypto = { value: v[0], label: fgLabel(v[0]), weekAgo: v[7] ?? null, source: 'alternative.me' }; } catch { /* hoppas över */ }
     const wk = fg.slice(-6, -1).map(x => x.value);
-    return { stocks: now && { ...now, weekAgo: ago(5)?.value ?? null, weekMin: wk.length ? Math.min(...wk) : null, weekMax: wk.length ? Math.max(...wk) : null, monthAgo: ago(21)?.value ?? null, method: 'CNN:s metod med sju mått', putCall: PC.length ? { date: PC.at(-1).d, total: PC.at(-1).c, equity: PC.at(-1).equity, avg5: Math.round(PC.slice(-5).reduce((a, x) => a + x.c, 0) / Math.min(5, PC.length) * 100) / 100 } : null }, crypto, history: fg.slice(-260).map(x => ({ d: x.d, v: x.value })) };
+    return { stocks: now && { ...now, prevClose: ago(1)?.value ?? null, yearAgo: ago(252)?.value ?? null, weekAgo: ago(5)?.value ?? null, weekMin: wk.length ? Math.min(...wk) : null, weekMax: wk.length ? Math.max(...wk) : null, monthAgo: ago(21)?.value ?? null, method: 'CNN:s metod med sju mått', putCall: PC.length ? { date: PC.at(-1).d, total: PC.at(-1).c, equity: PC.at(-1).equity, avg5: Math.round(PC.slice(-5).reduce((a, x) => a + x.c, 0) / Math.min(5, PC.length) * 100) / 100 } : null }, crypto, history: fg.slice(-260).map(x => ({ d: x.d, v: x.value })) };
   });
 }
 

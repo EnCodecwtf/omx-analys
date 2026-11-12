@@ -1669,6 +1669,42 @@ async function fetchMonthly(refresh) {
   monthlyData = await (await fetch('/api/monthly' + (refresh ? '?refresh=1' : ''))).json();
   return monthlyData;
 }
+// Fear & Greed-mätare (aktier, räknat med CNN:s metod) på startsidan.
+const FG_ZONES = [[0, 25, '#ef4444', 'Extrem rädsla'], [25, 45, '#f97316', 'Rädsla'], [45, 55, '#eab308', 'Neutralt'], [55, 75, '#84cc16', 'Girighet'], [75, 100, '#22c55e', 'Extrem girighet']];
+const fgColor = v => FG_ZONES.find(z => v < z[1] || z[1] === 100)[2];
+const fgName = v => FG_ZONES.find(z => v < z[1] || z[1] === 100)[3];
+function fgGauge(v) {
+  const pt = (deg, r) => [100 + r * Math.cos(deg * Math.PI / 180), 100 - r * Math.sin(deg * Math.PI / 180)];
+  const ang = x => 180 - x * 1.8;
+  const seg = ([a, b, col]) => { const [x0, y0] = pt(ang(a) - (a ? 0.8 : 0), 82), [x1, y1] = pt(ang(b) + (b < 100 ? 0.8 : 0), 82);
+    return `<path d="M ${x0.toFixed(1)} ${y0.toFixed(1)} A 82 82 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}" stroke="${col}" stroke-width="16" fill="none" opacity="${v >= a && (v < b || b === 100) ? 1 : 0.35}"/>`; };
+  const [nx, ny] = pt(ang(v), 66);
+  const ticks = [0, 25, 50, 75, 100].map(t => { const [x, y] = pt(ang(t), 100); return `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="middle" class="fg-tick">${t}</text>`; }).join('');
+  return `<svg viewBox="-8 -8 216 122" class="fg-svg" role="img" aria-label="Fear and Greed ${v} av 100, ${fgName(v)}">
+    ${FG_ZONES.map(seg).join('')}${ticks}
+    <line x1="100" y1="100" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="6" fill="var(--text)"/>
+  </svg>`;
+}
+async function loadFearGreed() {
+  const el = $('#fg-gauge');
+  let j; try { j = await (await fetch('/api/feargreed')).json(); } catch { el.innerHTML = ''; return; }
+  const s = j.stocks; if (!s) { el.innerHTML = ''; return; }
+  const cmp = (lab, v) => v == null ? '' : `<li><span>${lab}</span><b style="color:${fgColor(v)}">${v}</b><small>${fgName(v).toLowerCase()}</small></li>`;
+  const parts = Object.entries(s.parts || {}).filter(([, v]) => v != null);
+  el.innerHTML = `<article class="card fg-card">
+    <div class="fg-head"><h3>Fear &amp; Greed</h3><span class="muted small">aktier · ${esc(s.d)}</span></div>
+    <div class="fg-body">
+      <div class="fg-dial">${fgGauge(s.value)}<div class="fg-value" style="color:${fgColor(s.value)}">${s.value}</div><div class="fg-label">${esc(fgName(s.value))}</div></div>
+      <ul class="fg-cmp">${cmp('Föregående dag', s.prevClose)}${cmp('För en vecka sedan', s.weekAgo)}${cmp('För en månad sedan', s.monthAgo)}${cmp('För ett år sedan', s.yearAgo)}</ul>
+    </div>
+    ${j.crypto ? `<div class="fg-crypto small">Bitcoin: <b style="color:${fgColor(j.crypto.value)}">${j.crypto.value}</b> ${esc(fgName(j.crypto.value).toLowerCase())}${s.putCall ? ` · Put/call ${String(s.putCall.total).replace('.', ',')} (5 dagar ${String(s.putCall.avg5).replace('.', ',')})` : ''}</div>` : ''}
+    <details class="fg-more"><summary class="small">Så räknas det – sju mått</summary>
+      <ul class="fg-parts">${parts.map(([n, v]) => `<li><span>${esc(n)}</span><span class="fg-bar"><i style="width:${v}%;background:${fgColor(v)}"></i></span><b>${v}</b></li>`).join('')}</ul>
+      <p class="small muted">Varje mått jämförs med sitt senaste år (0 = mest rädsla, 100 = mest girighet), och indexet är snittet. Samma metod som CNN:s index: momentum, styrka, bredd, volatilitet (VIX), säker hamn, skräpobligationer och put/call-kvoten (CBOE). Bitcoin från alternative.me. Extrem rädsla har historiskt varit ett bättre köpläge än ett säljläge – men det är ingen signal.</p>
+    </details>
+  </article>`;
+}
 async function loadMonthlyTeaser() {
   const el = $('#monthly-teaser');
   try { await fetchMonthly(); } catch { el.innerHTML = ''; return; }
@@ -1958,6 +1994,7 @@ $('#ig-off').addEventListener('click', async () => {
 if (location.hash === '#ig') { setView('more'); openTool('ig'); }
 if (location.hash === '#manadens-aktier') { setView('more'); openTool('monthly'); }
 loadMonthlyTeaser();
+loadFearGreed();
 
 // Fri analys av valfri tillgång: riktning, MA 44/332 och plan för kort position i nedtrend.
 function renderFreeCards(d) {
