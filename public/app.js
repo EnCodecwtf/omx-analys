@@ -724,7 +724,7 @@ function renderAi() {
     ${a.monthly ? aiMonthlyBox(a.monthly, a.allocation ? Math.round(a.allocation.targets.monthly * 100) : 10) : ''}
     <h2 class="v-title">Beslut</h2>
     <ul class="ai-log">${a.log.slice(0, 40).map(l => `<li><span class="ai-ico">${AI_ICON[l.action] || '•'}</span><div><div class="ai-when">${esc(l.date)} · ${esc(l.name)} · ${esc(l.action)}</div><p>${esc(l.text)}</p></div></li>`).join('') || '<li class="muted">Inga beslut än.</li>'}</ul>
-    ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}` : ''}
+    ${a.closed.length ? `<h2 class="v-title">Avslutade <span class="muted">(${a.stats.wins} av ${a.stats.trades} med vinst)</span></h2><details class="closed-list"><summary>Visa avslutade affärer (${a.closed.length})</summary>${a.closed.map(c => `<div class="row" data-symbol="${esc(c.symbol)}"><div class="name">${esc(c.name)}</div><div class="right num ${c.pnl > 0 ? 'pos' : 'neg'}">${sign(c.pnl)}</div><div class="meta"><span>${esc(c.opened)} – ${esc(c.closedOn)}</span><span>${pct(c.pnlPct)}</span>${c.hit ? `<span>TP${c.hit} ✓</span>` : ''}</div></div>`).join('')}</details>` : ''}
     <p class="muted small" style="margin-top:12px">Fiktivt konto som startade med ${kr(a.start)} vid första signalen.${a.allocation ? ` Sedan ${esc(a.allocation.started)} är kontot fördelat 40 % Månadens aktier, 20 % OMX-signaler, 20 % guld och 20 % bitcoin-cykeln, och det ställs om vid varje månadsbyte. Kurvan räknar delarna utanför OMX-signalerna till anskaffningsvärdet fram till idag.` : a.monthly ? ` Sedan ${esc(a.monthly.started)} ligger 10 % (${kr(a.monthly.amount)}) i Månadens aktier, och kontots värde och kontanter räknas med den delen.` : ''} OMX-signaler: högst ${a.maxOpen} affärer samtidigt, cirka 10 % av kontot per affär (minst 1 000 kr). Panikveckan tas också, vid sidan av de tre: 10 % per aktie, utan hävstång, säljs på säljdagen. AI:n väljer fiktivt ett av papperen som appen föreslår för signalen (förstahandsvalet bland minifutures, annars bull-certifikat) och räknar pappers värde från finansieringsnivå och knock-out, med pappers spread plus 0,2 % i avgift. Räknat på dagsdata.
       Vid TP1 avgör en maskininlärningsmodell (tränad på 2017–2021, testad på 2022–2026) om resten ska få löpa eller säljas. Övriga beslut följer regler som väger trend (EMA 20), mål, stopp, rapporter och tid i affären. Inte investeringsrådgivning.</p>`;
   bindRows(el);
@@ -738,6 +738,10 @@ const KIND = e => e.kind === 'exp' ? `Experiment · ${e.title || ''}` : e.kind =
 const isLive = e => e.state === 'öppen' || e.state === 'väntar på köp';
 const sv = v => String(v).replace('.', ',');
 const resText = e => e.pct != null ? `${e.pct > 0 ? '+' : ''}${sv(e.pct)} %` : e.r != null ? `${e.r > 0 ? '+' : ''}${sv(e.r)} R` : '–';
+// Experiment mäts i tillgångens rörelse utan hävstång; notisen rekommenderar en mini (2–3x, Fed-natten ~3x).
+const expLev = e => e.kind !== 'exp' || e.pct == null ? '' : (() => { const [lo, hi] = e.lev ? [e.lev, e.lev] : [2, 3];
+  const f = x => `${x > 0 ? '+' : ''}${sv(Math.round(x * 10) / 10)} %`;
+  return lo === hi ? `med ${lo}x: ${f(e.pct * lo)}` : `med ${lo}–${hi}x: ${f(e.pct * lo)} till ${f(e.pct * hi)}`; })();
 const resCls = e => (e.pct ?? e.r) == null ? '' : (e.pct ?? e.r) > 0 ? 'pos' : (e.pct ?? e.r) < 0 ? 'neg' : '';
 
 // Mätare från stoppet till TP3 med köp, mål och kursen just nu.
@@ -754,7 +758,7 @@ function tradeBar(e) {
 function nextStep(e) {
   const entry = e.entry ?? e.close, hit = e.hit || 0, act = e.kind === 'short' ? 'stäng' : 'sälj';
   if (e.kind === 'exp' && e.exp === 'fed-night') return `Köpt ${esc(e.date)} på ${fmt(e.close)} (Nasdaq-mini cirka ${e.lev || 3}x). Sälj <b>${esc(wd(e.exitDate))} 15.30</b> när USA öppnar, före Feds besked. Inget stopp. Halv insats.`;
-  if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. ${e.exitAt ? `Stäng i dag kl <b>${esc(e.exitAt)}</b>.` : `Stäng senast <b>${esc(wd(e.exitDate))}</b>.`}${e.size < 1 ? ' Halv insats.' : ''}`;
+  if (e.kind === 'exp') return `${e.side === 'lång' ? 'Köpt' : 'Blankad'} ${esc(e.date)} på ${fmt(e.close)}. Stopp ${fmt(e.stop)}${e.tp ? `, mål <b>${fmt(e.tp)}</b>` : ''}. ${e.exitAt ? `Stäng i dag kl <b>${esc(e.exitAt)}</b>.` : `Stäng senast <b>${esc(wd(e.exitDate))}</b>.`}${e.size < 1 ? ' Halv insats.' : ''} Resultatet visas i guldets/råvarans rörelse utan hävstång – med en mini på 2–3x blir det 2–3 gånger så mycket, åt båda hållen.`;
   if (e.kind === 'panic' || e.kind === 'crypto') return e.state === 'väntar på köp' ? `Köp på öppningen nästa handelsdag. Sälj på stängningen ${esc(e.exitDate)}.` : `${e.buyDate ? `Köpt ${esc(e.buyDate)}. ` : ''}Inget att göra förrän säljdagen: sälj på stängningen <b>${esc(wd(e.exitDate))}</b>, oavsett kurs.`;
   if (e.state === 'väntar på köp') return `${e.kind === 'short' ? 'Blanka' : 'Köp'} på öppningen. Stopp ${fmt(e.stop)}, första mål ${fmt(e.tps[0])}.`;
   if (hit === 0) return `Nästa: ${act} 1/3 vid TP1 <b>${fmt(e.tps[0])}</b>. Stopp ${fmt(e.stop)}.`;
@@ -829,11 +833,13 @@ function renderTrades() {
     ${open.length ? open.map(tradeCard).join('') : '<div class="empty small">Inga öppna affärer. Nya signaler visas under Idag.</div>'}
     <h2 class="v-title">Avslutade <span class="muted">(${closed.length})</span></h2>
     ${s.closed ? `<div class="note small">OMX: ${s.closed} stängda · TP1 ${s.tp1Rate ?? '–'} % · snitt ${s.avgR == null ? '–' : sv(s.avgR) + ' R'}${s.panic?.closed ? ` · panikveckor snitt ${sv(s.panic.avgPct)} %` : ''}${s.crypto?.closed ? ` · krypto snitt ${sv(s.crypto.avgPct)} %` : ''}</div>` : ''}
-    ${closed.length ? closed.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
+    ${closed.length ? `<details class="closed-list"${store.get('closedOpen', '0') === '1' ? ' open' : ''}><summary>Visa avslutade affärer (${closed.length}) · ${closed.filter(e => (e.pct ?? e.r) > 0).length} med vinst</summary>
+      ${closed.map(e => `<div class="row" data-symbol="${esc(e.symbol)}">
       <div class="name">${esc(e.name)} <span class="tag">${KIND(e)}</span></div>
-      <div class="right num ${resCls(e)}">${resText(e)}</div>
-      <div class="meta"><span>${esc(e.date)}</span><span>${esc(e.state)}${e.hit ? ' · TP' + e.hit + ' ✓' : ''}</span></div></div>`).join('')
+      <div class="right num ${resCls(e)}">${resText(e)}${e.kind === 'exp' ? '<div class="small muted">utan hävstång</div>' : ''}</div>
+      <div class="meta"><span>${esc(e.date)}</span><span>${esc(e.state)}${e.hit ? ' · TP' + e.hit + ' ✓' : ''}</span>${expLev(e) ? `<span>${esc(expLev(e))}</span>` : ''}</div></div>`).join('')}</details>`
       : '<div class="empty small">Inga avslutade affärer än. Alla signaler sparas med frysta nivåer, vinnare som förlorare.</div>'}`;
+  el.querySelector('.closed-list')?.addEventListener('toggle', ev => store.set('closedOpen', ev.target.open ? '1' : '0'));
   bindRows(el);
 }
 

@@ -665,3 +665,5 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .fg-bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
 .fg-bar i { display: block; height: 100%; }
 .fg-parts b { text-align: right; font-variant-numeric: tabular-nums; }
+.closed-list > summary { cursor: pointer; padding: 10px 12px; margin: 4px 0 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text-2); font-size: 13px; }
+.closed-list[open] > summary { margin-bottom: 10px; }
