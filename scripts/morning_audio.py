@@ -16,6 +16,9 @@ APP = os.environ.get('APP_URL', 'https://omx-analys.vercel.app').rstrip('/')
 KEY = os.environ.get('CRON_SECRET', '')
 REPO = os.environ['GITHUB_REPOSITORY']
 VOICE = os.environ.get('VOICE', 'sv-SE-MattiasNeural')
+# Glen: Mattias, lite snabbare och ljusare än standard (valt efter röstproven i public/rostprov/).
+RATE = os.environ.get('RATE', '+8%')
+PITCH = os.environ.get('PITCH', '+4Hz')
 TAG = 'morgon-ljud'
 
 
@@ -32,7 +35,7 @@ def duration(path):
 async def synth(text, path):
     for attempt in range(3):
         try:
-            await edge_tts.Communicate(text, VOICE, rate='+4%').save(path)
+            await edge_tts.Communicate(text, VOICE, rate=RATE, pitch=PITCH).save(path)
             if os.path.getsize(path) > 0:
                 return
         except Exception as err:  # noqa: BLE001 – försök igen, tjänsten är inofficiell
