@@ -117,6 +117,20 @@ def main():
     for a in old:
         subprocess.run(['gh', 'release', 'delete-asset', TAG, a, '-R', REPO, '-y'], check=False)
 
+    # Discord (valfritt): lägger upp ljudfilen i en kanal via webhook, utan länk till sajten.
+    # Webhook-adressen sparas som GitHub-hemlighet DISCORD_WEBHOOK_URL (aldrig i koden eller chatten).
+    hook = os.environ.get('DISCORD_WEBHOOK_URL', '').strip()
+    if hook and not os.environ.get('FORCE'):
+        d = datetime.date.fromisoformat(m['date'])
+        days = ['måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag', 'söndag']
+        months = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december']
+        label = f'{days[d.weekday()]} {d.day} {months[d.month - 1]}'
+        nice = os.path.join(work, f'Morgonsoffan med Glen {label}.mp3')
+        subprocess.run(['cp', out, nice], check=True)
+        payload = json.dumps({'content': f'☕ **Morgonsoffan med Glen**, {label}' + (f"\n{m['summary']}" if m.get('summary') else ''), 'allowed_mentions': {'parse': []}})
+        r = subprocess.run(['curl', '-sS', '-o', '/dev/null', '-w', '%{http_code}', '-F', f'payload_json={payload}', '-F', f'files[0]=@{nice};type=audio/mpeg', hook], capture_output=True, text=True)
+        print('Discord:', r.stdout or r.stderr)
+
     body = json.dumps({'date': m['date'], 'file': name, 'offsets': offsets, 'duration': total, 'voice': VOICE}).encode()
     url = f'{APP}/api/cron/morning-audio' + (f'?key={KEY}' if KEY else '')
     req = urllib.request.Request(url, data=body, method='POST', headers={'Content-Type': 'application/json', 'User-Agent': 'omx-analys-audio'})

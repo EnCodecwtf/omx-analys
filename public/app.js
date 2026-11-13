@@ -1124,6 +1124,24 @@ async function loadMorning() {
   if (tool === 'morning') renderMorning();
 }
 const MTYPE = { fakta: 'Kurser och händelser som går att kontrollera', analys: 'Systemets tolkning – inte en signal', fokus: 'Vad systemets regler säger i dag', signal: 'Bara när alla regler är uppfyllda', 'affärer': 'Dina öppna affärer i signalloggen' };
+async function shareMorningAudio(m) {
+  const day = new Date(m.date + 'T12:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' });
+  const name = `Morgonsoffan med Glen ${day}.mp3`;
+  try {
+    toast('Hämtar ljudfilen…');
+    const blob = await (await fetch(m.audio.url)).blob();
+    const file = new File([blob], name, { type: 'audio/mpeg' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Morgonsoffan med Glen', text: `☕ Morgonsoffan med Glen, ${day}.${m.summary ? ' ' + m.summary : ''}` });
+      return;
+    }
+    // Dator eller webbläsare utan delning: ladda ner filen, dra sedan in den i Discord.
+    const u = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = u; link.download = name; document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 10000);
+    toast('Ljudfilen är nedladdad. Dra in den i Discord.');
+  } catch (err) { if (err?.name !== 'AbortError') toast('Kunde inte dela ljudfilen.'); }
+}
 function renderMorning() {
   const el = $('#morning');
   const m = morningData;
@@ -1160,6 +1178,11 @@ function renderMorning() {
     a.addEventListener('ended', stopSpeech);
     a.addEventListener('error', () => { a.remove(); toast('Ljudfilen kunde inte spelas. Enhetens egen röst används i stället.'); setVoiceLabel(); setSayButtons(); });
     $('#listen').appendChild(a);
+    // Dela ljudfilen (t.ex. till Discord) utan länk till sajten: filen skickas, inte adressen.
+    const sh = document.createElement('button');
+    sh.className = 'btn'; sh.id = 'say-share'; sh.textContent = '↗ Dela ljudet';
+    sh.addEventListener('click', () => shareMorningAudio(m));
+    $('#listen').appendChild(sh);
   }
   $('#say-play').addEventListener('click', toggleSpeech);
   $('#say-stop').addEventListener('click', stopSpeech);
