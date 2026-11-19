@@ -735,7 +735,7 @@ let logData = null;
 // Målen med bock och grön färg när de är nådda.
 const tpChips = (tps, hit = 0) => tps.map((p, k) => `<span class="tp-chip${k < hit ? ' hit' : ''}" title="${k < hit ? 'Nådd' : 'Inte nådd än'}">TP${k + 1} ${fmt(p)}${k < hit ? ' ✓' : ''}</span>`).join(' ');
 const KIND = e => e.kind === 'exp' ? `Experiment · ${e.title || ''}` : e.kind === 'short' ? 'Blankning (AI)' : e.kind === 'panic' ? 'Panikvecka' : e.kind === 'crypto' ? 'Krypto' : e.market === 'USA' ? 'USA' : 'OMX';
-const isLive = e => e.state === 'öppen' || e.state === 'väntar på köp';
+const isLive = e => e.state === 'öppen' || e.state === 'väntar på köp' || e.state === 'väntar på data';
 const sv = v => String(v).replace('.', ',');
 const resText = e => e.pct != null ? `${e.pct > 0 ? '+' : ''}${sv(e.pct)} %` : e.r != null ? `${e.r > 0 ? '+' : ''}${sv(e.r)} R` : '–';
 // Experiment mäts i tillgångens rörelse utan hävstång; notisen rekommenderar en mini (2–3x, Fed-natten ~3x).
@@ -782,10 +782,10 @@ function tradeCard(e) {
   const days = e.kind === 'panic' || e.kind === 'crypto';
   return `<div class="trade-card" data-symbol="${esc(e.symbol)}">
     <div class="tc-head"><div><b>${esc(e.name)}</b> <span class="tag">${KIND(e)}</span></div>
-      <div class="tc-res ${e.state === 'väntar på köp' ? '' : resCls(e)}">${e.state === 'väntar på köp' ? '<span class="muted small">väntar på köp</span>' : resText(e)}</div></div>
+      <div class="tc-res ${e.state === 'väntar på köp' || e.state === 'väntar på data' ? '' : resCls(e)}">${e.state === 'väntar på köp' ? '<span class="muted small">väntar på köp</span>' : e.state === 'väntar på data' ? '<span class="muted small">kurser hämtas…</span>' : resText(e)}</div></div>
     <div class="muted small">Signal ${esc(e.date)}${e.entry ? ` · köp ${fmt(e.entry)}` : ''}${e.last != null ? ` · nu ${fmt(e.last)}` : ''}</div>
-    ${!days && e.tps ? tradeBar(e) : ''}
-    <div class="tc-next">${nextStep(e)}</div>
+    ${!days && e.tps && e.state !== 'väntar på data' ? tradeBar(e) : ''}
+    <div class="tc-next">${e.state === 'väntar på data' ? 'Kurserna kunde inte hämtas just nu (vanligt precis vid börsöppningen). Affären finns kvar – läget uppdateras om en stund.' : nextStep(e)}</div>
     ${coachBox(e)}
   </div>`;
 }

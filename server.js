@@ -325,16 +325,26 @@ async function outcomeOf(e) {
   try {
     const bars = await fetchBars(e.symbol);
     return e.kind === 'crypto' ? cryptoOutcome(e, completeBars(bars)) : e.kind === 'panic' ? panicOutcome(e, bars) : e.kind === 'exp' ? await expOutcomeFor(e) : e.kind === 'short' ? shortOutcome(e, bars) : signalLog.outcome(e, bars);
-  } catch { return { state: 'okänd' }; }
+  } catch { return { state: 'okänd', dataError: true }; }
 }
 
 // Alla loggade signaler med utfall. Signaler som kom medan en tidigare affär i
 // samma instrument och strategi var öppen tas bort, eftersom det bara får finnas
 // en affär i taget per instrument (som i backtestet).
+// Senast kända utfall per signal: om kurserna inte går att hämta för stunden (vanligt runt
+// börsöppningen) visas det i stället, så att affärer inte tillfälligt försvinner eller ser stängda ut.
+const lastOutcome = new Map();
 async function withOutcomes() {
-  let out = [];
-  for (const e of await signalLog.entries()) out.push({ ...e, ...(await outcomeOf(e)) });
-  const { dupes } = signalLog.busy(out);
+  let out = [], missing = false;
+  for (const e of await signalLog.entries()) {
+    const id = signalLog.idOf(e);
+    let o = await outcomeOf(e);
+    if (o.dataError) { missing = true; o = lastOutcome.get(id) || { state: 'väntar på data', dataError: true }; }
+    else lastOutcome.set(id, o);
+    out.push({ ...e, ...o });
+  }
+  // Rensa aldrig bort signaler medan kurser saknas: ett tillfälligt fel får inte radera något.
+  const { dupes } = missing ? { dupes: [] } : signalLog.busy(out);
   if (dupes.length) {
     await signalLog.remove(dupes);
     out = out.filter(e => !dupes.includes(signalLog.idOf(e)));
@@ -356,7 +366,7 @@ async function openSlots() {
   const m = new Map();
   let out = [];
   try { out = await withOutcomes(); } catch (err) { console.error('Signalloggen kunde inte läsas:', err.message); }
-  for (const e of out) if (e.state === 'öppen' || e.state === 'väntar på köp') m.set(signalLog.slotOf(e.symbol, e.kind), e);
+  for (const e of out) if (e.state === 'öppen' || e.state === 'väntar på köp' || e.state === 'väntar på data') m.set(signalLog.slotOf(e.symbol, e.kind), e);
   return m;
 }
 // Markerar rader där en tidigare signal redan är en öppen affär: ingen ny signal då.
@@ -374,7 +384,7 @@ async function markInTrade(rows, kindOf = () => undefined) {
 async function calendar() {
   return cached('calendar', async () => {
     const from = today(), to = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
-    const live = (await withOutcomes()).filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
+    const live = (await withOutcomes()).filter(e => e.state === 'öppen' || e.state === 'väntar på köp' || e.state === 'väntar på data');
     const open = new Set(live.map(e => e.symbol));
     let rows = [];
     try { rows = (await scan()).rows; } catch { /* kalendern visas ändå */ }
@@ -504,7 +514,7 @@ async function marketLevels() {
 const MORNING_KEY = 'omx-analys:morning';
 async function makeMorning() {
   const [moves, s, cal, log, macroAt, night, levels, fg] = await Promise.all([marketMoves(), scan(), calendar(), logView(), macro(), overnight().catch(() => null), marketLevels().catch(() => []), fearGreedView().catch(() => null)]);
-  const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp');
+  const live = log.entries.filter(e => e.state === 'öppen' || e.state === 'väntar på köp' || e.state === 'väntar på data');
   const label = { trend: 'trend', support: 'stöd', rsi: 'RSI', macd: 'MACD', score: 'poäng', elliott: 'Elliott', report: 'rapport', macro: 'makro' };
   const omxRows = s.rows.filter(r => !r.isCrypto && !r.isIndex && !r.error);
   const [mk, geo] = await Promise.all([news(MARKET_QUERY, { limit: 8 }).catch(() => []), news(GEO_QUERY, { limit: 30 }).catch(() => [])]);
