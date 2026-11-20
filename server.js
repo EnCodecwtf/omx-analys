@@ -1199,7 +1199,7 @@ async function liveCheck({ force = false } = {}) {
         // Experiment: notis vid stopp eller mål, och påminnelse på säljdagen.
         const o = await expOutcomeFor(e);
         const ny = monthly.nyNow();
-        // Asien-guld: påminnelse att stänga 09.20–09.30 i New York (15.20–15.30 svensk tid).
+        // Asien-guld: påminnelse att stänga från 15.35 i New York (21.35 svensk tid), före 22.00.
         // Fed-natten: sälj när USA öppnar beslutsdagen (09.25 i New York, 15.25 svensk tid).
         const exitNow = e.exp === ASIA.id ? ny.date === e.exitDate && ny.min >= ASIA.exit - 10 : e.exp === FED_NIGHT.id ? ny.date === e.exitDate && ny.min >= FED_NIGHT.exitMin - 5 : ny.date >= e.exitDate;
         const sameDay = (e.exp === ASIA.id || e.exp === FED_NIGHT.id) && o.why === 'säljdag' && ny.date === e.exitDate;

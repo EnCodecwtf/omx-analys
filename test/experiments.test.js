@@ -36,15 +36,15 @@ test('utfall: stopp, mål och säljdag', () => {
   assert.equal(expOutcome(e, open).state, 'öppen');
 });
 
-test('Asien-guld: följer nattens rörelse 02.00 → 09.30, stopp 1 %', async () => {
+test('Asien-guld: följer nattens rörelse 02.00 → 15.45 (före USA:s stängning), stopp 1 %', async () => {
   const { asiaSignal, asiaOutcome } = await import('../lib/experiments.js');
-  // Timstaplar från 19.00 kvällen före till 10.00 (New York), priset stiger under natten.
+  // Timstaplar från 19.00 kvällen före till 16.00 (New York), priset stiger under natten.
   const base = Date.parse('2026-11-10T00:00:00Z') / 1000;
   const hours = [];
-  for (let k = 0; k <= 15; k++) { const hm = (19 + k) % 24 * 60, d = 19 + k < 24 ? '2026-11-10' : '2026-11-11'; const p = 4000 + k * 3; hours.push({ t: base + k * 3600, d, hm, o: p, h: p + 2, l: p - 2, c: p + 1 }); }
+  for (let k = 0; k <= 21; k++) { const hm = (19 + k) % 24 * 60, d = 19 + k < 24 ? '2026-11-10' : '2026-11-11'; const p = 4000 + k * 3; hours.push({ t: base + k * 3600, d, hm, o: p, h: p + 2, l: p - 2, c: p + 1 }); }
   const e = asiaSignal(hours, { date: '2026-11-11', nyMin: 2 * 60 + 10 });
   assert.equal(e.side, 'lång');
-  assert.equal(e.exitAt, '15.30');
+  assert.equal(e.exitAt, '21.45');
   const o = asiaOutcome(e, hours);
   assert.equal(o.state, 'stängd');
   assert.equal(o.why, 'säljdag');
