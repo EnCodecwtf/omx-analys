@@ -1,0 +1,46 @@
+name: Minutdata för backtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: 'År som JSON-lista'
+        default: '[2016,2017,2018,2019,2020,2021,2022,2023]'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 3
+      fail-fast: false
+      matrix:
+        year: ${{ fromJson(github.event.inputs.years) }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/minute_fetch.py ${{ matrix.year }} out
+      - run: gzip -9 out/*.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: min-${{ matrix.year }}
+          path: out/*.json.gz
+
+  commit:
+    needs: fetch
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: art
+      - name: Spara på grenen data-minutes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          if git fetch origin data-minutes; then git checkout -B data-minutes origin/data-minutes; else git checkout --orphan data-minutes; git rm -rf --quiet .; fi
+          mkdir -p min && find art -name '*.json.gz' -exec cp {} min/ \;
+          git add min && git commit -m "Minutdata $(date -u +%F)" && git push origin data-minutes || echo "inget nytt"
