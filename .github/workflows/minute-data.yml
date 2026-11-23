@@ -6,6 +6,9 @@ on:
       years:
         description: 'År som JSON-lista'
         default: '[2016,2017,2018,2019,2020,2021,2022,2023]'
+      instruments:
+        description: 'Instrument (tomt = S&P och Nasdaq), t.ex. XAUUSD'
+        default: ''
 
 permissions:
   contents: write
@@ -21,7 +24,7 @@ jobs:
         year: ${{ fromJson(github.event.inputs.years) }}
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/minute_fetch.py ${{ matrix.year }} out
+      - run: python3 scripts/minute_fetch.py ${{ matrix.year }} out ${{ github.event.inputs.instruments }}
       - run: gzip -9 out/*.json
       - uses: actions/upload-artifact@v4
         with:
