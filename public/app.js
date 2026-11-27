@@ -1060,6 +1060,9 @@ async function loadReport(month) {
     <div class="rp-top"><label class="small muted">Månad <select id="rp-month">${r.months.map(m => `<option value="${m}"${m === r.month ? ' selected' : ''}>${monthName(m)}</option>`).join('')}</select></label>
       <span class="muted small">Uppdaterad ${new Date(r.generated).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div>
     <h2 class="rp-title">Tradingresultat ${monthName(r.month)}</h2>
+    ${r.verdict ? `<div class="rp-box rp-verdict">${r.verdict.headline ? `<b>${esc(r.verdict.headline)}</b>` : ''}<ul>${r.verdict.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>` : ''}
+    <div class="rp-card"><img id="rp-card-img" alt="Resultatkort för ${esc(monthName(r.month))}"><button class="btn primary" id="rp-share">↗ Dela resultatkortet</button>
+      <p class="muted small">Delas som bild, till exempel till Discord. Bara siffror från rapporten, inga länkar till appen.</p></div>
     <p class="rp-line"><b>${S.closed} avslutade affärer.</b> ${S.wins} vinster, ${S.losses} förluster och ${S.breakeven} break-even.${S.open ? ` ${S.open} öppna affärer räknas den månad de stängs (se längre ner).` : ''}</p>
     <div class="calc-tiles">
       <div class="stat"><b class="num">${S.winRate == null ? '–' : sv(S.winRate) + ' %'}</b><span>vinstandel av alla ${S.closed} avslutade<br><span class="muted">break-even räknas inte som vinst</span></span></div>
@@ -1077,7 +1080,7 @@ async function loadReport(month) {
         <td class="r num small">${x.value != null ? `just nu ${sgn(x.value, x.unit)}` : '–'}</td></tr>`).join('')}</table>` : ''}
     <div class="rp-grid">
       <div class="rp-box"><b>Jämförelse</b>
-        <p>OMXS30 under månaden: <b>${sgn(r.benchmark.changePct, '%')}</b>.</p>
+        <p>${(r.benchmarks?.length ? r.benchmarks : [r.benchmark]).map(b => `${esc(b.name)} <b>${sgn(b.changePct, '%')}</b>`).join(' · ')} under månaden.</p>
         <p>Förväntan från tioårstestet: cirka <b>+${sv(r.expected.avgR)} R</b> per affär och TP1 i ${r.expected.tp1Rate} % av affärerna. En enskild månad kan avvika mycket åt båda hållen.</p></div>
       ${r.panic ? `<div class="rp-box"><b>Panikveckan</b>
         <p>${r.panic.trades} affärer${r.panic.open ? `, varav ${r.panic.open} öppna (just nu ${sgn(r.panic.nowPct, '%')} i snitt)` : ''}.</p>
@@ -1109,6 +1112,8 @@ async function loadReport(month) {
     <p class="muted small">Historiska resultat är ingen garanti för framtiden. Inte investeringsrådgivning.</p>
   </article>`;
   $('#rp-month').addEventListener('change', e => loadReport(e.target.value));
+  try { $('#rp-card-img').src = reportCardCanvas(r).toDataURL('image/png'); } catch { $('#rp-card-img').remove(); }
+  $('#rp-share').addEventListener('click', () => shareReportCard(r).catch(() => toast('Kunde inte dela bilden.')));
 }
 
 // Morgonsoffan med Glen: dagens morgonsession i text.
@@ -2049,6 +2054,7 @@ $('#ig-off').addEventListener('click', async () => {
 
 if (location.hash === '#ig') { setView('more'); openTool('ig'); }
 if (location.hash === '#manadens-aktier') { setView('more'); openTool('monthly'); }
+if (location.hash === '#rapport') { setView('more'); openTool('report'); }
 loadMonthlyTeaser();
 loadFearGreed();
 
@@ -2116,3 +2122,120 @@ async function runLookup() {
 }
 $('#lookup-q').addEventListener('input', () => { clearTimeout(lookupTimer); lookupTimer = setTimeout(runLookup, 350); });
 $('#lookup-q').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(lookupTimer); runLookup(); } });
+
+// Månadsrapporten som delbart kort (bild), i stil med ett resultatkort för Discord.
+// Ritas i webbläsaren och delas som PNG, inga externa bilder.
+function reportCardCanvas(r) {
+  const W = 1600, H = 900, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const G = '#9dff1f', G2 = '#39d353', R = '#ff3b3b', GR = '#b8bec4', WH = '#ffffff';
+  const sv = v => String(v).replace('.', ',');
+  const pct = v => v == null ? '–' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${sv(Math.abs(v).toFixed(1))} %`;
+  const font = (w, s, it = false) => `${it ? 'italic ' : ''}${w} ${s}px "Arial Black", "Helvetica Neue", Arial, sans-serif`;
+  const condensed = (txt, px, py, size, color, { w = 900, sx = 0.78, align = 'left', it = false, glow = null } = {}) => {
+    x.save(); x.font = font(w, size, it); x.fillStyle = color; x.textBaseline = 'alphabetic';
+    if (glow) { x.shadowColor = glow; x.shadowBlur = 24; }
+    const tw = x.measureText(txt).width * sx;
+    const ox = align === 'center' ? px - tw / 2 : align === 'right' ? px - tw : px;
+    x.translate(ox, py); x.scale(sx, 1); x.fillText(txt, 0, 0); x.restore(); return tw;
+  };
+  const rr = (px, py, w, h, rad) => { x.beginPath(); x.roundRect(px, py, w, h, rad); };
+  // Bakgrund: mörk med grönt sken och rutnät.
+  const bg = x.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#050807'); bg.addColorStop(1, '#0a1410'); x.fillStyle = bg; x.fillRect(0, 0, W, H);
+  const glow = x.createRadialGradient(W * 0.78, H * 0.3, 20, W * 0.78, H * 0.3, 700); glow.addColorStop(0, 'rgba(57,211,83,0.28)'); glow.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = glow; x.fillRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(157,255,31,0.06)'; x.lineWidth = 1;
+  for (let i = 0; i < W; i += 40) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, H); x.stroke(); }
+  for (let i = 0; i < H; i += 40) { x.beginPath(); x.moveTo(0, i); x.lineTo(W, i); x.stroke(); }
+  // Kurva till höger: månadens affärer i följd (summa procent/R), med pil.
+  const closed = r.rows.filter(t => t.result !== 'öppen' && t.result !== 'okänd' && t.value != null);
+  let acc = 0; const pts = [0, ...closed.map(t => (acc += Math.max(-3, Math.min(3, t.value))))];
+  const up = acc >= 0, col = up ? G : R;
+  const cx0 = 1010, cx1 = 1560, cy0 = 470, cy1 = 90, mn = Math.min(...pts), mx = Math.max(...pts, mn + 1);
+  const P = i => [cx0 + (cx1 - cx0) * i / Math.max(1, pts.length - 1), cy0 - (cy0 - cy1) * (pts[i] - mn) / (mx - mn)];
+  x.save(); x.shadowColor = col; x.shadowBlur = 30; x.strokeStyle = col; x.lineWidth = 9; x.lineJoin = 'round'; x.beginPath();
+  pts.forEach((_, i) => { const [a, b] = P(i); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.stroke();
+  const [ea, eb] = P(pts.length - 1), [pa, pb] = P(Math.max(0, pts.length - 2)), ang = Math.atan2(eb - pb, ea - pa);
+  x.fillStyle = col; x.beginPath(); x.moveTo(ea + 34 * Math.cos(ang), eb + 34 * Math.sin(ang));
+  x.lineTo(ea + 22 * Math.cos(ang + 2.4), eb + 22 * Math.sin(ang + 2.4)); x.lineTo(ea + 22 * Math.cos(ang - 2.4), eb + 22 * Math.sin(ang - 2.4)); x.fill(); x.restore();
+  // Ljusstakar som dekor bakom kurvan.
+  for (let i = 0; i < 26; i++) { const bx = 1000 + i * 22, h = 20 + ((i * 37) % 60), by = 520 - (up ? i * 12 : (26 - i) * 6) - h; x.fillStyle = (i * 7) % 3 ? 'rgba(57,211,83,0.22)' : 'rgba(255,59,59,0.18)'; x.fillRect(bx, by, 10, h); }
+  // Märke och rubrik.
+  x.font = font(700, 26); x.fillStyle = GR; x.textAlign = 'center'; x.fillText('TRENDJAKT', 330, 46); x.textAlign = 'left';
+  x.strokeStyle = GR; x.lineWidth = 2; x.beginPath(); x.moveTo(150, 37); x.lineTo(240, 37); x.moveTo(420, 37); x.lineTo(510, 37); x.stroke();
+  const monthTitle = new Date(r.month + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' }).toUpperCase();
+  condensed(monthTitle, 40, 150, 118, WH, { sx: 0.74 });
+  // Grönt band "TRADINGRESULTAT".
+  x.save(); const band = x.createLinearGradient(40, 0, 760, 0); band.addColorStop(0, '#6fd400'); band.addColorStop(0.5, G); band.addColorStop(1, '#6fd400');
+  x.fillStyle = band; x.beginPath(); x.moveTo(70, 165); x.lineTo(760, 165); x.lineTo(735, 222); x.lineTo(45, 222); x.closePath(); x.fill(); x.restore();
+  condensed('TRADINGRESULTAT', 402, 213, 56, '#06210a', { align: 'center', sx: 0.8 });
+  // Raden med antal.
+  const S = r.summary, decided = S.wins + S.losses;
+  let lx = 52; const seg = (t, colr) => { lx += condensed(t, lx, 272, 36, colr, { sx: 0.8 }) + 6; };
+  seg(`${S.closed} TRADES.`, WH); seg(`${S.wins} ${S.wins === 1 ? 'VINNARE' : 'VINNARE'}.`, G); seg(`${S.breakeven} BE.`, WH); seg(`${S.losses} ${S.losses === 1 ? 'FÖRLUST' : 'FÖRLUSTER'}.`, R);
+  // Vänster: affärerna.
+  const list = closed.slice(-16), boxY = 300, rowH = Math.min(34, Math.floor(470 / Math.max(8, list.length)));
+  x.save(); x.strokeStyle = G; x.lineWidth = 3; x.shadowColor = G; x.shadowBlur = 10; rr(40, boxY, 650, list.length * rowH + 24, 14); x.stroke(); x.restore();
+  x.fillStyle = 'rgba(0,0,0,0.55)'; rr(40, boxY, 650, list.length * rowH + 24, 14); x.fill();
+  const icon = (px, py, kind) => { x.beginPath(); x.arc(px, py, 11, 0, 7); x.fillStyle = kind === 'vinst' ? G2 : kind === 'förlust' ? R : '#8a9096'; x.fill();
+    x.strokeStyle = '#061006'; x.lineWidth = 3.2; x.beginPath();
+    if (kind === 'vinst') { x.moveTo(px - 5, py); x.lineTo(px - 1, py + 4); x.lineTo(px + 6, py - 4); } else if (kind === 'förlust') { x.moveTo(px - 4.5, py - 4.5); x.lineTo(px + 4.5, py + 4.5); x.moveTo(px + 4.5, py - 4.5); x.lineTo(px - 4.5, py + 4.5); } else { x.moveTo(px - 5, py); x.lineTo(px + 5, py); }
+    x.stroke(); };
+  const short = t => ({ 'Experiment': 'ASIEN', 'Panikvecka': 'PANIK', 'OMX': 'SWING', 'USA': 'USA', 'Krypto': 'KRYPTO', 'Blankning (AI)': 'AI' }[t] || '');
+  list.forEach((t, i) => {
+    const y = boxY + 22 + i * rowH + rowH / 2;
+    icon(66, y - 6, t.result);
+    const d = (t.exitDate || t.date); x.font = font(800, 19); x.fillStyle = WH; x.fillText(`${+d.slice(8)}/${+d.slice(5, 7)}`, 90, y);
+    x.fillText(t.name.replace(/ [ABC]$/, '').toUpperCase().slice(0, 14), 170, y);
+    x.font = font(700, 13); x.fillStyle = GR; x.fillText(short(t.type), 360, y);
+    x.font = font(800, 18); x.fillStyle = t.side === 'kort' ? R : G2; x.fillText(t.side === 'kort' ? 'SHORT' : 'LONG', 420, y);
+    icon(518, y - 6, t.result);
+    x.font = font(800, 18); x.fillStyle = t.result === 'förlust' ? R : t.result === 'vinst' ? G2 : GR;
+    x.fillText(`${t.result === 'vinst' ? 'VINST' : t.result === 'förlust' ? 'FÖRLUST' : 'BE'} ${t.unit === 'R' ? `${t.value > 0 ? '+' : ''}${sv(t.value)}R` : pct(t.value)}`, 538, y);
+  });
+  if (closed.length > list.length) { x.font = font(700, 16); x.fillStyle = GR; x.fillText(`+ ${closed.length - list.length} till i appen`, 60, boxY + list.length * rowH + 44); }
+  // Mitten: vinstandel och brickor.
+  const mx0 = 715, mw = 300;
+  x.save(); x.strokeStyle = G; x.lineWidth = 3; x.shadowColor = G; x.shadowBlur = 10; rr(mx0, boxY, mw, 230, 14); x.stroke(); x.restore();
+  x.fillStyle = 'rgba(0,0,0,0.55)'; rr(mx0, boxY, mw, 230, 14); x.fill();
+  const wr = decided ? Math.round(S.wins / decided * 1000) / 10 : null;
+  condensed(wr == null ? '–' : `${sv(wr)}%`, mx0 + mw / 2, boxY + 108, 96, G, { align: 'center', glow: G, sx: 0.8 });
+  condensed('WINRATE', mx0 + mw / 2, boxY + 168, 60, WH, { align: 'center', sx: 0.8 });
+  x.font = font(800, 15); x.fillStyle = G; x.textAlign = 'center'; x.fillText('PÅ AVGJORDA TRADES', mx0 + mw / 2, boxY + 196);
+  x.font = font(700, 13); x.fillStyle = GR; x.fillText(`(${S.wins} VINSTER AV ${decided} AVGJORDA)`, mx0 + mw / 2, boxY + 216); x.textAlign = 'left';
+  const tiles = [[S.closed, 'TRADES', WH], [S.wins, 'VINSTER', G], [S.breakeven, 'BE', GR], [S.losses, 'FÖRLUST', R]], tw = (mw - 15) / 4;
+  tiles.forEach(([v, l, colr], i) => { const tx = mx0 + i * (tw + 5), ty = boxY + 240;
+    x.fillStyle = 'rgba(0,0,0,0.6)'; rr(tx, ty, tw, 86, 10); x.fill(); x.strokeStyle = 'rgba(157,255,31,0.45)'; x.lineWidth = 2; rr(tx, ty, tw, 86, 10); x.stroke();
+    x.textAlign = 'center'; x.font = font(900, 32); x.fillStyle = colr; x.fillText(String(v), tx + tw / 2, ty + 46); x.font = font(700, 12); x.fillStyle = GR; x.fillText(l, tx + tw / 2, ty + 70); x.textAlign = 'left'; });
+  // Slogan till höger.
+  x.save(); x.translate(1360, 560); x.rotate(-0.08); x.textAlign = 'right';
+  x.font = font(900, 30, true); x.fillStyle = WH; x.fillText('PLANEN.', 200, 0); x.fillText('STOPPET.', 200, 36); x.fillStyle = G; x.fillText('TÅLAMODET.', 200, 72); x.restore();
+  // Nederst: jämförelse mot index och AI-tradern.
+  const cmp = [];
+  if (r.account) cmp.push(['AI-TRADERN', r.account.changePct, 'fiktivt konto']);
+  if (r.monthly?.retPct != null) cmp.push(['MÅNADENS AKTIER', r.monthly.retPct, r.monthly.open ? 'hittills' : 'med hävstång']);
+  if (r.panic?.closed) cmp.push(['PANIKVECKAN', r.panic.avgPct, 'snitt per affär']);
+  for (const b of r.benchmarks || []) cmp.push([b.name.toUpperCase(), b.changePct, 'index']);
+  const by0 = 690, bw = 1520 - 680, n = Math.max(1, cmp.length), cw = bw / n;
+  x.save(); x.strokeStyle = G; x.lineWidth = 3; x.shadowColor = G; x.shadowBlur = 10; rr(715, by0, 845, 150, 14); x.stroke(); x.restore();
+  x.fillStyle = 'rgba(0,0,0,0.6)'; rr(715, by0, 845, 150, 14); x.fill();
+  x.font = font(800, 17); x.fillStyle = WH; x.fillText('MÅNADEN MOT INDEX', 740, by0 + 32);
+  cmp.forEach(([name, v, sub], i) => { const tx = 730 + i * (820 / n) + (820 / n) / 2; x.textAlign = 'center';
+    x.font = font(900, 34); x.fillStyle = v > 0 ? G : v < 0 ? R : WH; x.fillText(pct(v), tx, by0 + 88);
+    x.font = font(800, 14); x.fillStyle = WH; x.fillText(name, tx, by0 + 114); x.font = font(600, 12); x.fillStyle = GR; x.fillText(sub, tx, by0 + 134); x.textAlign = 'left'; });
+  // Fotrad.
+  x.font = font(800, 20, true); x.fillStyle = WH; x.textAlign = 'center'; x.fillText('"HANDLA PLANEN, INTE KÄNSLAN"', W / 2, 880); x.textAlign = 'left';
+  x.strokeStyle = GR; x.lineWidth = 2; x.beginPath(); x.moveTo(420, 872); x.lineTo(560, 872); x.moveTo(1040, 872); x.lineTo(1180, 872); x.stroke();
+  return c;
+}
+async function shareReportCard(r) {
+  const c = reportCardCanvas(r);
+  const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  const name = `Trendjakt ${r.month}.png`, file = new File([blob], name, { type: 'image/png' });
+  const text = [r.verdict?.headline, ...(r.verdict?.lines || []).slice(0, 2)].filter(Boolean).join(' ');
+  try {
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: `Tradingresultat ${r.monthName || r.month}`, text }); return; }
+  } catch (err) { if (err?.name === 'AbortError') return; }
+  const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 5000);
+  toast('Bilden är sparad. Dra in den i Discord.');
+}

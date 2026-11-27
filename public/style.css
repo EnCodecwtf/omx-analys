@@ -695,3 +695,10 @@ ul.ai-log p { margin: 2px 0 0; color: var(--text-2); }
 .month-group[open] > summary::before { content: '▾'; }
 .done > summary .done-name::after { content: ' ›'; color: var(--muted); }
 .done[open] > summary .done-name::after { content: ' ⌄'; }
+
+/* Månadsrapportens sammanfattning och delbara resultatkort */
+.rp-verdict { border-left: 3px solid #9dff1f; margin: 8px 0 12px; }
+.rp-verdict ul { margin: 6px 0 0; padding-left: 18px; }
+.rp-card { margin: 10px 0 16px; }
+.rp-card img { width: 100%; height: auto; border-radius: 12px; display: block; margin-bottom: 8px; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
+.rp-card .btn { width: 100%; }

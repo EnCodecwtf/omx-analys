@@ -23,12 +23,12 @@ import { fearGreed, fgLabel } from './lib/feargreed.js';
 import { fetchProducts, recommend, avanzaUrl } from './lib/avanza.js';
 import { relevantPatterns } from './lib/patterns.js';
 import { cryptoSignal, cryptoBacktest, cryptoOutcome, completeBars } from './lib/crypto.js';
-import { panicPicks, panicOutcome, addTradingDays } from './lib/panic.js';
+import { panicPicks, panicOutcome, addTradingDays, isStockholmDay } from './lib/panic.js';
 import { coachTrade, coachTp, reachedDate } from './lib/coach.js';
 import { marketMoves, buildMorning } from './lib/morning.js';
 import { overnight } from './lib/overnight.js';
 import { runAiTrader, AI_START_CAPITAL } from './lib/aitrader.js';
-import { buildReport, frozenHash } from './lib/report.js';
+import { buildReport, frozenHash, reportVerdict } from './lib/report.js';
 import { macroOutcomes, nextKpifDates, fedWatch, OUTCOME_ORDER } from './lib/macrodata.js';
 import { fundamentals, shortRegister, shortFor, newsFor, technical, scoreShort, shortOutcome, SHORT_SIZE } from './lib/shortlab.js';
 
@@ -1251,6 +1251,8 @@ async function liveCheck({ force = false } = {}) {
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
   try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   try { sent.push(...await monthlyJumpCheck()); } catch (err) { console.error('Månadens aktier, säljregeln:', err.message); }
+  // Månadsrapporten: sista handelsdagen efter USA:s stängning, annars nästa morgon.
+  try { const m = await monthReportNotify(s); if (m) sent.push(`månadsrapport ${m}`); } catch (err) { console.error('Månadsrapporten:', err.message); }
   // Knock-out-varning: ett papper i Månadens aktier som är mindre än 15 % från sin knock-out (en gång per papper och månad).
   if (usOpen) {
     try {
@@ -1269,6 +1271,40 @@ async function liveCheck({ force = false } = {}) {
 
 // Samlat backtest för alla instrument. Tar några sekunder, så det räknas i
 // bakgrunden och hämtas separat av gränssnittet.
+// Månadsrapporten: alla avslutade affärer, AI-tradern och index (OMXS30, S&P 500, Nasdaq).
+async function monthReport(m) {
+  const out = await withOutcomes();
+  const months = [...new Set(out.filter(e => e.exitDate && e.state !== 'öppen' && e.state !== 'väntar på köp').map(e => e.exitDate.slice(0, 7)))].sort().reverse();
+  const month = /^\d{4}-\d{2}$/.test(m || '') ? m : today().slice(0, 7);
+  const [ai, omx, spx, ndx, mv] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => []), fetchBars('^GSPC').catch(() => []), fetchBars('^IXIC').catch(() => []), monthlyView().catch(() => null)]);
+  // Månadens aktier: perioden för rapportens månad (beslutad vid förra månadsskiftet) och AI-traderns del.
+  const per = mv?.periods.find(p => p.month === month) || null;
+  const monthlyPart = per ? { ...per, rules: mv.rules, aiPart: ai?.monthly && ai.monthly.month === month ? { value: ai.monthly.value, amount: ai.monthly.amount, pnlPct: ai.monthly.pnlPct, edge: ai.monthly.edge } : null } : null;
+  const r = { months: months.includes(today().slice(0, 7)) ? months : [today().slice(0, 7), ...months], ...buildReport({ month, entries: out, ai, omx, spx, ndx }), monthly: monthlyPart };
+  r.monthName = new Date(month + '-15T12:00:00Z').toLocaleDateString('sv-SE', { month: 'long' });
+  r.verdict = reportVerdict(r);
+  return r;
+}
+// Notis med månadsrapporten: sista handelsdagen efter USA:s stängning (22.05), annars nästa
+// morgon. En gång per månad.
+async function monthReportNotify(s) {
+  if (s.weekend || !isStockholmDay(s.date)) return null;
+  const lastDay = !addTradingDays(s.date, 1).startsWith(s.date.slice(0, 7));
+  const prevMonth = (() => { const d = new Date(s.date.slice(0, 7) + '-01T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
+  let month = null;
+  if (lastDay && s.min >= 22 * 60 + 5) month = s.date.slice(0, 7);
+  else if (s.min >= 7 * 60 && s.min < 12 * 60 && !(await signalLog.kvGet('omx-analys:report-sent:' + prevMonth, null))) month = prevMonth;
+  if (!month || !await signalLog.markWarning(`report|${month}`)) return null;
+  const r = await monthReport(month);
+  await signalLog.kvSet('omx-analys:report-sent:' + month, true);
+  const body = [r.verdict.headline, ...r.verdict.lines.slice(0, 3)].filter(Boolean).join(' ');
+  const title = `📊 Månadsrapport ${r.monthName}`;
+  let ok = false;
+  try { ok = !!(await notifyText(title, body, { symbol: 'rapport' })); } catch { /* ntfy är valfritt */ }
+  try { await pushAll({ title, body, url: '/#rapport', tag: 'rapport' }); ok = true; } catch { /* push är valfritt */ }
+  return ok ? month : null;
+}
+
 async function summary() {
   return cached('summary', async () => {
     const trades = [];
@@ -1554,15 +1590,7 @@ export default async function handler(req, res) {
     }
     // Månadsrapport: alla signaler i månaden, ärligt räknat. ?month=ÅÅÅÅ-MM (standard: innevarande).
     if (url.pathname === '/api/report') {
-      const out = await withOutcomes();
-      // Månader med avslutade affärer (rapporten räknar efter säljdatum).
-      const months = [...new Set(out.filter(e => e.exitDate && e.state !== 'öppen' && e.state !== 'väntar på köp').map(e => e.exitDate.slice(0, 7)))].sort().reverse();
-      const month = /^\d{4}-\d{2}$/.test(url.searchParams.get('month') || '') ? url.searchParams.get('month') : today().slice(0, 7);
-      const [ai, omx, mv] = await Promise.all([aiTrader().catch(() => null), fetchBars('^OMX').catch(() => []), monthlyView().catch(() => null)]);
-      // Månadens aktier: perioden för rapportens månad (beslutad vid förra månadsskiftet) och AI-traderns del.
-      const per = mv?.periods.find(p => p.month === month) || null;
-      const monthlyPart = per ? { ...per, rules: mv.rules, aiPart: ai?.monthly && ai.monthly.month === month ? { value: ai.monthly.value, amount: ai.monthly.amount, pnlPct: ai.monthly.pnlPct, edge: ai.monthly.edge } : null } : null;
-      return send(res, 200, { months: months.includes(today().slice(0, 7)) ? months : [today().slice(0, 7), ...months], ...buildReport({ month, entries: out, ai, omx }), monthly: monthlyPart });
+      return send(res, 200, await monthReport(url.searchParams.get('month')));
     }
     // Det som publicerades (frysta nivåer och tid), för ögonblicksbilderna på GitHub.
     if (url.pathname === '/api/log-frozen') {
