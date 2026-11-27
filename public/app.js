@@ -1058,7 +1058,7 @@ async function loadReport(month) {
   const badgeOf = x => ({ vinst: '<span class="rp-b win">VINST</span>', förlust: '<span class="rp-b loss">FÖRLUST</span>', 'break-even': '<span class="rp-b be">BREAK-EVEN</span>', öppen: '<span class="rp-b open">ÖPPEN</span>' }[x.result] || '<span class="rp-b">–</span>');
   el.innerHTML = `<article class="card tool-card report">
     <div class="rp-top"><label class="small muted">Månad <select id="rp-month">${r.months.map(m => `<option value="${m}"${m === r.month ? ' selected' : ''}>${monthName(m)}</option>`).join('')}</select></label>
-      <span class="muted small">Uppdaterad ${new Date(r.generated).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></div>
+      <span class="muted small">${r.final ? `Släppt ${new Date(r.releasedAt).toLocaleString('sv-SE', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} · låst` : `Preliminär, uppdaterad ${new Date(r.generated).toLocaleString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}. Den fullständiga rapporten släpps den 1:a.`}</span></div>
     <h2 class="rp-title">Tradingresultat ${monthName(r.month)}</h2>
     ${r.verdict ? `<div class="rp-box rp-verdict">${r.verdict.headline ? `<b>${esc(r.verdict.headline)}</b>` : ''}<ul>${r.verdict.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>` : ''}
     <div class="rp-card"><img id="rp-card-img" alt="Resultatkort för ${esc(monthName(r.month))}"><button class="btn primary" id="rp-share">↗ Dela resultatkortet</button>

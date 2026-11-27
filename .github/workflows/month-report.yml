@@ -1,0 +1,13 @@
+# Månadsrapporten släpps den 1:a varje månad kl 08 svensk tid (även helg) för
+# månaden som just tagit slut. Körs flera gånger som reserv; appen släpper bara en gång.
+name: Månadsrapport
+on:
+  schedule:
+    - cron: '5 7,8,10 1 * *'
+  workflow_dispatch:
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: curl -fsS -m 240 "https://omx-analys.vercel.app/api/cron/report?key=${{ secrets.CRON_SECRET }}"

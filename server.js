@@ -1251,8 +1251,8 @@ async function liveCheck({ force = false } = {}) {
   // Månadens aktier: slutligt besked strax före stängningen på bytesdagen.
   try { for (const kind of ['final', 'reminder']) { const k = await monthlyNotify(kind); if (k) sent.push(`månadens aktier ${k}`); } } catch (err) { console.error('Månadens aktier:', err.message); }
   try { sent.push(...await monthlyJumpCheck()); } catch (err) { console.error('Månadens aktier, säljregeln:', err.message); }
-  // Månadsrapporten: sista handelsdagen efter USA:s stängning, annars nästa morgon.
-  try { const m = await monthReportNotify(s); if (m) sent.push(`månadsrapport ${m}`); } catch (err) { console.error('Månadsrapporten:', err.message); }
+  // Månadsrapporten: reserv om den schemalagda släppningen den 1:a missades.
+  try { const m = await monthReportRelease(s); if (m) sent.push(`månadsrapport ${m}`); } catch (err) { console.error('Månadsrapporten:', err.message); }
   // Knock-out-varning: ett papper i Månadens aktier som är mindre än 15 % från sin knock-out (en gång per papper och månad).
   if (usOpen) {
     try {
@@ -1272,7 +1272,11 @@ async function liveCheck({ force = false } = {}) {
 // Samlat backtest för alla instrument. Tar några sekunder, så det räknas i
 // bakgrunden och hämtas separat av gränssnittet.
 // Månadsrapporten: alla avslutade affärer, AI-tradern och index (OMXS30, S&P 500, Nasdaq).
-async function monthReport(m) {
+async function monthReport(m, { live = false } = {}) {
+  if (!live && /^\d{4}-\d{2}$/.test(m || '')) {
+    const fin = await signalLog.kvGet(REPORT_FINAL(m), null).catch(() => null);
+    if (fin) { const cur = await monthReport(today().slice(0, 7), { live: true }).catch(() => null); return { ...fin, months: cur?.months ? [...new Set([...cur.months, ...fin.months])].sort().reverse() : fin.months }; }
+  }
   const out = await withOutcomes();
   const months = [...new Set(out.filter(e => e.exitDate && e.state !== 'öppen' && e.state !== 'väntar på köp').map(e => e.exitDate.slice(0, 7)))].sort().reverse();
   const month = /^\d{4}-\d{2}$/.test(m || '') ? m : today().slice(0, 7);
@@ -1285,24 +1289,24 @@ async function monthReport(m) {
   r.verdict = reportVerdict(r);
   return r;
 }
-// Notis med månadsrapporten: sista handelsdagen efter USA:s stängning (22.05), annars nästa
-// morgon. En gång per månad.
-async function monthReportNotify(s) {
-  if (s.weekend || !isStockholmDay(s.date)) return null;
-  const lastDay = !addTradingDays(s.date, 1).startsWith(s.date.slice(0, 7));
-  const prevMonth = (() => { const d = new Date(s.date.slice(0, 7) + '-01T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
-  let month = null;
-  if (lastDay && s.min >= 22 * 60 + 5) month = s.date.slice(0, 7);
-  else if (s.min >= 7 * 60 && s.min < 12 * 60 && !(await signalLog.kvGet('omx-analys:report-sent:' + prevMonth, null))) month = prevMonth;
-  if (!month || !await signalLog.markWarning(`report|${month}`)) return null;
-  const r = await monthReport(month);
-  await signalLog.kvSet('omx-analys:report-sent:' + month, true);
+// Månadsrapporten släpps den 1:a varje månad kl 08 (även helg) för månaden som just tagit slut.
+// Den låses vid släppet: rapporten sparas och visas sedan oförändrad. Missas den 1:a
+// (GitHub hoppar ibland över körningar) släpps den nästa gång appen anropas under morgonen.
+const REPORT_FINAL = m => 'omx-analys:report-final:' + m;
+const prevMonthOf = d => { const x = new Date(d.slice(0, 7) + '-01T12:00:00Z'); x.setUTCMonth(x.getUTCMonth() - 1); return x.toISOString().slice(0, 7); };
+async function monthReportRelease(s, { force = false } = {}) {
+  const month = prevMonthOf(s.date);
+  if (!force && (+s.date.slice(8) > 3 || s.min < 8 * 60 || s.min > 14 * 60)) return null;
+  if (await signalLog.kvGet(REPORT_FINAL(month), null)) return null;
+  const r = await monthReport(month, { live: true }); // räknas först, så att ett fel inte spärrar släppet
+  if (!await signalLog.markWarning(`report|${month}`)) return null;
+  r.final = true; r.releasedAt = new Date().toISOString();
+  await signalLog.kvSet(REPORT_FINAL(month), r);
+  const title = `📊 Månadsrapport ${r.monthName} är släppt`;
   const body = [r.verdict.headline, ...r.verdict.lines.slice(0, 3)].filter(Boolean).join(' ');
-  const title = `📊 Månadsrapport ${r.monthName}`;
-  let ok = false;
-  try { ok = !!(await notifyText(title, body, { symbol: 'rapport' })); } catch { /* ntfy är valfritt */ }
-  try { await pushAll({ title, body, url: '/#rapport', tag: 'rapport' }); ok = true; } catch { /* push är valfritt */ }
-  return ok ? month : null;
+  try { await notifyText(title, body, { symbol: 'rapport' }); } catch { /* ntfy är valfritt */ }
+  try { await pushAll({ title, body, url: '/#rapport', tag: 'rapport' }); } catch { /* push är valfritt */ }
+  return month;
 }
 
 async function summary() {
@@ -1640,6 +1644,10 @@ export default async function handler(req, res) {
       res.writeHead(r.status, headers);
       res.end(Buffer.from(await r.arrayBuffer()));
       return;
+    }
+    if (url.pathname === '/api/cron/report') {
+      const m = await monthReportRelease(sthlm(), { force: url.searchParams.get('force') === '1' });
+      return send(res, 200, { ok: true, released: m });
     }
     if (url.pathname === '/api/cron/morning') {
       const s = sthlm();
